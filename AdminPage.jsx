@@ -3,84 +3,62 @@ import {
     ChevronLeft, Package, Receipt, TrendingUp, ShoppingBag,
     Plus, Edit3, Trash2, Save, X, Upload, Image as ImageIcon,
     QrCode, Sparkles, ArrowUpRight, ScanLine, Search, Grid,
-    List as ListIcon, MoreHorizontal, Camera, RefreshCcw
+    List as ListIcon, MoreHorizontal, Camera
 } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
-// --- Scanner Component (Safe Mode) ---
+// --- Scanner Component (Simplified - Like QRScanner.jsx) ---
 const BarcodeScanner = ({ onResult, onClose }) => {
-    const [error, setError] = useState(null);
-    const [cameras, setCameras] = useState([]);
-    const [camIndex, setCamIndex] = useState(0);
-    const [isSwitching, setIsSwitching] = useState(false);
     const scannerRef = useRef(null);
+    const [error, setError] = useState(null);
 
-    // 1. Lấy danh sách Camera
     useEffect(() => {
-        Html5Qrcode.getCameras().then(devices => {
-            if (devices && devices.length) {
-                setCameras(devices);
-                // Tìm cam sau
-                const backCam = devices.findIndex(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('sau'));
-                if (backCam !== -1) setCamIndex(backCam);
-                else setCamIndex(devices.length - 1); // Mặc định cam cuối
-            }
-        }).catch(err => {
-            console.error(err);
-            setError("Lỗi quyền truy cập Camera");
-        });
-    }, []);
+        const scannerId = "reader";
 
-    // 2. Start Scanner
-    useEffect(() => {
-        if (cameras.length === 0) return;
-
+        // Logic "Simple is Best" - Kế thừa từ QRScanner.jsx
         const startScanner = async () => {
-            const currentCamId = cameras[camIndex].id;
-
-            // Cleanup previous instance
+            // Cleanup nếu còn sót lại
             if (scannerRef.current) {
                 try {
                     await scannerRef.current.stop();
                     scannerRef.current.clear();
-                } catch (e) { console.log(e); }
+                } catch (e) { }
             }
 
-            const html5QrCode = new Html5Qrcode("reader");
+            const html5QrCode = new Html5Qrcode(scannerId);
             scannerRef.current = html5QrCode;
 
             try {
                 await html5QrCode.start(
-                    currentCamId,
+                    { facingMode: "environment" }, // Tự động chọn Cam sau
                     {
-                        fps: 10, // Giảm FPS xuống 10 để ổn định
+                        fps: 10,
                         qrbox: { width: 250, height: 250 },
                         aspectRatio: 1.0,
-                        // KHÔNG set videoConstraints resolution để tránh lỗi màn hình đen trên cam yếu
+                        disableFlip: false
                     },
                     (decodedText) => {
                         html5QrCode.stop().then(() => {
                             onResult(decodedText);
                             const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-                            audio.play().catch(() => { });
+                            audio.play().catch(e => { });
                         });
                     },
-                    () => { }
+                    (errorMessage) => { /* ignore */ }
                 );
-                setError(null);
             } catch (err) {
-                console.error("Start failed", err);
-                setError(`Không thể mở Camera ${camIndex + 1}. Hãy thử cam khác.`);
+                console.error(err);
+                setError("Lỗi Camera. Hãy đảm bảo bạn cho phép quyền truy cập.");
             }
-            setIsSwitching(false);
         };
 
-        const timer = setTimeout(startScanner, 300); // Delay start to prevent conflicts
+        // Delay nhẹ để UI render xong div#reader
+        const timer = setTimeout(startScanner, 100);
         return () => clearTimeout(timer);
 
-    }, [camIndex, cameras, onResult]);
+    }, [onResult]);
 
     // Cleanup khi đóng modal
     useEffect(() => {
@@ -91,45 +69,30 @@ const BarcodeScanner = ({ onResult, onClose }) => {
         };
     }, []);
 
-    const handleSwitch = () => {
-        if (cameras.length > 1 && !isSwitching) {
-            setIsSwitching(true);
-            setCamIndex(prev => (prev + 1) % cameras.length);
-        }
-    };
-
     return (
         <div className="fixed inset-0 bg-black z-[120] flex flex-col items-center justify-center">
-            <div className="absolute top-6 right-6 flex flex-col gap-4 z-50">
-                <button onClick={handleSwitch} disabled={isSwitching} className="text-white p-3 bg-white/20 rounded-full backdrop-blur-md active:scale-90 transition-all shadow-lg">
-                    <RefreshCcw size={24} className={isSwitching ? 'animate-spin' : ''} />
-                </button>
-                <button onClick={onClose} className="text-white p-3 bg-red-500/80 rounded-full backdrop-blur-md active:scale-90 transition-all shadow-lg">
-                    <X size={24} />
-                </button>
-            </div>
-
+            <button onClick={onClose} className="absolute top-6 right-6 text-white p-3 bg-white/20 rounded-full z-50 backdrop-blur-md active:scale-90 transition-all">
+                <X size={28} />
+            </button>
             <div className="w-full h-full relative flex flex-col items-center justify-center bg-black">
                 <div id="reader" className="w-full max-w-lg aspect-square bg-black overflow-hidden rounded-lg"></div>
 
                 {/* Overlay Basic */}
                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                    <div className="w-[260px] h-[260px] border-2 border-white/50 rounded-lg relative">
-                        <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-red-500"></div>
+                    <div className="w-[260px] h-[260px] border-2 border-white/50 rounded-lg relative shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
+                        <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-red-500 animate-[ping_2s_infinite]"></div>
                     </div>
                 </div>
 
-                <div className="absolute bottom-10 flex flex-col items-center gap-2">
-                    {cameras.length > 0 && <p className="text-white/50 text-[12px]">Cam {camIndex + 1}: {cameras[camIndex]?.label}</p>}
+                <div className="absolute bottom-20 flex flex-col items-center gap-2">
                     {error && <p className="text-red-300 bg-red-900/80 px-4 py-2 rounded-lg font-bold">{error}</p>}
-                    {!error && isSwitching && <p className="text-white animate-pulse">Đang chuyển camera...</p>}
+                    {!error && <p className="text-white/80 animate-pulse bg-black/40 px-3 py-1 rounded-full backdrop-blur-md">Đưa mã vạch vào khung</p>}
                 </div>
             </div>
         </div>
     );
 };
 
-// ... Include lại AdminPage và ProductGridItem để đảm bảo file vẹn toàn ...
 const ProductGridItem = ({ p, onEdit, onDelete }) => (
     <div onClick={() => onEdit(p)} className="bg-white rounded-[1.5rem] overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-[#F5F5F7] active:scale-[0.98] transition-all relative group">
         <div className={`absolute top-2 left-2 px-2 py-1 rounded-lg text-[10px] font-bold z-10 backdrop-blur-md ${p.stock <= 5 ? 'bg-red-500/90 text-white' : 'bg-white/90 text-[#1D1D1F] shadow-sm'}`}>Kho: {p.stock}</div>
