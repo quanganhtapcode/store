@@ -11,7 +11,7 @@ const POSView = ({
     selectedCategory,
     setSelectedCategory,
     addToCart,
-    setView,
+    onAdminClick,
     setShowScanner,
     cart,
     checkout,
@@ -19,11 +19,9 @@ const POSView = ({
 }) => {
     const [showCartDetail, setShowCartDetail] = useState(false);
 
-    // Expand products: Split products with case pricing into 2 separate entries
     const expandedProducts = useMemo(() => {
         const result = [];
         products.forEach(p => {
-            // Always add retail version
             result.push({
                 ...p,
                 saleType: 'unit',
@@ -32,7 +30,6 @@ const POSView = ({
                 isRetail: true
             });
 
-            // If has case price, add case version as separate product
             if (p.case_price > 0) {
                 result.push({
                     ...p,
@@ -112,7 +109,6 @@ const POSView = ({
 
     return (
         <div className="flex flex-col h-full bg-[#F5F5F7] font-['Inter']">
-            {/* Header */}
             <header className="bg-white/80 backdrop-blur-md sticky top-0 z-30 px-4 py-3 border-b border-[#D2D2D7]/30">
                 <div className="flex gap-2 items-center">
                     <div className="relative flex-1">
@@ -132,7 +128,7 @@ const POSView = ({
                         <QrCode size={16} />
                     </button>
                     <button
-                        onClick={() => setView('admin')}
+                        onClick={onAdminClick}
                         className="w-9 h-9 bg-white border border-[#D2D2D7] text-[#1D1D1F] rounded-full flex items-center justify-center active:bg-gray-50 transition-colors"
                     >
                         <Settings size={16} />
@@ -164,7 +160,6 @@ const POSView = ({
                     </section>
                 ) : (
                     <>
-                        {/* Section: Bán chạy */}
                         <section className="mb-8">
                             <div className="px-5 mb-4 flex items-center justify-between">
                                 <h3 className="text-[13px] font-bold text-[#1D1D1F] tracking-tight">Thịnh hành</h3>
@@ -175,7 +170,6 @@ const POSView = ({
                             </div>
                         </section>
 
-                        {/* Section: Theo Hãng */}
                         {Object.entries(productsByBrand).map(([brand, items]) => (
                             <section key={brand} className="mb-8">
                                 <div className="px-5 mb-3 flex items-center justify-between">
@@ -191,7 +185,6 @@ const POSView = ({
                 )}
             </main>
 
-            {/* Cart Detail Modal */}
             {showCartDetail && (
                 <div className="fixed inset-0 bg-[#1D1D1F]/60 backdrop-blur-sm z-[100] flex items-end">
                     <div className="bg-white w-full max-h-[70vh] rounded-t-[2.5rem] p-6 animate-in slide-in-from-bottom-10">
@@ -259,7 +252,6 @@ const POSView = ({
                 </div>
             )}
 
-            {/* Cart */}
             {cart.length > 0 && (
                 <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-48px)] max-w-[340px] z-50">
                     <div

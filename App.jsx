@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import QRScanner from './QRScanner';
 import POSView from './POSView';
-import AdminView from './AdminView';
+import AdminPage from './AdminPage';
 import ReceiptModal from './ReceiptModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 const App = () => {
-    const [view, setView] = useState('pos');
+    const navigate = useNavigate();
     const [products, setProducts] = useState([]);
     const [history, setHistory] = useState([]);
     const [cart, setCart] = useState([]);
@@ -17,8 +18,6 @@ const App = () => {
     // UI States
     const [showReceipt, setShowReceipt] = useState(false);
     const [lastOrder, setLastOrder] = useState(null);
-    const [aiLoading, setAiLoading] = useState(false);
-    const [aiResponse, setAiResponse] = useState(null);
     const [showScanner, setShowScanner] = useState(false);
 
     // Fetch Data from SQL API
@@ -41,7 +40,6 @@ const App = () => {
         fetchData();
     }, []);
 
-    // --- ACTIONS ---
     const handleScanResult = (code) => {
         const product = products.find(p => p.code === code || p.id === code);
         if (product) {
@@ -80,62 +78,40 @@ const App = () => {
                 setLastOrder(order);
                 setCart([]);
                 setShowReceipt(true);
-                fetchData(); // Refresh stock
+                fetchData();
             }
         } catch (error) {
             console.error("Checkout failed:", error);
         }
     };
 
-    const askGemini = async (prompt, system) => {
-        setAiLoading(true);
-        const apiKey = "";
-        try {
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }],
-                    systemInstruction: { parts: [{ text: system }] }
-                })
-            });
-            const data = await res.json();
-            setAiResponse(data.candidates?.[0]?.content?.parts?.[0]?.text || "Không có phản hồi từ AI.");
-        } catch (e) {
-            setAiResponse("Lỗi AI: Vui lòng kiểm tra API Key.");
-        } finally {
-            setAiLoading(false);
-        }
-    };
-
     return (
-        <div className="max-w-md mx-auto h-screen relative overflow-hidden font-['Inter']">
-            {view === 'pos' ? (
-                <POSView
-                    products={products}
-                    searchTerm={searchTerm}
-                    setSearchTerm={setSearchTerm}
-                    selectedCategory={selectedCategory}
-                    setSelectedCategory={setSelectedCategory}
-                    addToCart={addToCart}
-                    setView={setView}
-                    setShowScanner={setShowScanner}
-                    cart={cart}
-                    checkout={checkout}
-                    setCart={setCart}
-                />
-            ) : (
-                <AdminView
-                    setView={setView}
-                    history={history}
-                    askGemini={askGemini}
-                    aiLoading={aiLoading}
-                    aiResponse={aiResponse}
-                    setAiResponse={setAiResponse}
-                    products={products}
-                    refreshData={fetchData}
-                />
-            )}
+        <>
+            <Routes>
+                <Route path="/" element={
+                    <POSView
+                        products={products}
+                        searchTerm={searchTerm}
+                        setSearchTerm={setSearchTerm}
+                        selectedCategory={selectedCategory}
+                        setSelectedCategory={setSelectedCategory}
+                        addToCart={addToCart}
+                        onAdminClick={() => navigate('/admin')}
+                        setShowScanner={setShowScanner}
+                        cart={cart}
+                        checkout={checkout}
+                        setCart={setCart}
+                    />
+                } />
+                <Route path="/admin/*" element={
+                    <AdminPage
+                        products={products}
+                        history={history}
+                        refreshData={fetchData}
+                        onBackToPos={() => navigate('/')}
+                    />
+                } />
+            </Routes>
 
             {showScanner && (
                 <QRScanner
@@ -158,7 +134,7 @@ const App = () => {
                     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
                 `}}
             />
-        </div>
+        </>
     );
 };
 

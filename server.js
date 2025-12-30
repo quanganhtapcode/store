@@ -10,7 +10,8 @@ const app = express();
 const port = 3001;
 
 app.use(cors());
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '50mb' })); // Support large base64 images
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
 const dbPath = path.join(__dirname, 'pos.db');
 const db = new sqlite3.Database(dbPath);
@@ -41,32 +42,37 @@ db.serialize(() => {
     db.get("SELECT COUNT(*) as count FROM products", (err, row) => {
         if (row && row.count === 0) {
             console.log("Importing products from CSV...");
-            fs.createReadStream(path.join(__dirname, 'san_pham_2025-12-30.csv'))
-                .pipe(csv())
-                .on('data', (data) => {
-                    const id = data['Mã sản phẩm'];
-                    const name = data['Tên sản phẩm'];
-                    const brand = data['Thương hiệu'];
-                    const category = data['Danh mục'];
-                    const price = parseInt(data['Giá lẻ (VND)']) || 0;
-                    const case_price = parseInt(data['Giá thùng (VND)']) || 0;
-                    const units_per_case = parseInt(data['Số lượng/thùng']) || 1;
-                    const stock = 100; // Default stock for demo
-                    const code = data['Mã sản phẩm'];
-                    const image = data['Hình ảnh'];
+            const csvPath = path.join(__dirname, 'san_pham_2025-12-30.csv');
+            if (fs.existsSync(csvPath)) {
+                fs.createReadStream(csvPath)
+                    .pipe(csv())
+                    .on('data', (data) => {
+                        const id = data['Mã sản phẩm'];
+                        const name = data['Tên sản phẩm'];
+                        const brand = data['Thương hiệu'];
+                        const category = data['Danh mục'];
+                        const price = parseInt(data['Giá lẻ (VND)']) || 0;
+                        const case_price = parseInt(data['Giá thùng (VND)']) || 0;
+                        const units_per_case = parseInt(data['Số lượng/thùng']) || 1;
+                        const stock = 100;
+                        const code = data['Mã sản phẩm'];
+                        const image = data['Hình ảnh'];
 
-                    db.run(`INSERT INTO products (id, name, brand, category, price, case_price, units_per_case, stock, code, image) 
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                        [id, name, brand, category, price, case_price, units_per_case, stock, code, image]);
-                })
-                .on('end', () => {
-                    console.log('CSV import finished.');
-                });
+                        db.run(`INSERT INTO products (id, name, brand, category, price, case_price, units_per_case, stock, code, image) 
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                            [id, name, brand, category, price, case_price, units_per_case, stock, code, image]);
+                    })
+                    .on('end', () => {
+                        console.log('CSV import finished.');
+                    });
+            }
         }
     });
 });
 
-// APIs
+// === PRODUCT APIs ===
+
+// Get all products
 app.get('/api/products', (req, res) => {
     db.all("SELECT * FROM products", [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -74,19 +80,48 @@ app.get('/api/products', (req, res) => {
     });
 });
 
-app.put('/api/products/:id', (req, res) => {
-    const { id } = req.params;
-    const { name, price, case_price, units_per_case } = req.body;
+// Add new product
+app.post('/api/products', (req, res) => {
+    const { name, brand, category, price, case_price, units_per_case, stock, code, image } = req.body;
+    const id = `PROD-${Date.now()}`;
 
     db.run(
-        `UPDATE products SET name = ?, price = ?, case_price = ?, units_per_case = ? WHERE id = ?`,
-        [name, price, case_price || 0, units_per_case || 1, id],
+        `INSERT INTO products (id, name, brand, category, price, case_price, units_per_case, stock, code, image) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, name, brand || '', category || '', price, case_price || 0, units_per_case || 1, stock || 0, code || '', image || ''],
+        function (err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ id, success: true });
+        }
+    );
+});
+
+// Update product
+app.put('/api/products/:id', (req, res) => {
+    const { id } = req.params;
+    const { name, brand, category, price, case_price, units_per_case, stock, code, image } = req.body;
+
+    db.run(
+        `UPDATE products SET name = ?, brand = ?, category = ?, price = ?, case_price = ?, units_per_case = ?, stock = ?, code = ?, image = ? WHERE id = ?`,
+        [name, brand, category, price, case_price || 0, units_per_case || 1, stock, code || '', image || '', id],
         function (err) {
             if (err) return res.status(500).json({ error: err.message });
             res.json({ updated: this.changes });
         }
     );
 });
+
+// Delete product
+app.delete('/api/products/:id', (req, res) => {
+    const { id } = req.params;
+
+    db.run(`DELETE FROM products WHERE id = ?`, [id], function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ deleted: this.changes });
+    });
+});
+
+// === ORDER APIs ===
 
 app.get('/api/orders', (req, res) => {
     db.all("SELECT * FROM orders ORDER BY timestamp DESC", [], (err, rows) => {
@@ -108,7 +143,7 @@ app.post('/api/orders', (req, res) => {
         function (err) {
             if (err) return res.status(500).json({ error: err.message });
 
-            // Update stock: If selling by case, deduct corresponding unit quantity
+            // Update stock
             const updatePromises = items.map(item => {
                 const qtyToDeduct = item.saleType === 'case' ? (item.quantity * item.units_per_case) : item.quantity;
                 return new Promise((resolve, reject) => {
@@ -127,5 +162,6 @@ app.post('/api/orders', (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log(`Server running at http://localhost:${port}`);
+    console.log(`🚀 Gemini POS API running at http://localhost:${port}`);
+    console.log(`📦 Database: ${dbPath}`);
 });
