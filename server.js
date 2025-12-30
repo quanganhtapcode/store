@@ -11,7 +11,7 @@ const app = express();
 const port = 3001;
 
 // --- Middlewares ---
-app.use(cors({ origin: true, credentials: true })); // Allow all for dev convenience, tighten in prod
+app.use(cors({ origin: '*', credentials: true })); // Allow all origins explicitly to fix CORS issues on Vercel
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
@@ -20,10 +20,8 @@ const imagesDir = path.join(__dirname, 'public/images');
 if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir, { recursive: true });
 app.use('/images', express.static(imagesDir));
 
-// Phục vụ các folder ảnh chất lượng cao
-app.use('/original', express.static(path.join(__dirname, 'original')));
-app.use('/grid', express.static(path.join(__dirname, 'grid')));
-app.use('/detail', express.static(path.join(__dirname, 'detail')));
+// Served via /images from public/images
+// Structure will be: /images/original/..., /images/grid/..., /images/detail/...
 
 const dbPath = path.join(__dirname, 'pos.db');
 const db = new sqlite3.Database(dbPath);
