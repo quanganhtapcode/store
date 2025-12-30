@@ -3,91 +3,48 @@ import {
     ChevronLeft, Package, Receipt, TrendingUp, ShoppingBag,
     Plus, Edit3, Trash2, Save, X, Upload, Image as ImageIcon,
     QrCode, Sparkles, ArrowUpRight, ScanLine, Search, Grid,
-    List as ListIcon, MoreHorizontal, Camera
+    List as ListIcon, MoreHorizontal, Camera, Calendar, FileText, CheckCircle, XCircle, Clock
 } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
-// --- Scanner Component (Simplified - Like QRScanner.jsx) ---
+// --- Scanner Component (Simplified) ---
 const BarcodeScanner = ({ onResult, onClose }) => {
     const scannerRef = useRef(null);
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        const scannerId = "reader";
-
-        // Logic "Simple is Best" - Kế thừa từ QRScanner.jsx
         const startScanner = async () => {
-            // Cleanup nếu còn sót lại
             if (scannerRef.current) {
-                try {
-                    await scannerRef.current.stop();
-                    scannerRef.current.clear();
-                } catch (e) { }
+                try { await scannerRef.current.stop(); scannerRef.current.clear(); } catch (e) { }
             }
-
-            const html5QrCode = new Html5Qrcode(scannerId);
+            const html5QrCode = new Html5Qrcode("reader");
             scannerRef.current = html5QrCode;
-
             try {
                 await html5QrCode.start(
-                    { facingMode: "environment" }, // Tự động chọn Cam sau
-                    {
-                        fps: 10,
-                        qrbox: { width: 250, height: 250 },
-                        aspectRatio: 1.0,
-                        disableFlip: false
-                    },
+                    { facingMode: "environment" },
+                    { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
                     (decodedText) => {
                         html5QrCode.stop().then(() => {
                             onResult(decodedText);
-                            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-                            audio.play().catch(e => { });
+                            new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play().catch(e => { });
                         });
                     },
-                    (errorMessage) => { /* ignore */ }
+                    (errorMessage) => { }
                 );
-            } catch (err) {
-                console.error(err);
-                setError("Lỗi Camera. Hãy đảm bảo bạn cho phép quyền truy cập.");
-            }
+            } catch (err) { setError("Lỗi Camera."); }
         };
-
-        // Delay nhẹ để UI render xong div#reader
-        const timer = setTimeout(startScanner, 100);
-        return () => clearTimeout(timer);
-
+        setTimeout(startScanner, 100);
+        return () => { if (scannerRef.current?.isScanning) scannerRef.current.stop().catch(console.error); };
     }, [onResult]);
-
-    // Cleanup khi đóng modal
-    useEffect(() => {
-        return () => {
-            if (scannerRef.current?.isScanning) {
-                scannerRef.current.stop().catch(console.error);
-            }
-        };
-    }, []);
 
     return (
         <div className="fixed inset-0 bg-black z-[120] flex flex-col items-center justify-center">
-            <button onClick={onClose} className="absolute top-6 right-6 text-white p-3 bg-white/20 rounded-full z-50 backdrop-blur-md active:scale-90 transition-all">
-                <X size={28} />
-            </button>
+            <button onClick={onClose} className="absolute top-6 right-6 text-white p-3 bg-white/20 rounded-full z-50 backdrop-blur-md active:scale-90 transition-all"><X size={28} /></button>
             <div className="w-full h-full relative flex flex-col items-center justify-center bg-black">
                 <div id="reader" className="w-full max-w-lg aspect-square bg-black overflow-hidden rounded-lg"></div>
-
-                {/* Overlay Basic */}
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                    <div className="w-[260px] h-[260px] border-2 border-white/50 rounded-lg relative shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
-                        <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-red-500 animate-[ping_2s_infinite]"></div>
-                    </div>
-                </div>
-
-                <div className="absolute bottom-20 flex flex-col items-center gap-2">
-                    {error && <p className="text-red-300 bg-red-900/80 px-4 py-2 rounded-lg font-bold">{error}</p>}
-                    {!error && <p className="text-white/80 animate-pulse bg-black/40 px-3 py-1 rounded-full backdrop-blur-md">Đưa mã vạch vào khung</p>}
-                </div>
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center"><div className="w-[260px] h-[260px] border-2 border-white/50 rounded-lg relative shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]"><div className="absolute top-1/2 left-0 right-0 h-[1px] bg-red-500 animate-[ping_2s_infinite]"></div></div></div>
             </div>
         </div>
     );
@@ -114,21 +71,54 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
     const [activeTab, setActiveTab] = useState('products');
     const [editingProduct, setEditingProduct] = useState(null);
     const [showAddProduct, setShowAddProduct] = useState(false);
+
+    // Order State
+    const [orders, setOrders] = useState([]);
     const [selectedOrder, setSelectedOrder] = useState(null);
+    const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
+
+    // Logs State
+    const [logs, setLogs] = useState([]);
+
+    // Product Pagination
     const [displayLimit, setDisplayLimit] = useState(20);
     const [searchTerm, setSearchTerm] = useState('');
 
-    const today = new Date().toLocaleDateString();
-    const todayOrders = useMemo(() => history.filter(o => new Date(o.timestamp).toLocaleDateString() === today), [history, today]);
-    const revenue = useMemo(() => todayOrders.reduce((s, o) => s + o.total, 0), [todayOrders]);
+    // Fetch Extended Data
+    const fetchOrders = useCallback(async () => {
+        let url = `${API_URL}/orders`;
+        if (dateFilter.start && dateFilter.end) {
+            url += `?startDate=${dateFilter.start}&endDate=${dateFilter.end}`;
+        }
+        const res = await fetch(url);
+        const data = await res.json();
+        setOrders(data);
+    }, [dateFilter]);
 
-    // Filter & Virtualization Logic
+    const fetchLogs = useCallback(async () => {
+        const res = await fetch(`${API_URL}/logs`);
+        const data = await res.json();
+        setLogs(data);
+    }, []);
+
+    useEffect(() => {
+        if (activeTab === 'orders') fetchOrders();
+        if (activeTab === 'logs') fetchLogs();
+    }, [activeTab, fetchOrders, fetchLogs]);
+
     const filteredProducts = useMemo(() => products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || (p.code && p.code.includes(searchTerm))), [products, searchTerm]);
     const displayedProducts = useMemo(() => filteredProducts.slice(0, displayLimit), [filteredProducts, displayLimit]);
+
     const handleScroll = (e) => { if (e.target.scrollHeight - e.target.scrollTop <= e.target.clientHeight + 200 && displayLimit < filteredProducts.length) setDisplayLimit(prev => prev + 20); };
     const handleDeleteProduct = async (id) => { if (!confirm('Xóa sản phẩm này?')) return; try { await fetch(`${API_URL}/products/${id}`, { method: 'DELETE' }); refreshData(); } catch (e) { } };
+    const handleUpdateOrder = async (id, data) => {
+        try {
+            await fetch(`${API_URL}/orders/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+            fetchOrders(); setSelectedOrder(null);
+        } catch (e) { alert('Lỗi update đơn'); }
+    };
 
-    // Tabs
+    // --- TABS UI ---
     const ProductsTab = () => (
         <div className="space-y-4">
             <div className="sticky top-0 bg-[#F5F5F7] z-10 pb-2 pt-1">
@@ -148,28 +138,65 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
     );
 
     const OrdersTab = () => (
-        <div className="space-y-3 pb-20">
-            {selectedOrder ? (
-                <div className="bg-white rounded-[2rem] p-6 shadow-lg animate-in slide-in-from-right-10">
-                    <div className="flex justify-between items-center mb-6">
-                        <button onClick={() => setSelectedOrder(null)} className="flex items-center gap-1 text-[#0071E3] font-bold text-[14px]"><ChevronLeft size={18} /> Quay lại</button>
-                        <span className="font-bold text-[#1D1D1F]">#{selectedOrder.id.toString().slice(-5)}</span>
-                    </div>
-                    <div className="space-y-3">{selectedOrder.items.map((item, idx) => (<div key={idx} className="flex justify-between py-2 border-b border-[#F5F5F7] last:border-0"><div><p className="font-bold text-[14px]">{item.displayName}</p><p className="text-[12px] text-[#86868B]">{item.quantity} x {item.finalPrice?.toLocaleString()}đ</p></div><span className="font-bold">{((item.finalPrice || item.price) * item.quantity).toLocaleString()}đ</span></div>))}</div>
+        <div className="space-y-4 pb-20">
+            {/* Filter Bar */}
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#F5F5F7] flex flex-wrap gap-3 items-center">
+                <div className="flex items-center gap-2 bg-[#F9F9FA] px-3 py-2 rounded-xl border border-[#E8E8ED]">
+                    <Calendar size={16} className="text-[#86868B]" />
+                    <input type="date" className="bg-transparent text-[13px] font-bold outline-none" value={dateFilter.start} onChange={e => setDateFilter({ ...dateFilter, start: e.target.value })} />
+                    <span className="text-[#D2D2D7]">-</span>
+                    <input type="date" className="bg-transparent text-[13px] font-bold outline-none" value={dateFilter.end} onChange={e => setDateFilter({ ...dateFilter, end: e.target.value })} />
                 </div>
+                <button onClick={fetchOrders} className="px-4 py-2 bg-[#0071E3] text-white rounded-xl text-[13px] font-bold shadow-lg shadow-blue-500/20 active:scale-95 transition-all">Lọc</button>
+            </div>
+
+            {selectedOrder ? (
+                <OrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} onUpdate={handleUpdateOrder} />
             ) : (
-                history.map(o => (<div key={o.id} onClick={() => setSelectedOrder(o)} className="bg-white p-4 rounded-2xl flex justify-between items-center shadow-sm border border-[#F5F5F7] active:scale-[0.98] transition-all"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-[#E8E8ED] rounded-xl flex items-center justify-center text-[#1D1D1F] font-bold text-[12px]">#{o.id.toString().slice(-4)}</div><div><p className="font-bold text-[#1D1D1F] text-[15px]">{o.total.toLocaleString()}đ</p><p className="text-[11px] text-[#86868B]">{new Date(o.timestamp).toLocaleString()}</p></div></div><ChevronLeft size={18} className="rotate-180 text-[#D2D2D7]" /></div>))
+                <div className="space-y-3">
+                    {orders.map(o => (
+                        <div key={o.id} onClick={() => setSelectedOrder(o)} className="bg-white p-4 rounded-2xl flex justify-between items-center shadow-sm border border-[#F5F5F7] active:scale-[0.98] transition-all cursor-pointer">
+                            <div className="flex items-center gap-4">
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-[18px] ${o.status === 'cancelled' ? 'bg-red-100 text-red-600' : 'bg-[#E8E8ED] text-[#1D1D1F]'}`}>
+                                    {o.status === 'cancelled' ? <XCircle size={24} /> : (o.payment_method === 'transfer' ? 'CK' : 'TM')}
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-bold text-[#1D1D1F] text-[16px]">#{o.id}</span>
+                                        <span className="text-[12px] px-2 py-0.5 bg-[#F5F5F7] text-[#86868B] rounded-md font-medium">{o.customer_name || 'Khách lẻ'}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <Clock size={12} className="text-[#86868B]" />
+                                        <p className="text-[12px] text-[#86868B]">{new Date(o.timestamp).toLocaleString()}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <p className="font-black text-[#1D1D1F] text-[16px]">{o.total?.toLocaleString()}đ</p>
+                                <p className={`text-[11px] font-bold ${o.status === 'cancelled' ? 'text-red-500' : 'text-emerald-600'}`}>
+                                    {o.status === 'cancelled' ? 'Đã hủy' : 'Hoàn thành'}
+                                </p>
+                            </div>
+                        </div>
+                    ))}
+                    {orders.length === 0 && <div className="text-center py-10 text-[#86868B]">Không có đơn hàng nào</div>}
+                </div>
             )}
         </div>
     );
 
-    const DashboardTab = () => (
-        <div className="space-y-4 pb-20">
-            <div className="bg-[#1D1D1F] text-white p-6 rounded-[2rem] shadow-xl">
-                <p className="text-[13px] text-white/60 mb-1 font-bold uppercase tracking-wider">Doanh thu hôm nay</p>
-                <h2 className="text-[36px] font-black tracking-tight">{revenue.toLocaleString()}đ</h2>
-                <div className="mt-4 flex gap-3"><div className="bg-white/10 px-3 py-1.5 rounded-lg text-[12px] font-medium backdrop-blur-md">{todayOrders.length} đơn hàng</div></div>
-            </div>
+    const LogsTab = () => (
+        <div className="space-y-3 pb-20">
+            {logs.map((log, i) => (
+                <div key={i} className="bg-white p-4 rounded-xl border border-[#F5F5F7] flex gap-3 items-start">
+                    <div className="mt-1 w-2 h-2 rounded-full bg-[#0071E3] shrink-0"></div>
+                    <div>
+                        <p className="text-[13px] font-bold text-[#1D1D1F]">{log.action}</p>
+                        <p className="text-[12px] text-[#86868B] mt-0.5">{log.details}</p>
+                        <p className="text-[10px] text-[#D2D2D7] mt-1">{new Date(log.timestamp).toLocaleString()}</p>
+                    </div>
+                </div>
+            ))}
         </div>
     );
 
@@ -181,16 +208,17 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
                     <span className="font-black text-[16px]">Quản trị</span>
                     <div className="w-9"></div>
                 </div>
-                <div className="flex bg-[#F5F5F7] p-1 rounded-2xl">
-                    {[{ id: 'dashboard', l: 'Tổng quan' }, { id: 'products', l: 'Sản phẩm' }, { id: 'orders', l: 'Đơn hàng' }].map(t => (
-                        <button key={t.id} onClick={() => setActiveTab(t.id)} className={`flex-1 py-2 rounded-xl text-[12px] font-bold transition-all ${activeTab === t.id ? 'bg-white shadow-sm text-[#1D1D1F]' : 'text-[#86868B]'}`}>{t.l}</button>
+                <div className="flex bg-[#F5F5F7] p-1 rounded-2xl overflow-x-auto scrollbar-hide">
+                    {[{ id: 'products', l: 'Kho hàng' }, { id: 'orders', l: 'Đơn hàng' }, { id: 'logs', l: 'Nhật ký' }].map(t => (
+                        <button key={t.id} onClick={() => setActiveTab(t.id)} className={`flex-1 py-2 px-4 rounded-xl text-[12px] font-bold whitespace-nowrap transition-all ${activeTab === t.id ? 'bg-white shadow-sm text-[#1D1D1F]' : 'text-[#86868B]'}`}>{t.l}</button>
                     ))}
                 </div>
             </div>
             <main className="flex-1 overflow-y-auto p-4 scroll-smooth" onScroll={handleScroll}>
-                <div className="max-w-4xl mx-auto">{activeTab === 'dashboard' && <DashboardTab />}{activeTab === 'products' && <ProductsTab />}{activeTab === 'orders' && <OrdersTab />}</div>
+                <div className="max-w-4xl mx-auto">{activeTab === 'products' && <ProductsTab />}{activeTab === 'orders' && <OrdersTab />}{activeTab === 'logs' && <LogsTab />}</div>
             </main>
             {(editingProduct || showAddProduct) && <ProductModal product={editingProduct} onClose={() => { setEditingProduct(null); setShowAddProduct(false) }} onSave={() => { refreshData(); setEditingProduct(null); setShowAddProduct(false) }} />}
+            {selectedOrder && <OrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} onUpdate={handleUpdateOrder} />}
         </div>
     );
 };
@@ -218,10 +246,61 @@ const ProductModal = ({ product, onClose, onSave }) => {
                         </div>
                         <div className="bg-[#F9F9FA] p-4 rounded-2xl border border-[#F5F5F7]"><label className="text-[11px] font-bold uppercase text-[#86868B] mb-2 block">Giá thùng & Quy cách</label><div className="flex gap-3"><input type="number" value={formData.case_price} onChange={e => setFormData({ ...formData, case_price: parseInt(e.target.value) || 0 })} placeholder="Giá thùng" className="flex-1 bg-white p-3 rounded-xl font-bold text-emerald-600 outline-none" /><input type="number" value={formData.units_per_case} onChange={e => setFormData({ ...formData, units_per_case: parseInt(e.target.value) || 1 })} placeholder="SL/Thùng" className="w-24 bg-white p-3 rounded-xl font-medium outline-none text-center" /></div></div>
                         <div><label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Mã vạch</label><div className="relative mt-1"><input value={formData.code || ''} onChange={e => setFormData({ ...formData, code: e.target.value })} placeholder="Quét hoặc nhập mã..." className="w-full bg-[#F9F9FA] pl-4 pr-12 py-3.5 rounded-xl font-mono text-[14px] outline-none" /><button onClick={() => setIsScanning(true)} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-white rounded-lg shadow-sm border border-[#E8E8ED] hover:scale-105 transition-transform"><ScanLine size={18} className="text-[#1D1D1F]" /></button></div></div>
-                        <div className="grid grid-cols-2 gap-3"><input value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} placeholder="Danh mục" className="bg-[#F9F9FA] p-3 rounded-xl text-[13px] outline-none" /><input value={formData.brand} onChange={e => setFormData({ ...formData, brand: e.target.value })} placeholder="Thương hiệu" className="bg-[#F9F9FA] p-3 rounded-xl text-[13px] outline-none" /></div>
                     </div>
                 </div>
                 <div className="p-4 border-t border-[#F5F5F7]"><button onClick={handleSubmit} className="w-full bg-[#0071E3] text-white py-4 rounded-2xl font-bold text-[16px] shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-transform">Lưu sản phẩm</button></div>
+            </div>
+        </div>
+    );
+};
+
+const OrderDetailModal = ({ order, onClose, onUpdate }) => {
+    const [note, setNote] = useState(order.note || '');
+
+    return (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center animate-in fade-in">
+            <div className="bg-white w-full sm:max-w-lg h-[90vh] sm:h-auto rounded-t-[2rem] sm:rounded-[2rem] flex flex-col shadow-2xl animate-in slide-in-from-bottom-20 overflow-hidden">
+                <div className="p-4 border-b border-[#F5F5F7] flex justify-between items-center"><h3 className="font-bold text-[16px]">Đơn hàng #{order.id}</h3><button onClick={onClose} className="p-2 bg-[#F5F5F7] rounded-full hover:bg-[#E8E8ED]"><X size={20} /></button></div>
+                <div className="flex-1 overflow-y-auto p-5">
+                    <div className="flex justify-between items-start mb-6">
+                        <div>
+                            <p className="text-[#86868B] text-[12px] uppercase font-bold">Khách hàng</p>
+                            <p className="font-bold text-[15px]">{order.customer_name || 'Khách lẻ'}</p>
+                            <p className="text-[13px] text-[#86868B] mt-1">{new Date(order.timestamp).toLocaleString()}</p>
+                        </div>
+                        <div className="text-right">
+                            <span className={`px-3 py-1 rounded-lg text-[12px] font-bold ${order.status === 'cancelled' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>{order.status === 'cancelled' ? 'Đã hủy' : 'Hoàn thành'}</span>
+                        </div>
+                    </div>
+
+                    <div className="space-y-3 mb-6">
+                        {order.items.map((item, i) => (
+                            <div key={i} className="flex justify-between py-2 border-b border-[#F5F5F7] last:border-0">
+                                <div>
+                                    <p className="font-bold text-[14px]">{item.displayName}</p>
+                                    <p className="text-[12px] text-[#86868B]">{item.quantity} x {item.finalPrice?.toLocaleString() || item.price?.toLocaleString()}đ</p>
+                                </div>
+                                <span className="font-medium">{(item.quantity * (item.finalPrice || item.price)).toLocaleString()}đ</span>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="bg-[#F9F9FA] p-4 rounded-2xl mb-4">
+                        <label className="text-[11px] font-bold uppercase text-[#86868B] block mb-2">Ghi chú</label>
+                        <textarea className="w-full bg-transparent outline-none text-[13px]" rows={3} placeholder="Ghi chú đơn hàng..." value={note} onChange={e => setNote(e.target.value)}></textarea>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-4 border-t border-[#F5F5F7]">
+                        <span className="font-bold text-[#86868B]">Tổng tiền</span>
+                        <span className="font-black text-[24px] text-[#0071E3]">{order.total?.toLocaleString()}đ</span>
+                    </div>
+                </div>
+                <div className="p-4 border-t border-[#F5F5F7] flex gap-3">
+                    {order.status !== 'cancelled' && (
+                        <button onClick={() => onUpdate(order.id, { status: 'cancelled', note })} className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-bold text-[14px] hover:bg-red-100 transition-colors">Hủy đơn</button>
+                    )}
+                    <button onClick={() => { onUpdate(order.id, { note }); onClose(); }} className="flex-1 py-3 bg-[#1D1D1F] text-white rounded-xl font-bold text-[14px] hover:bg-black transition-colors">Cập nhật & Đóng</button>
+                </div>
             </div>
         </div>
     );
