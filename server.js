@@ -5,48 +5,46 @@ const bodyParser = require('body-parser');
 const csv = require('csv-parser');
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
 
 const app = express();
 const port = 3001;
 
-// --- CORS Configuration ---
-const allowedOrigins = [
-    'https://store-six-fawn.vercel.app',
-    'https://store-git-main-quanganhtapcodes-projects.vercel.app',
-    'http://localhost:3000',
-    'http://localhost:5173'
-];
-
-app.use(cors({
-    origin: function (origin, callback) {
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.some(o => origin.startsWith(o)) || origin.includes('vercel.app')) {
-            callback(null, true);
-        } else {
-            console.log('Blocked by CORS:', origin);
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true
-}));
-
+// --- Middlewares ---
+app.use(cors({ origin: true, credentials: true })); // Allow all for dev convenience, tighten in prod
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
+
+// --- Static Image Serving (Tối ưu tốc độ) ---
+const imagesDir = path.join(__dirname, 'public/images');
+if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir, { recursive: true });
+app.use('/images', express.static(imagesDir));
 
 const dbPath = path.join(__dirname, 'pos.db');
 const db = new sqlite3.Database(dbPath);
 
-// --- Helpers ---
+// --- Professional Helpers ---
+const generateId = (prefix) => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < 8; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
+    return `${prefix}-${result}`; // Ex: PRD-A1B2C3D4
+};
+
+const generateOrderCode = (index) => {
+    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const seq = String(index).padStart(4, '0');
+    return `ORD-${date}-${seq}`;
+};
+
 const logActivity = (action, details) => {
     const timestamp = Date.now();
     db.run(`INSERT INTO activity_logs (action, details, timestamp) VALUES (?, ?, ?)`, [action, details, timestamp]);
 };
 
-// --- Database Initialization & Migration ---
+// --- Database Init ---
 db.serialize(() => {
-    // 1. Table Products
+    // 1. PRODUCTS (Thêm total_sold)
     db.run(`CREATE TABLE IF NOT EXISTS products (
         id TEXT PRIMARY KEY,
         name TEXT,
@@ -57,36 +55,24 @@ db.serialize(() => {
         units_per_case INTEGER,
         stock INTEGER,
         code TEXT,
-        image TEXT
+        image TEXT,
+        total_sold INTEGER DEFAULT 0
     )`);
 
-    // 2. Table Orders (Enhanced)
+    // 2. ORDERS (Thêm order_code)
     db.run(`CREATE TABLE IF NOT EXISTS orders (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_code TEXT,
         total INTEGER,
         timestamp INTEGER,
         items TEXT,
         customer_name TEXT,
-        payment_method TEXT, -- 'cash', 'transfer'
-        status TEXT, -- 'completed', 'cancelled'
+        payment_method TEXT, 
+        status TEXT,
         note TEXT
     )`);
 
-    // 2.1 Migration: Add missing columns to orders if they don't exist
-    const ensureColumn = (table, column, type) => {
-        db.all(`PRAGMA table_info(${table})`, (err, rows) => {
-            if (!rows.some(r => r.name === column)) {
-                console.log(`Migrating: Adding ${column} to ${table}`);
-                db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
-            }
-        });
-    };
-    ensureColumn('orders', 'customer_name', 'TEXT');
-    ensureColumn('orders', 'payment_method', 'TEXT');
-    ensureColumn('orders', 'status', 'TEXT');
-    ensureColumn('orders', 'note', 'TEXT');
-
-    // 3. Table Activity Logs
+    // 3. LOGS
     db.run(`CREATE TABLE IF NOT EXISTS activity_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         action TEXT,
@@ -94,168 +80,168 @@ db.serialize(() => {
         timestamp INTEGER
     )`);
 
-    // Import CSV loop logic (Keep existing logic)
-    db.get("SELECT COUNT(*) as count FROM products", (err, row) => {
-        if (row && row.count === 0) {
-            const csvPath = path.join(__dirname, 'san_pham_2025-12-30.csv');
-            if (fs.existsSync(csvPath)) {
-                fs.createReadStream(csvPath)
-                    .pipe(csv())
-                    .on('data', (data) => {
-                        const id = data['Mã sản phẩm'];
-                        if (!id) return;
-                        const name = data['Tên sản phẩm'];
-                        const brand = data['Thương hiệu'] || '';
-                        const category = data['Danh mục'] || '';
-                        const price = parseInt(data['Giá lẻ (VND)']) || 0;
-                        const case_price = parseInt(data['Giá thùng (VND)']) || 0;
-                        const units_per_case = parseInt(data['Số lượng/thùng']) || 1;
-                        const stock = 100;
-                        const code = data['Mã sản phẩm'];
-                        const image = data['Hình ảnh'] || '';
+    // 4. IMPORT NOTES (Phiếu nhập hàng - Chuyên nghiệp)
+    db.run(`CREATE TABLE IF NOT EXISTS import_notes (
+        id TEXT PRIMARY KEY,
+        timestamp INTEGER,
+        total_cost INTEGER,
+        note TEXT,
+        items TEXT -- JSON list of imported items
+    )`);
 
-                        db.run(`INSERT INTO products (id, name, brand, category, price, case_price, units_per_case, stock, code, image) 
-                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                            [id, name, brand, category, price, case_price, units_per_case, stock, code, image]);
-                    });
-                logActivity('SYSTEM_IMPORT', 'Imported initial products from CSV');
+    // Migration logic (Safe column adding)
+    const addCol = (tbl, col, type) => {
+        db.all(`PRAGMA table_info(${tbl})`, (e, r) => {
+            if (!r.some(x => x.name === col)) {
+                db.run(`ALTER TABLE ${tbl} ADD COLUMN ${col} ${type}`);
             }
-        }
-    });
+        });
+    };
+    addCol('products', 'total_sold', 'INTEGER DEFAULT 0');
+    addCol('orders', 'order_code', 'TEXT');
 });
 
-// --- API Endpoints ---
+// --- Image Download Utility ---
+const downloadImage = (url, filename) => {
+    return new Promise((resolve, reject) => {
+        const filepath = path.join(imagesDir, filename);
+        const file = fs.createWriteStream(filepath);
+        https.get(url, response => {
+            response.pipe(file);
+            file.on('finish', () => {
+                file.close();
+                resolve(`/images/${filename}`);
+            });
+        }).on('error', err => {
+            fs.unlink(filepath, () => { }); // Delete partial
+            reject(err);
+        });
+    });
+};
 
-// 1. Products
+// --- APIs ---
+
+// PRODUCTS
 app.get('/api/products', (req, res) => {
-    db.all("SELECT * FROM products", [], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
+    // Sắp xếp theo bán chạy (total_sold) để hiển thị Thịnh hành
+    db.all("SELECT * FROM products ORDER BY total_sold DESC, name ASC", [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err });
         res.json(rows);
     });
 });
 
+// Chức năng mới: Sync Images (Tải ảnh từ URL về server local)
+app.post('/api/products/sync-images', async (req, res) => {
+    db.all("SELECT id, image FROM products WHERE image LIKE 'http%'", [], async (err, rows) => {
+        if (err) return res.json({ error: err.message });
+
+        let count = 0;
+        for (const row of rows) {
+            try {
+                const ext = path.extname(row.image) || '.jpg';
+                const filename = `${row.id}${ext}`;
+                const localPath = await downloadImage(row.image, filename);
+
+                db.run("UPDATE products SET image = ? WHERE id = ?", [localPath, row.id]);
+                count++;
+            } catch (e) { console.error(`Failed to dl image for ${row.id}`, e); }
+        }
+        res.json({ processed: count });
+    });
+});
+
 app.post('/api/products', (req, res) => {
-    const { name, brand, category, price, case_price, units_per_case, stock, code, image } = req.body;
-    const id = `PROD-${Date.now()}`;
-    db.run(`INSERT INTO products (id, name, brand, category, price, case_price, units_per_case, stock, code, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id, name, brand || '', category || '', price, case_price || 0, units_per_case || 1, stock || 0, code || '', image || ''],
+    const p = req.body;
+    const id = generateId('PRD'); // ID Chuyên nghiệp 10 ký tự
+    db.run(`INSERT INTO products (id, name, brand, category, price, case_price, units_per_case, stock, code, image, total_sold) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+        [id, p.name, p.brand, p.category, p.price, p.case_price, p.units_per_case, p.stock, p.code, p.image],
         function (err) {
             if (err) return res.status(500).json({ error: err.message });
-            logActivity('ADD_PRODUCT', `Added product: ${name}`);
+            logActivity('ADD_PRODUCT', `Added ${p.name}`);
             res.json({ id, success: true });
         }
     );
 });
 
-app.put('/api/products/:id', (req, res) => {
-    const { id } = req.params;
-    const { name, brand, category, price, case_price, units_per_case, stock, code, image } = req.body;
-    db.run(`UPDATE products SET name=?, brand=?, category=?, price=?, case_price=?, units_per_case=?, stock=?, code=?, image=? WHERE id=?`,
-        [name, brand, category, price, case_price, units_per_case, stock, code, image, id],
+// ORDERS
+app.post('/api/orders', (req, res) => {
+    const { total, items, timestamp, customer_name, payment_method, note } = req.body;
+
+    // Tạo mã đơn hàng chuyên nghiệp
+    db.get("SELECT COUNT(*) as count FROM orders", (err, row) => {
+        const orderCode = generateOrderCode((row?.count || 0) + 1);
+        const itemsStr = JSON.stringify(items);
+
+        db.run(`INSERT INTO orders (order_code, total, timestamp, items, customer_name, payment_method, status, note) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [orderCode, total, timestamp, itemsStr, customer_name || 'Khách lẻ', payment_method || 'cash', 'completed', note || ''],
+            function (err) {
+                if (err) return res.status(500).json({ error: err.message });
+
+                // Trừ kho & Tăng lượt bán (Trending logic)
+                items.forEach(item => {
+                    const qty = item.saleType === 'case' ? (item.quantity * item.units_per_case) : item.quantity;
+                    // Logic update thông minh: Giảm tồn kho, Tăng đã bán
+                    db.run(`UPDATE products SET stock = stock - ?, total_sold = total_sold + ? WHERE id = ?`,
+                        [qty, qty, item.id]);
+                });
+
+                logActivity('CREATE_ORDER', `New Order ${orderCode} - ${total}đ`);
+                res.json({ id: this.lastID, order_code: orderCode });
+            });
+    });
+});
+
+// STATS (Thống kê cho Admin)
+app.get('/api/stats', (req, res) => {
+    const today = new Date().setHours(0, 0, 0, 0);
+    const firstDayOfMonth = new Date(new Date().setDate(1)).setHours(0, 0, 0, 0);
+
+    db.serialize(() => {
+        const result = {};
+
+        // Doanh thu hôm nay
+        db.all("SELECT total FROM orders WHERE timestamp >= ?", [today], (e, r) => {
+            result.todayRevenue = r.reduce((ack, x) => ack + x.total, 0);
+            result.todayOrders = r.length;
+
+            // Doanh thu tháng
+            db.all("SELECT total FROM orders WHERE timestamp >= ?", [firstDayOfMonth], (e2, r2) => {
+                result.monthRevenue = r2.reduce((ack, x) => ack + x.total, 0);
+
+                // Top sản phẩm bán chạy
+                db.all("SELECT name, total_sold FROM products ORDER BY total_sold DESC LIMIT 5", (e3, r3) => {
+                    result.topProducts = r3;
+                    res.json(result);
+                });
+            });
+        });
+    });
+});
+
+// IMPORT (Nhập hàng)
+app.post('/api/imports', (req, res) => {
+    const { items, total_cost, note } = req.body;
+    const id = generateId('IMP');
+    const timestamp = Date.now();
+
+    db.run(`INSERT INTO import_notes (id, timestamp, total_cost, note, items) VALUES (?, ?, ?, ?, ?)`,
+        [id, timestamp, total_cost, note, JSON.stringify(items)],
         function (err) {
             if (err) return res.status(500).json({ error: err.message });
-            logActivity('UPDATE_PRODUCT', `Updated product: ${name} (${id})`);
-            res.json({ updated: this.changes });
+
+            // Tăng số lượng tồn kho
+            items.forEach(item => {
+                db.run(`UPDATE products SET stock = stock + ? WHERE id = ?`, [item.quantity, item.id]);
+            });
+
+            logActivity('IMPORT_STOCK', `Imported Stock ${id} - ${total_cost}đ`);
+            res.json({ success: true, id });
         }
     );
 });
 
-app.delete('/api/products/:id', (req, res) => {
-    const { id } = req.params;
-    db.run(`DELETE FROM products WHERE id=?`, [id], function (err) {
-        if (err) return res.status(500).json({ error: err.message });
-        logActivity('DELETE_PRODUCT', `Deleted product ID: ${id}`);
-        res.json({ deleted: this.changes });
-    });
-});
-
-// 2. Orders (Enhanced with Filter & Update)
-app.get('/api/orders', (req, res) => {
-    const { startDate, endDate } = req.query;
-    let query = "SELECT * FROM orders";
-    let params = [];
-
-    if (startDate && endDate) {
-        // Assume format YYYY-MM-DD
-        const start = new Date(startDate).setHours(0, 0, 0, 0);
-        const end = new Date(endDate).setHours(23, 59, 59, 999);
-        query += " WHERE timestamp BETWEEN ? AND ?";
-        params = [start, end];
-    }
-
-    query += " ORDER BY timestamp DESC";
-
-    db.all(query, params, (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        const processedRows = rows.map(r => ({
-            ...r,
-            items: JSON.parse(r.items || '[]')
-        }));
-        res.json(processedRows);
-    });
-});
-
-app.post('/api/orders', (req, res) => {
-    const { total, items, timestamp, customer_name, payment_method, note } = req.body;
-    const itemsStr = JSON.stringify(items);
-
-    db.run(`INSERT INTO orders (total, timestamp, items, customer_name, payment_method, status, note) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [total, timestamp, itemsStr, customer_name || 'Khách lẻ', payment_method || 'cash', 'completed', note || ''],
-        function (err) {
-            if (err) return res.status(500).json({ error: err.message });
-
-            // Update stock
-            const updatePromises = items.map(item => {
-                const qty = item.saleType === 'case' ? (item.quantity * item.units_per_case) : item.quantity;
-                return new Promise((resolve) => {
-                    db.run(`UPDATE products SET stock = stock - ? WHERE id = ?`, [qty, item.id], resolve);
-                });
-            });
-
-            Promise.all(updatePromises).then(() => {
-                logActivity('CREATE_ORDER', `Created Order #${this.lastID} - Total: ${total}`);
-                res.json({ id: this.lastID });
-            });
-        });
-});
-
-app.put('/api/orders/:id', (req, res) => {
-    const { id } = req.params;
-    const { customer_name, payment_method, note, status, total, items } = req.body;
-
-    // Logic updates could be complex (restocking if cancelled). 
-    // For now, simple update of fields.
-    let sql = `UPDATE orders SET customer_name=?, payment_method=?, note=?`;
-    let params = [customer_name, payment_method, note];
-
-    if (status) {
-        sql += `, status=?`;
-        params.push(status);
-    }
-    if (total && items) {
-        sql += `, total=?, items=?`;
-        params.push(total);
-        params.push(JSON.stringify(items));
-    }
-
-    sql += ` WHERE id=?`;
-    params.push(id);
-
-    db.run(sql, params, function (err) {
-        if (err) return res.status(500).json({ error: err.message });
-        logActivity('UPDATE_ORDER', `Updated Order #${id}`);
-        res.json({ updated: this.changes });
-    });
-});
-
-// 3. Activity Logs
-app.get('/api/logs', (req, res) => {
-    db.all("SELECT * FROM activity_logs ORDER BY timestamp DESC LIMIT 100", [], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json(rows);
-    });
-});
-
 app.listen(port, () => {
-    console.log(`🚀 Enhanced API running at port ${port}`);
+    console.log(`🚀 Professional Retail Server running at port ${port}`);
 });

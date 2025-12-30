@@ -3,42 +3,30 @@ import {
     ChevronLeft, Package, Receipt, TrendingUp, ShoppingBag,
     Plus, Edit3, Trash2, Save, X, Upload, Image as ImageIcon,
     QrCode, Sparkles, ArrowUpRight, ScanLine, Search, Grid,
-    List as ListIcon, MoreHorizontal, Camera, Calendar, FileText, CheckCircle, XCircle, Clock
+    List as ListIcon, MoreHorizontal, Camera, Calendar, FileText, CheckCircle, XCircle, Clock, Truck, BarChart3, RefreshCw
 } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
-// --- Scanner Component (Simplified) ---
+// --- Scanner Component (Strict Environment Mode - Như POS ngoài) ---
 const BarcodeScanner = ({ onResult, onClose }) => {
     const scannerRef = useRef(null);
-    const [error, setError] = useState(null);
-
     useEffect(() => {
         const startScanner = async () => {
-            if (scannerRef.current) {
-                try { await scannerRef.current.stop(); scannerRef.current.clear(); } catch (e) { }
-            }
+            if (scannerRef.current) try { await scannerRef.current.stop(); scannerRef.current.clear(); } catch (e) { }
             const html5QrCode = new Html5Qrcode("reader");
             scannerRef.current = html5QrCode;
             try {
-                await html5QrCode.start(
-                    { facingMode: "environment" },
-                    { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
-                    (decodedText) => {
-                        html5QrCode.stop().then(() => {
-                            onResult(decodedText);
-                            new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play().catch(e => { });
-                        });
-                    },
-                    (errorMessage) => { }
+                await html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+                    (decodedText) => { html5QrCode.stop().then(() => { onResult(decodedText); new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play().catch(() => { }); }); },
+                    () => { }
                 );
-            } catch (err) { setError("Lỗi Camera."); }
+            } catch (err) { }
         };
         setTimeout(startScanner, 100);
         return () => { if (scannerRef.current?.isScanning) scannerRef.current.stop().catch(console.error); };
     }, [onResult]);
-
     return (
         <div className="fixed inset-0 bg-black z-[120] flex flex-col items-center justify-center">
             <button onClick={onClose} className="absolute top-6 right-6 text-white p-3 bg-white/20 rounded-full z-50 backdrop-blur-md active:scale-90 transition-all"><X size={28} /></button>
@@ -50,175 +38,236 @@ const BarcodeScanner = ({ onResult, onClose }) => {
     );
 };
 
-const ProductGridItem = ({ p, onEdit, onDelete }) => (
-    <div onClick={() => onEdit(p)} className="bg-white rounded-[1.5rem] overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.03)] border border-[#F5F5F7] active:scale-[0.98] transition-all relative group">
-        <div className={`absolute top-2 left-2 px-2 py-1 rounded-lg text-[10px] font-bold z-10 backdrop-blur-md ${p.stock <= 5 ? 'bg-red-500/90 text-white' : 'bg-white/90 text-[#1D1D1F] shadow-sm'}`}>Kho: {p.stock}</div>
-        <button onClick={(e) => { e.stopPropagation(); onDelete(p.id); }} className="absolute top-2 right-2 p-1.5 bg-white/80 rounded-full opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-50 z-10"><Trash2 size={16} /></button>
-        <div className="aspect-square bg-[#F9F9FA] flex items-center justify-center relative overflow-hidden">
-            {p.image ? <img src={p.image} className="w-full h-full object-cover" /> : <ImageIcon size={32} className="text-[#D2D2D7]" />}
-        </div>
-        <div className="p-3">
-            <h4 className="font-bold text-[#1D1D1F] text-[13px] leading-snug line-clamp-2 h-[2.5em] mb-1">{p.name}</h4>
-            <div className="flex flex-col gap-0.5">
-                <span className="text-[#0071E3] font-black text-[15px]">{p.price.toLocaleString()}đ</span>
-                {p.case_price > 0 && <span className="text-[10px] text-[#86868B]">Thùng: <span className="text-emerald-600 font-bold">{p.case_price.toLocaleString()}đ</span></span>}
-            </div>
-        </div>
-    </div>
-);
-
+// --- Main Admin Component ---
 const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
-    const [activeTab, setActiveTab] = useState('products');
+    const [activeTab, setActiveTab] = useState('dashboard');
     const [editingProduct, setEditingProduct] = useState(null);
     const [showAddProduct, setShowAddProduct] = useState(false);
 
-    // Order State
+    // Data States
     const [orders, setOrders] = useState([]);
-    const [selectedOrder, setSelectedOrder] = useState(null);
+    const [logs, setLogs] = useState([]);
+    const [stats, setStats] = useState({ todayRevenue: 0, todayOrders: 0, monthRevenue: 0, topProducts: [] });
     const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
 
-    // Logs State
-    const [logs, setLogs] = useState([]);
+    // Import State
+    const [importCart, setImportCart] = useState([]);
+    const [showImportModal, setShowImportModal] = useState(false);
 
-    // Product Pagination
-    const [displayLimit, setDisplayLimit] = useState(20);
-    const [searchTerm, setSearchTerm] = useState('');
-
-    // Fetch Extended Data
+    // Fetchers
     const fetchOrders = useCallback(async () => {
         let url = `${API_URL}/orders`;
-        if (dateFilter.start && dateFilter.end) {
-            url += `?startDate=${dateFilter.start}&endDate=${dateFilter.end}`;
-        }
+        if (dateFilter.start && dateFilter.end) url += `?startDate=${dateFilter.start}&endDate=${dateFilter.end}`;
         const res = await fetch(url);
-        const data = await res.json();
-        setOrders(data);
+        setOrders(await res.json());
     }, [dateFilter]);
 
     const fetchLogs = useCallback(async () => {
         const res = await fetch(`${API_URL}/logs`);
-        const data = await res.json();
-        setLogs(data);
+        setLogs(await res.json());
     }, []);
+
+    const fetchStats = useCallback(async () => {
+        const res = await fetch(`${API_URL}/stats`);
+        setStats(await res.json());
+    }, []);
+
+    const syncImages = async () => {
+        if (confirm('Tải toàn bộ lung ảnh về server máy chủ? (Mất vài phút)')) {
+            try {
+                await fetch(`${API_URL}/products/sync-images`, { method: 'POST' });
+                alert('Đã đồng bộ xong! Ảnh sẽ tải nhanh hơn.');
+                refreshData();
+            } catch (e) { alert('Lỗi đồng bộ'); }
+        }
+    };
 
     useEffect(() => {
         if (activeTab === 'orders') fetchOrders();
         if (activeTab === 'logs') fetchLogs();
-    }, [activeTab, fetchOrders, fetchLogs]);
+        if (activeTab === 'dashboard') fetchStats();
+    }, [activeTab, fetchOrders, fetchLogs, fetchStats]);
 
+    // Product Logic
+    const [searchTerm, setSearchTerm] = useState('');
+    const [displayLimit, setDisplayLimit] = useState(20);
     const filteredProducts = useMemo(() => products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || (p.code && p.code.includes(searchTerm))), [products, searchTerm]);
     const displayedProducts = useMemo(() => filteredProducts.slice(0, displayLimit), [filteredProducts, displayLimit]);
-
     const handleScroll = (e) => { if (e.target.scrollHeight - e.target.scrollTop <= e.target.clientHeight + 200 && displayLimit < filteredProducts.length) setDisplayLimit(prev => prev + 20); };
     const handleDeleteProduct = async (id) => { if (!confirm('Xóa sản phẩm này?')) return; try { await fetch(`${API_URL}/products/${id}`, { method: 'DELETE' }); refreshData(); } catch (e) { } };
-    const handleUpdateOrder = async (id, data) => {
-        try {
-            await fetch(`${API_URL}/orders/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-            fetchOrders(); setSelectedOrder(null);
-        } catch (e) { alert('Lỗi update đơn'); }
-    };
 
-    // --- TABS UI ---
-    const ProductsTab = () => (
-        <div className="space-y-4">
-            <div className="sticky top-0 bg-[#F5F5F7] z-10 pb-2 pt-1">
-                <div className="flex gap-2">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#86868B]" size={18} />
-                        <input type="text" placeholder="Tìm kiếm..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-white pl-10 pr-4 py-3.5 rounded-2xl text-[14px] font-medium outline-none shadow-sm focus:ring-2 focus:ring-[#0071E3]/20" />
-                    </div>
-                    <button onClick={() => setShowAddProduct(true)} className="bg-[#1D1D1F] text-white w-12 rounded-2xl flex items-center justify-center shadow-lg active:scale-90 transition-all"><Plus size={24} /></button>
-                </div>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pb-20">
-                {displayedProducts.map(p => <ProductGridItem key={p.id} p={p} onEdit={setEditingProduct} onDelete={handleDeleteProduct} />)}
-            </div>
-            {displayedProducts.length === 0 && <div className="text-center py-10 text-[#86868B]">Không có sản phẩm</div>}
-        </div>
-    );
+    // --- TABS ---
 
-    const OrdersTab = () => (
+    const DashboardTab = () => (
         <div className="space-y-4 pb-20">
-            {/* Filter Bar */}
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#F5F5F7] flex flex-wrap gap-3 items-center">
-                <div className="flex items-center gap-2 bg-[#F9F9FA] px-3 py-2 rounded-xl border border-[#E8E8ED]">
-                    <Calendar size={16} className="text-[#86868B]" />
-                    <input type="date" className="bg-transparent text-[13px] font-bold outline-none" value={dateFilter.start} onChange={e => setDateFilter({ ...dateFilter, start: e.target.value })} />
-                    <span className="text-[#D2D2D7]">-</span>
-                    <input type="date" className="bg-transparent text-[13px] font-bold outline-none" value={dateFilter.end} onChange={e => setDateFilter({ ...dateFilter, end: e.target.value })} />
+            <div className="grid grid-cols-2 gap-3">
+                <div className="bg-[#1D1D1F] text-white p-5 rounded-[2rem] shadow-lg col-span-2">
+                    <p className="text-[12px] opacity-60 font-bold uppercase tracking-wider mb-1">Doanh thu hôm nay</p>
+                    <h2 className="text-[32px] font-black">{stats.todayRevenue?.toLocaleString()}đ</h2>
+                    <div className="mt-2 flex gap-2">
+                        <span className="bg-white/20 px-2 py-1 rounded-lg text-[11px] font-bold">{stats.todayOrders} đơn</span>
+                    </div>
                 </div>
-                <button onClick={fetchOrders} className="px-4 py-2 bg-[#0071E3] text-white rounded-xl text-[13px] font-bold shadow-lg shadow-blue-500/20 active:scale-95 transition-all">Lọc</button>
+                <div className="bg-white p-5 rounded-[2rem] border border-[#F5F5F7] shadow-sm">
+                    <p className="text-[11px] text-[#86868B] font-bold uppercase">Tháng này</p>
+                    <p className="text-[20px] font-black text-[#0071E3] mt-1">{stats.monthRevenue?.toLocaleString()}đ</p>
+                </div>
+                <div className="bg-white p-5 rounded-[2rem] border border-[#F5F5F7] shadow-sm" onClick={syncImages}>
+                    <p className="text-[11px] text-[#86868B] font-bold uppercase">Hệ thống</p>
+                    <div className="flex items-center gap-2 mt-2 text-[#1D1D1F] font-bold text-[13px]">
+                        <RefreshCw size={16} /> Đồng bộ ảnh
+                    </div>
+                </div>
             </div>
 
-            {selectedOrder ? (
-                <OrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} onUpdate={handleUpdateOrder} />
-            ) : (
+            <div className="bg-white p-5 rounded-[2rem] border border-[#F5F5F7] shadow-sm">
+                <h3 className="font-bold text-[#1D1D1F] mb-4 flex items-center gap-2"><TrendingUp size={18} /> Top Bán Chạy</h3>
                 <div className="space-y-3">
-                    {orders.map(o => (
-                        <div key={o.id} onClick={() => setSelectedOrder(o)} className="bg-white p-4 rounded-2xl flex justify-between items-center shadow-sm border border-[#F5F5F7] active:scale-[0.98] transition-all cursor-pointer">
-                            <div className="flex items-center gap-4">
-                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-[18px] ${o.status === 'cancelled' ? 'bg-red-100 text-red-600' : 'bg-[#E8E8ED] text-[#1D1D1F]'}`}>
-                                    {o.status === 'cancelled' ? <XCircle size={24} /> : (o.payment_method === 'transfer' ? 'CK' : 'TM')}
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-bold text-[#1D1D1F] text-[16px]">#{o.id}</span>
-                                        <span className="text-[12px] px-2 py-0.5 bg-[#F5F5F7] text-[#86868B] rounded-md font-medium">{o.customer_name || 'Khách lẻ'}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <Clock size={12} className="text-[#86868B]" />
-                                        <p className="text-[12px] text-[#86868B]">{new Date(o.timestamp).toLocaleString()}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="text-right">
-                                <p className="font-black text-[#1D1D1F] text-[16px]">{o.total?.toLocaleString()}đ</p>
-                                <p className={`text-[11px] font-bold ${o.status === 'cancelled' ? 'text-red-500' : 'text-emerald-600'}`}>
-                                    {o.status === 'cancelled' ? 'Đã hủy' : 'Hoàn thành'}
-                                </p>
-                            </div>
+                    {stats.topProducts?.map((p, i) => (
+                        <div key={i} className="flex justify-between items-center py-2 border-b border-[#F5F5F7] last:border-0">
+                            <span className="text-[13px] font-medium text-[#1D1D1F] truncate max-w-[70%]">{i + 1}. {p.name}</span>
+                            <span className="text-[12px] font-bold text-[#0071E3]">{p.total_sold} đã bán</span>
                         </div>
                     ))}
-                    {orders.length === 0 && <div className="text-center py-10 text-[#86868B]">Không có đơn hàng nào</div>}
                 </div>
-            )}
+            </div>
         </div>
     );
 
-    const LogsTab = () => (
-        <div className="space-y-3 pb-20">
-            {logs.map((log, i) => (
-                <div key={i} className="bg-white p-4 rounded-xl border border-[#F5F5F7] flex gap-3 items-start">
-                    <div className="mt-1 w-2 h-2 rounded-full bg-[#0071E3] shrink-0"></div>
-                    <div>
-                        <p className="text-[13px] font-bold text-[#1D1D1F]">{log.action}</p>
-                        <p className="text-[12px] text-[#86868B] mt-0.5">{log.details}</p>
-                        <p className="text-[10px] text-[#D2D2D7] mt-1">{new Date(log.timestamp).toLocaleString()}</p>
-                    </div>
+    const ProductsTab = () => (
+        <div className="space-y-4">
+            <div className="sticky top-0 bg-[#F5F5F7] z-10 pb-2 pt-1 flex gap-2">
+                <div className="relative flex-1">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#86868B]" size={18} />
+                    <input type="text" placeholder="Tìm..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-white pl-10 pr-4 py-3.5 rounded-2xl text-[14px] font-medium outline-none shadow-sm" />
                 </div>
-            ))}
+                <button onClick={() => setShowAddProduct(true)} className="bg-[#1D1D1F] text-white w-12 rounded-2xl flex items-center justify-center shadow-lg active:scale-90 transition-all"><Plus size={24} /></button>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pb-20">
+                {displayedProducts.map(p => (
+                    <div key={p.id} onClick={() => setEditingProduct(p)} className="bg-white rounded-[1.5rem] overflow-hidden shadow-sm border border-[#F5F5F7] active:scale-[0.98] transition-all relative group">
+                        <div className="absolute top-2 left-2 px-2 py-1 rounded-lg text-[10px] font-bold z-10 bg-white/90 shadow-sm">Kho: {p.stock}</div>
+                        <div className="aspect-square bg-[#F9F9FA] flex items-center justify-center relative overflow-hidden">
+                            {p.image ? <img src={p.image.startsWith('http') ? p.image : `${API_URL}${p.image}`} className="w-full h-full object-cover" /> : <ImageIcon size={32} className="text-[#D2D2D7]" />}
+                        </div>
+                        <div className="p-3">
+                            <h4 className="font-bold text-[#1D1D1F] text-[13px] line-clamp-2 h-[2.5em] mb-1">{p.name}</h4>
+                            <p className="text-[#0071E3] font-black text-[15px]">{p.price.toLocaleString()}đ</p>
+                            <p className="text-[10px] text-[#86868B] mt-1 truncate">ID: {p.id}</p>
+                        </div>
+                    </div>
+                ))}
+            </div>
         </div>
     );
+
+    const ImportTab = () => {
+        const addToImport = (p) => {
+            setImportCart(prev => {
+                const ex = prev.find(i => i.id === p.id);
+                if (ex) return prev.map(i => i.id === p.id ? { ...i, quantity: i.quantity + 1 } : i);
+                return [...prev, { ...p, quantity: 1, importPrice: p.price * 0.7 }]; // Default import price heuristic
+            });
+        };
+        const submitImport = async () => {
+            if (importCart.length === 0) return;
+            const total_cost = importCart.reduce((s, i) => s + (i.importPrice * i.quantity), 0);
+            try {
+                await fetch(`${API_URL}/imports`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ items: importCart, total_cost, note: 'Nhập hàng nhanh' })
+                });
+                alert('Đã nhập kho thành công!'); setImportCart([]); refreshData();
+            } catch (e) { alert('Lỗi nhập kho'); }
+        };
+
+        return (
+            <div className="space-y-4 pb-20">
+                <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#F5F5F7]">
+                    <h3 className="font-bold text-[15px] mb-3">Phiếu nhập kho mới</h3>
+                    {importCart.length === 0 ? <p className="text-center text-[#86868B] text-[13px] py-4">Chạm vào sản phẩm để thêm vào phiếu nhập</p> : (
+                        <div className="space-y-2 mb-4">
+                            {importCart.map((i, idx) => (
+                                <div key={idx} className="flex justify-between items-center text-[13px]">
+                                    <span className="truncate w-1/2 font-medium">{i.name}</span>
+                                    <div className="flex gap-2">
+                                        <input type="number" className="w-12 bg-[#F5F5F7] rounded px-1 text-center" value={i.quantity} onChange={(e) => setImportCart(prev => prev.map((pi, pii) => pii === idx ? { ...pi, quantity: parseInt(e.target.value) } : pi))} />
+                                        <input type="number" className="w-20 bg-[#F5F5F7] rounded px-1 text-right" value={i.importPrice} onChange={(e) => setImportCart(prev => prev.map((pi, pii) => pii === idx ? { ...pi, importPrice: parseInt(e.target.value) } : pi))} />
+                                    </div>
+                                </div>
+                            ))}
+                            <div className="pt-3 border-t border-[#F5F5F7] flex justify-between font-bold">
+                                <span>Tổng tiền hàng</span>
+                                <span className="text-[#0071E3]">{importCart.reduce((s, i) => s + (i.importPrice * i.quantity), 0).toLocaleString()}đ</span>
+                            </div>
+                            <button onClick={submitImport} className="w-full mt-3 bg-[#1D1D1F] text-white py-3 rounded-xl font-bold text-[14px]">Xác nhận Nhập Kho</button>
+                        </div>
+                    )}
+                </div>
+                {/* Product List for Selection */}
+                <div className="grid grid-cols-2 gap-3">
+                    {displayedProducts.slice(0, 10).map(p => (
+                        <div key={p.id} onClick={() => addToImport(p)} className="bg-white p-3 rounded-2xl border border-[#F5F5F7] active:scale-95 transition-all">
+                            <p className="font-bold text-[12px] line-clamp-1">{p.id}</p>
+                            <p className="font-medium text-[#1D1D1F] text-[13px] truncate">{p.name}</p>
+                            <p className="text-[11px] text-[#86868B]">Tồn: {p.stock}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    };
 
     return (
         <div className="flex flex-col h-screen bg-[#F5F5F7] font-['Inter']">
             <div className="bg-white/90 backdrop-blur-md px-4 py-3 border-b border-[#D2D2D7]/30 sticky top-0 z-20">
                 <div className="flex items-center justify-between mb-3">
                     <button onClick={onBackToPos} className="w-9 h-9 bg-[#F5F5F7] rounded-full flex items-center justify-center text-[#1D1D1F]"><ChevronLeft size={20} /></button>
-                    <span className="font-black text-[16px]">Quản trị</span>
+                    <span className="font-black text-[16px]">Quản trị Hệ thống</span>
                     <div className="w-9"></div>
                 </div>
                 <div className="flex bg-[#F5F5F7] p-1 rounded-2xl overflow-x-auto scrollbar-hide">
-                    {[{ id: 'products', l: 'Kho hàng' }, { id: 'orders', l: 'Đơn hàng' }, { id: 'logs', l: 'Nhật ký' }].map(t => (
-                        <button key={t.id} onClick={() => setActiveTab(t.id)} className={`flex-1 py-2 px-4 rounded-xl text-[12px] font-bold whitespace-nowrap transition-all ${activeTab === t.id ? 'bg-white shadow-sm text-[#1D1D1F]' : 'text-[#86868B]'}`}>{t.l}</button>
+                    {[
+                        { id: 'dashboard', l: 'Tổng quan', i: BarChart3 },
+                        { id: 'products', l: 'Sản phẩm', i: Package },
+                        { id: 'import', l: 'Nhập hàng', i: Truck },
+                        { id: 'orders', l: 'Đơn hàng', i: Receipt },
+                        { id: 'logs', l: 'Nhật ký', i: FileText }
+                    ].map(t => (
+                        <button key={t.id} onClick={() => setActiveTab(t.id)} className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-[12px] font-bold whitespace-nowrap transition-all ${activeTab === t.id ? 'bg-white shadow-sm text-[#1D1D1F]' : 'text-[#86868B]'}`}>
+                            <t.i size={14} /> {t.l}
+                        </button>
                     ))}
                 </div>
             </div>
             <main className="flex-1 overflow-y-auto p-4 scroll-smooth" onScroll={handleScroll}>
-                <div className="max-w-4xl mx-auto">{activeTab === 'products' && <ProductsTab />}{activeTab === 'orders' && <OrdersTab />}{activeTab === 'logs' && <LogsTab />}</div>
+                <div className="max-w-4xl mx-auto">
+                    {activeTab === 'dashboard' && <DashboardTab />}
+                    {activeTab === 'products' && <ProductsTab />}
+                    {activeTab === 'import' && <ImportTab />}
+                    {/* Orders & Logs Tab similar to prev ver but with new fields */}
+                    {activeTab === 'orders' && (
+                        <div className="space-y-3 pb-20">
+                            {orders.map(o => (
+                                <div key={o.id} className="bg-white p-4 rounded-2xl flex justify-between items-center shadow-sm border border-[#F5F5F7]">
+                                    <div>
+                                        <p className="font-bold text-[14px] text-[#1D1D1F] flex items-center gap-2">{o.order_code} <span className="text-[10px] bg-[#E8E8ED] px-1.5 rounded">{o.payment_method}</span></p>
+                                        <p className="text-[12px] text-[#86868B]">{new Date(o.timestamp).toLocaleString()}</p>
+                                    </div>
+                                    <span className="font-black text-[#0071E3]">{o.total?.toLocaleString()}đ</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {activeTab === 'logs' && (
+                        <div className="space-y-2 pb-20">
+                            {logs.map((l, i) => <div key={i} className="text-[12px] p-3 bg-white rounded-xl border border-[#F5F5F7]"><span className="font-bold text-[#1D1D1F]">{l.action}</span>: {l.details} <div className="text-[10px] text-[#86868B] mt-1">{new Date(l.timestamp).toLocaleString()}</div></div>)}
+                        </div>
+                    )}
+                </div>
             </main>
             {(editingProduct || showAddProduct) && <ProductModal product={editingProduct} onClose={() => { setEditingProduct(null); setShowAddProduct(false) }} onSave={() => { refreshData(); setEditingProduct(null); setShowAddProduct(false) }} />}
-            {selectedOrder && <OrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} onUpdate={handleUpdateOrder} />}
+            {showImportModal && <div className="fixed inset-0 bg-black/50 z-50"></div>}
         </div>
     );
 };
@@ -237,70 +286,17 @@ const ProductModal = ({ product, onClose, onSave }) => {
             <div className="bg-white w-full sm:max-w-lg h-[90vh] sm:h-auto rounded-t-[2rem] sm:rounded-[2rem] flex flex-col shadow-2xl animate-in slide-in-from-bottom-20 overflow-hidden">
                 <div className="p-4 border-b border-[#F5F5F7] flex justify-between items-center"><h3 className="font-bold text-[16px]">{isEdit ? 'Sửa' : 'Thêm'} sản phẩm</h3><button onClick={onClose} className="p-2 bg-[#F5F5F7] rounded-full hover:bg-[#E8E8ED]"><X size={20} /></button></div>
                 <div className="flex-1 overflow-y-auto p-5 space-y-5">
-                    <div className="flex flex-col items-center gap-3"><div className="w-28 h-28 bg-[#F5F5F7] rounded-2xl overflow-hidden border border-[#E8E8ED] flex items-center justify-center relative">{formData.image ? <img src={formData.image} className="w-full h-full object-cover" /> : <ImageIcon className="text-[#D2D2D7]" />}<input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageChange} accept="image/*" /></div><p className="text[12px] text-[#0071E3] font-bold">Chạm để đổi ảnh</p></div>
+                    <div className="flex flex-col items-center gap-3"><div className="w-28 h-28 bg-[#F5F5F7] rounded-2xl overflow-hidden border border-[#E8E8ED] flex items-center justify-center relative">{formData.image ? <img src={formData.image.startsWith('http') || formData.image.startsWith('data') ? formData.image : `${API_URL}${formData.image}`} className="w-full h-full object-cover" /> : <ImageIcon className="text-[#D2D2D7]" />}<input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageChange} accept="image/*" /></div><p className="text[12px] text-[#0071E3] font-bold">Chạm để đổi ảnh</p></div>
                     <div className="space-y-4">
                         <input value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Tên sản phẩm" className="w-full bg-[#F9F9FA] p-4 rounded-xl font-bold outline-none ring-1 ring-transparent focus:ring-[#0071E3]" />
                         <div className="grid grid-cols-2 gap-3">
-                            <div><label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Giá lẻ</label><input type="number" value={formData.price} onChange={e => setFormData({ ...formData, price: parseInt(e.target.value) || 0 })} className="w-full bg-[#F9F9FA] p-3 rounded-xl font-bold text-[#0071E3] outline-none" /></div>
+                            <div><label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Giá lẻ (VND)</label><input type="number" value={formData.price} onChange={e => setFormData({ ...formData, price: parseInt(e.target.value) || 0 })} className="w-full bg-[#F9F9FA] p-3 rounded-xl font-bold text-[#0071E3] outline-none" /></div>
                             <div><label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Tồn kho</label><input type="number" value={formData.stock} onChange={e => setFormData({ ...formData, stock: parseInt(e.target.value) || 0 })} className="w-full bg-[#F9F9FA] p-3 rounded-xl font-medium outline-none" /></div>
                         </div>
-                        <div className="bg-[#F9F9FA] p-4 rounded-2xl border border-[#F5F5F7]"><label className="text-[11px] font-bold uppercase text-[#86868B] mb-2 block">Giá thùng & Quy cách</label><div className="flex gap-3"><input type="number" value={formData.case_price} onChange={e => setFormData({ ...formData, case_price: parseInt(e.target.value) || 0 })} placeholder="Giá thùng" className="flex-1 bg-white p-3 rounded-xl font-bold text-emerald-600 outline-none" /><input type="number" value={formData.units_per_case} onChange={e => setFormData({ ...formData, units_per_case: parseInt(e.target.value) || 1 })} placeholder="SL/Thùng" className="w-24 bg-white p-3 rounded-xl font-medium outline-none text-center" /></div></div>
                         <div><label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Mã vạch</label><div className="relative mt-1"><input value={formData.code || ''} onChange={e => setFormData({ ...formData, code: e.target.value })} placeholder="Quét hoặc nhập mã..." className="w-full bg-[#F9F9FA] pl-4 pr-12 py-3.5 rounded-xl font-mono text-[14px] outline-none" /><button onClick={() => setIsScanning(true)} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-white rounded-lg shadow-sm border border-[#E8E8ED] hover:scale-105 transition-transform"><ScanLine size={18} className="text-[#1D1D1F]" /></button></div></div>
                     </div>
                 </div>
                 <div className="p-4 border-t border-[#F5F5F7]"><button onClick={handleSubmit} className="w-full bg-[#0071E3] text-white py-4 rounded-2xl font-bold text-[16px] shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-transform">Lưu sản phẩm</button></div>
-            </div>
-        </div>
-    );
-};
-
-const OrderDetailModal = ({ order, onClose, onUpdate }) => {
-    const [note, setNote] = useState(order.note || '');
-
-    return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center animate-in fade-in">
-            <div className="bg-white w-full sm:max-w-lg h-[90vh] sm:h-auto rounded-t-[2rem] sm:rounded-[2rem] flex flex-col shadow-2xl animate-in slide-in-from-bottom-20 overflow-hidden">
-                <div className="p-4 border-b border-[#F5F5F7] flex justify-between items-center"><h3 className="font-bold text-[16px]">Đơn hàng #{order.id}</h3><button onClick={onClose} className="p-2 bg-[#F5F5F7] rounded-full hover:bg-[#E8E8ED]"><X size={20} /></button></div>
-                <div className="flex-1 overflow-y-auto p-5">
-                    <div className="flex justify-between items-start mb-6">
-                        <div>
-                            <p className="text-[#86868B] text-[12px] uppercase font-bold">Khách hàng</p>
-                            <p className="font-bold text-[15px]">{order.customer_name || 'Khách lẻ'}</p>
-                            <p className="text-[13px] text-[#86868B] mt-1">{new Date(order.timestamp).toLocaleString()}</p>
-                        </div>
-                        <div className="text-right">
-                            <span className={`px-3 py-1 rounded-lg text-[12px] font-bold ${order.status === 'cancelled' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>{order.status === 'cancelled' ? 'Đã hủy' : 'Hoàn thành'}</span>
-                        </div>
-                    </div>
-
-                    <div className="space-y-3 mb-6">
-                        {order.items.map((item, i) => (
-                            <div key={i} className="flex justify-between py-2 border-b border-[#F5F5F7] last:border-0">
-                                <div>
-                                    <p className="font-bold text-[14px]">{item.displayName}</p>
-                                    <p className="text-[12px] text-[#86868B]">{item.quantity} x {item.finalPrice?.toLocaleString() || item.price?.toLocaleString()}đ</p>
-                                </div>
-                                <span className="font-medium">{(item.quantity * (item.finalPrice || item.price)).toLocaleString()}đ</span>
-                            </div>
-                        ))}
-                    </div>
-
-                    <div className="bg-[#F9F9FA] p-4 rounded-2xl mb-4">
-                        <label className="text-[11px] font-bold uppercase text-[#86868B] block mb-2">Ghi chú</label>
-                        <textarea className="w-full bg-transparent outline-none text-[13px]" rows={3} placeholder="Ghi chú đơn hàng..." value={note} onChange={e => setNote(e.target.value)}></textarea>
-                    </div>
-
-                    <div className="flex justify-between items-center pt-4 border-t border-[#F5F5F7]">
-                        <span className="font-bold text-[#86868B]">Tổng tiền</span>
-                        <span className="font-black text-[24px] text-[#0071E3]">{order.total?.toLocaleString()}đ</span>
-                    </div>
-                </div>
-                <div className="p-4 border-t border-[#F5F5F7] flex gap-3">
-                    {order.status !== 'cancelled' && (
-                        <button onClick={() => onUpdate(order.id, { status: 'cancelled', note })} className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-bold text-[14px] hover:bg-red-100 transition-colors">Hủy đơn</button>
-                    )}
-                    <button onClick={() => { onUpdate(order.id, { note }); onClose(); }} className="flex-1 py-3 bg-[#1D1D1F] text-white rounded-xl font-bold text-[14px] hover:bg-black transition-colors">Cập nhật & Đóng</button>
-                </div>
             </div>
         </div>
     );
