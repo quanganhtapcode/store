@@ -1,78 +1,54 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
-# ------------------------------------------------------------
-# Deploy and synchronize the Gemini POS application to the VPS.
-# ------------------------------------------------------------
-# Usage:
-#   ./update-vps.sh
-# Ensure you have the SSH private key at ~/Desktop/key.pem and
-# that the key has appropriate permissions (chmod 600).
-# ------------------------------------------------------------
+# === Gemini POS - VPS Deployment Script ===
+# Sử dụng: ./update-vps.sh
+
+set -e
 
 # Configuration
-SSH_KEY="/mnt/c/Users/PC/Desktop/key.pem"
-# The IP of your VPS
 VPS_IP="10.66.66.1"
 VPS_USER="root"
-REMOTE_ROOT="/root/gemini-pos-api"   # Correct path found on server
+KEY_PATH="$HOME/Desktop/key.pem"
+REMOTE_PATH="/root/gemini-pos-api"
 
-# Local paths (relative to this script's location)
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-LOCAL_PROJECT="$SCRIPT_DIR"
-LOCAL_IMAGES="$SCRIPT_DIR/public/images"
+echo "🚀 Gemini POS - VPS Deployment"
+echo "=============================="
 
-# Helper: ensure the SSH key exists
-if [[ ! -f "$SSH_KEY" ]]; then
-  echo "Error: SSH key not found at $SSH_KEY"
-  exit 1
-fi
+# Files to sync (Frontend sẽ deploy qua Vercel, chỉ sync backend)
+BACKEND_FILES=(
+    "server.cjs"
+    "package.json"
+)
 
-# Fix for WSL/Windows permissions (SSH requires 600, but /mnt/c is 777)
-TARGET_KEY="/tmp/deploy_key_$(date +%s)"
-cp "$SSH_KEY" "$TARGET_KEY"
-chmod 600 "$TARGET_KEY"
-SSH_KEY="$TARGET_KEY"
+# 1. Sync Backend Files
+echo ""
+echo "📤 Syncing backend files..."
+for file in "${BACKEND_FILES[@]}"; do
+    if [ -f "$file" ]; then
+        scp -i "$KEY_PATH" "$file" "$VPS_USER@$VPS_IP:$REMOTE_PATH/"
+        echo "   ✅ $file"
+    fi
+done
 
-# cleanup on exit
-trap "rm -f $SSH_KEY" EXIT
+# 2. SSH Commands
+echo ""
+echo "🔧 Updating server..."
+ssh -i "$KEY_PATH" "$VPS_USER@$VPS_IP" << 'ENDSSH'
+cd /root/gemini-pos-api
 
-# ------------------------------------------------------------
-# Step 1: Sync the project source code (excluding node_modules and .git)
-# ------------------------------------------------------------
-rsync -avz -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=no" \
-  --exclude "node_modules" \
-  --exclude ".git" \
-  --exclude "dist" \
-  --exclude "images" \
-  --exclude "public/images" \
-  "$LOCAL_PROJECT/" "$VPS_USER@$VPS_IP:$REMOTE_ROOT/"
+# Install dependencies if package.json changed
+npm install --production 2>/dev/null || true
 
-# ------------------------------------------------------------
-# Step 2: Sync the optimized images directory (public/images)
-# ------------------------------------------------------------
-# The server serves images from the "public/images" folder.
-REMOTE_IMAGES="$REMOTE_ROOT/public/images"
-rsync -avz -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=no" \
-  "$LOCAL_IMAGES/" "$VPS_USER@$VPS_IP:$REMOTE_IMAGES/"
+# Restart PM2
+pm2 restart gemini-pos || pm2 start server.cjs --name gemini-pos
+pm2 save
 
-# ------------------------------------------------------------
-# Step 3: Install dependencies and restart the Node.js server
-# ------------------------------------------------------------
-ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$VPS_USER@$VPS_IP" <<'EOF'
-  set -e
-  cd "$REMOTE_ROOT"
-  echo "Installing npm dependencies..."
-  npm ci --production
-  echo "Building frontend (Vite)..."
-  npm run build
-  echo "Restarting the server..."
-  # If you use PM2, you can replace the following line with `pm2 restart app`
-  pkill -f "node server.js" || true
-  nohup node server.js > server.log 2>&1 &
-  echo "Deployment complete."
-EOF
+echo ""
+echo "✅ Server updated and running!"
+pm2 status
+ENDSSH
 
-# ------------------------------------------------------------
-# Finished
-# ------------------------------------------------------------
-echo "All steps completed successfully."
+echo ""
+echo "🎉 Deployment Complete!"
+echo "   API: https://vps.quanganh.org/api"
+echo "   Frontend: https://store-six-fawn.vercel.app"

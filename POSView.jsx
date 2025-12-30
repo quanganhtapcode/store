@@ -4,6 +4,16 @@ import {
     Image as ImageIcon, Settings, Store, Package, Trash2, X, Minus, Plus
 } from 'lucide-react';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const IMAGE_BASE_URL = API_URL.replace('/api', '');
+
+// Helper to get image URL
+const getImageUrl = (imagePath) => {
+    if (!imagePath) return null;
+    if (imagePath.startsWith('http') || imagePath.startsWith('data:')) return imagePath;
+    return `${IMAGE_BASE_URL}${imagePath}`;
+};
+
 const POSView = ({
     products,
     searchTerm,
@@ -88,7 +98,7 @@ const POSView = ({
             )}
             <div className="w-full aspect-square bg-[#FBFBFD] rounded-xl mb-2.5 overflow-hidden flex items-center justify-center">
                 {p.image ? (
-                    <img src={p.image} alt={p.displayName} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
+                    <img src={getImageUrl(p.image)} alt={p.displayName} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
                 ) : (
                     <div className="text-[#D2D2D7]"><ImageIcon size={size === 'sm' ? 24 : 28} /></div>
                 )}
@@ -202,7 +212,7 @@ const POSView = ({
                                 <div key={`cart-${item.id}-${item.saleType}-${idx}`} className="flex items-center gap-4 bg-[#F9F9FA] p-3.5 rounded-2xl border border-transparent shadow-sm">
                                     <div className="w-16 h-16 bg-white rounded-xl overflow-hidden flex-shrink-0 border border-[#F5F5F7]">
                                         {item.image ? (
-                                            <img src={item.image} alt={item.displayName} className="w-full h-full object-cover" />
+                                            <img src={getImageUrl(item.image)} alt={item.displayName} className="w-full h-full object-cover" />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-[#D2D2D7]">
                                                 <ImageIcon size={24} />

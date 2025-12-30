@@ -122,14 +122,25 @@ const downloadImage = (url, filename) => {
     });
 };
 
+// --- Helper: Check if local image exists ---
+const getLocalImagePath = (productId) => {
+    const localPath = `/images/${productId}.jpg`;
+    const fullPath = path.join(imagesDir, `${productId}.jpg`);
+    return fs.existsSync(fullPath) ? localPath : null;
+};
+
 // --- APIs ---
 
-// PRODUCTS
+// PRODUCTS - Auto map local images if exist
 app.get('/api/products', (req, res) => {
-    // Sắp xếp theo bán chạy (total_sold) để hiển thị Thịnh hành
     db.all("SELECT * FROM products ORDER BY total_sold DESC, name ASC", [], (err, rows) => {
         if (err) return res.status(500).json({ error: err });
-        res.json(rows);
+        // Auto map to local image if exists
+        const result = rows.map(p => {
+            const localImg = getLocalImagePath(p.id);
+            return localImg ? { ...p, image: localImg } : p;
+        });
+        res.json(result);
     });
 });
 
@@ -220,6 +231,79 @@ app.get('/api/stats', (req, res) => {
                 });
             });
         });
+    });
+});
+
+// GET ORDERS (Lấy danh sách đơn hàng)
+app.get('/api/orders', (req, res) => {
+    const { startDate, endDate } = req.query;
+    let query = "SELECT * FROM orders ORDER BY timestamp DESC";
+    let params = [];
+
+    if (startDate && endDate) {
+        query = "SELECT * FROM orders WHERE timestamp >= ? AND timestamp <= ? ORDER BY timestamp DESC";
+        params = [new Date(startDate).getTime(), new Date(endDate).getTime()];
+    }
+
+    db.all(query, params, (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
+});
+
+// GET SINGLE ORDER
+app.get('/api/orders/:id', (req, res) => {
+    const { id } = req.params;
+    db.get("SELECT * FROM orders WHERE id = ?", [id], (err, row) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!row) return res.status(404).json({ error: 'Order not found' });
+        res.json(row);
+    });
+});
+
+// UPDATE ORDER
+app.put('/api/orders/:id', (req, res) => {
+    const { id } = req.params;
+    const { customer_name, payment_method, status, note } = req.body;
+    db.run(`UPDATE orders SET customer_name = ?, payment_method = ?, status = ?, note = ? WHERE id = ?`,
+        [customer_name, payment_method, status, note, id],
+        function (err) {
+            if (err) return res.status(500).json({ error: err.message });
+            logActivity('UPDATE_ORDER', `Updated order #${id}`);
+            res.json({ success: true, changes: this.changes });
+        }
+    );
+});
+
+// GET LOGS (Nhật ký hoạt động)
+app.get('/api/logs', (req, res) => {
+    db.all("SELECT * FROM activity_logs ORDER BY timestamp DESC LIMIT 100", [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
+});
+
+// UPDATE PRODUCT
+app.put('/api/products/:id', (req, res) => {
+    const { id } = req.params;
+    const p = req.body;
+    db.run(`UPDATE products SET name = ?, brand = ?, category = ?, price = ?, case_price = ?, units_per_case = ?, stock = ?, code = ?, image = ? WHERE id = ?`,
+        [p.name, p.brand, p.category, p.price, p.case_price, p.units_per_case, p.stock, p.code, p.image, id],
+        function (err) {
+            if (err) return res.status(500).json({ error: err.message });
+            logActivity('UPDATE_PRODUCT', `Updated ${p.name}`);
+            res.json({ success: true, changes: this.changes });
+        }
+    );
+});
+
+// DELETE PRODUCT
+app.delete('/api/products/:id', (req, res) => {
+    const { id } = req.params;
+    db.run("DELETE FROM products WHERE id = ?", [id], function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        logActivity('DELETE_PRODUCT', `Deleted product ${id}`);
+        res.json({ success: true, changes: this.changes });
     });
 });
 

@@ -8,6 +8,14 @@ import {
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const IMAGE_BASE_URL = API_URL.replace('/api', ''); // Remove /api for images
+
+// Helper to get image URL
+const getImageUrl = (imagePath) => {
+    if (!imagePath) return null;
+    if (imagePath.startsWith('http') || imagePath.startsWith('data:')) return imagePath;
+    return `${IMAGE_BASE_URL}${imagePath}`;
+};
 
 // --- Scanner Component (Strict Environment Mode - Như POS ngoài) ---
 const BarcodeScanner = ({ onResult, onClose }) => {
@@ -53,6 +61,9 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
     // Import State
     const [importCart, setImportCart] = useState([]);
     const [showImportModal, setShowImportModal] = useState(false);
+
+    // Order State
+    const [editingOrder, setEditingOrder] = useState(null);
 
     // Fetchers
     const fetchOrders = useCallback(async () => {
@@ -148,7 +159,7 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
                     <div key={p.id} onClick={() => setEditingProduct(p)} className="bg-white rounded-[1.5rem] overflow-hidden shadow-sm border border-[#F5F5F7] active:scale-[0.98] transition-all relative group">
                         <div className="absolute top-2 left-2 px-2 py-1 rounded-lg text-[10px] font-bold z-10 bg-white/90 shadow-sm">Kho: {p.stock}</div>
                         <div className="aspect-square bg-[#F9F9FA] flex items-center justify-center relative overflow-hidden">
-                            {p.image ? <img src={p.image.startsWith('http') ? p.image : `${API_URL}${p.image}`} className="w-full h-full object-cover" /> : <ImageIcon size={32} className="text-[#D2D2D7]" />}
+                            {p.image ? <img src={getImageUrl(p.image)} className="w-full h-full object-cover" /> : <ImageIcon size={32} className="text-[#D2D2D7]" />}
                         </div>
                         <div className="p-3">
                             <h4 className="font-bold text-[#1D1D1F] text-[13px] line-clamp-2 h-[2.5em] mb-1">{p.name}</h4>
@@ -162,6 +173,12 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
     );
 
     const ImportTab = () => {
+        const [importSearch, setImportSearch] = useState('');
+        const importProducts = useMemo(() =>
+            products.filter(p => p.name.toLowerCase().includes(importSearch.toLowerCase()) || p.id.includes(importSearch)),
+            [products, importSearch]
+        );
+
         const addToImport = (p) => {
             setImportCart(prev => {
                 const ex = prev.find(i => i.id === p.id);
@@ -183,34 +200,90 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
 
         return (
             <div className="space-y-4 pb-20">
-                <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#F5F5F7]">
-                    <h3 className="font-bold text-[15px] mb-3">Phiếu nhập kho mới</h3>
-                    {importCart.length === 0 ? <p className="text-center text-[#86868B] text-[13px] py-4">Chạm vào sản phẩm để thêm vào phiếu nhập</p> : (
-                        <div className="space-y-2 mb-4">
+                {/* Phiếu nhập hiện tại */}
+                <div className="bg-gradient-to-br from-[#1D1D1F] to-[#2D2D2F] p-5 rounded-3xl shadow-xl text-white">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-bold text-[16px] flex items-center gap-2">
+                            <Truck size={20} /> Phiếu nhập kho
+                        </h3>
+                        <span className="text-[12px] bg-white/20 px-3 py-1 rounded-full">
+                            {importCart.length} sản phẩm
+                        </span>
+                    </div>
+
+                    {importCart.length === 0 ? (
+                        <p className="text-center text-white/60 text-[13px] py-6">Chọn sản phẩm bên dưới để thêm vào phiếu nhập</p>
+                    ) : (
+                        <div className="space-y-3">
                             {importCart.map((i, idx) => (
-                                <div key={idx} className="flex justify-between items-center text-[13px]">
-                                    <span className="truncate w-1/2 font-medium">{i.name}</span>
-                                    <div className="flex gap-2">
-                                        <input type="number" className="w-12 bg-[#F5F5F7] rounded px-1 text-center" value={i.quantity} onChange={(e) => setImportCart(prev => prev.map((pi, pii) => pii === idx ? { ...pi, quantity: parseInt(e.target.value) } : pi))} />
-                                        <input type="number" className="w-20 bg-[#F5F5F7] rounded px-1 text-right" value={i.importPrice} onChange={(e) => setImportCart(prev => prev.map((pi, pii) => pii === idx ? { ...pi, importPrice: parseInt(e.target.value) } : pi))} />
+                                <div key={idx} className="bg-white/10 backdrop-blur rounded-xl p-3 flex items-center gap-3">
+                                    <div className="w-12 h-12 bg-white/20 rounded-lg overflow-hidden flex-shrink-0">
+                                        {i.image ? <img src={getImageUrl(i.image)} className="w-full h-full object-cover" /> : <Package className="w-full h-full p-2 text-white/50" />}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-medium text-[13px] truncate">{i.name}</p>
+                                        <p className="text-[11px] text-white/60">Tồn hiện tại: {i.stock}</p>
+                                    </div>
+                                    <div className="flex flex-col gap-1 items-end">
+                                        <div className="flex items-center gap-1 bg-white/20 rounded-lg px-2 py-1">
+                                            <button onClick={() => setImportCart(prev => prev.map((pi, pii) => pii === idx ? { ...pi, quantity: Math.max(1, pi.quantity - 1) } : pi))} className="text-white/70 hover:text-white">-</button>
+                                            <input type="number" className="w-10 bg-transparent text-center text-[13px] font-bold" value={i.quantity} onChange={(e) => setImportCart(prev => prev.map((pi, pii) => pii === idx ? { ...pi, quantity: parseInt(e.target.value) || 1 } : pi))} />
+                                            <button onClick={() => setImportCart(prev => prev.map((pi, pii) => pii === idx ? { ...pi, quantity: pi.quantity + 1 } : pi))} className="text-white/70 hover:text-white">+</button>
+                                        </div>
+                                        <button onClick={() => setImportCart(prev => prev.filter((_, pii) => pii !== idx))} className="text-red-400 text-[11px] hover:text-red-300">
+                                            Xóa
+                                        </button>
                                     </div>
                                 </div>
                             ))}
-                            <div className="pt-3 border-t border-[#F5F5F7] flex justify-between font-bold">
-                                <span>Tổng tiền hàng</span>
-                                <span className="text-[#0071E3]">{importCart.reduce((s, i) => s + (i.importPrice * i.quantity), 0).toLocaleString()}đ</span>
+
+                            <div className="pt-4 border-t border-white/20">
+                                <div className="flex justify-between items-center mb-3">
+                                    <span className="text-white/70">Tổng số lượng</span>
+                                    <span className="font-bold text-[18px]">{importCart.reduce((s, i) => s + i.quantity, 0)} sản phẩm</span>
+                                </div>
+                                <button onClick={submitImport} className="w-full bg-[#0071E3] text-white py-4 rounded-2xl font-bold text-[15px] shadow-lg active:scale-[0.98] transition-all">
+                                    Xác nhận Nhập Kho
+                                </button>
                             </div>
-                            <button onClick={submitImport} className="w-full mt-3 bg-[#1D1D1F] text-white py-3 rounded-xl font-bold text-[14px]">Xác nhận Nhập Kho</button>
                         </div>
                     )}
                 </div>
-                {/* Product List for Selection */}
-                <div className="grid grid-cols-2 gap-3">
-                    {displayedProducts.slice(0, 10).map(p => (
-                        <div key={p.id} onClick={() => addToImport(p)} className="bg-white p-3 rounded-2xl border border-[#F5F5F7] active:scale-95 transition-all">
-                            <p className="font-bold text-[12px] line-clamp-1">{p.id}</p>
-                            <p className="font-medium text-[#1D1D1F] text-[13px] truncate">{p.name}</p>
-                            <p className="text-[11px] text-[#86868B]">Tồn: {p.stock}</p>
+
+                {/* Tìm kiếm sản phẩm */}
+                <div className="relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#86868B]" size={18} />
+                    <input
+                        type="text"
+                        placeholder="Tìm sản phẩm để nhập kho..."
+                        value={importSearch}
+                        onChange={(e) => setImportSearch(e.target.value)}
+                        className="w-full bg-white pl-11 pr-4 py-3.5 rounded-2xl text-[14px] font-medium outline-none shadow-sm border border-[#F5F5F7]"
+                    />
+                </div>
+
+                {/* Danh sách sản phẩm */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {importProducts.slice(0, 30).map(p => (
+                        <div
+                            key={p.id}
+                            onClick={() => addToImport(p)}
+                            className={`bg-white rounded-2xl overflow-hidden border-2 transition-all cursor-pointer active:scale-[0.97] ${importCart.some(i => i.id === p.id) ? 'border-[#0071E3] shadow-lg' : 'border-transparent shadow-sm'}`}
+                        >
+                            <div className="aspect-square bg-[#F9F9FA] flex items-center justify-center overflow-hidden">
+                                {p.image ? <img src={getImageUrl(p.image)} className="w-full h-full object-cover" /> : <ImageIcon size={28} className="text-[#D2D2D7]" />}
+                            </div>
+                            <div className="p-2.5">
+                                <p className="font-bold text-[12px] text-[#1D1D1F] line-clamp-2 h-[2.4em]">{p.name}</p>
+                                <div className="flex justify-between items-center mt-1">
+                                    <span className="text-[11px] text-[#86868B]">Tồn: {p.stock}</span>
+                                    {importCart.some(i => i.id === p.id) && (
+                                        <span className="text-[10px] bg-[#0071E3] text-white px-1.5 py-0.5 rounded-full font-bold">
+                                            +{importCart.find(i => i.id === p.id)?.quantity}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -248,15 +321,38 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
                     {/* Orders & Logs Tab similar to prev ver but with new fields */}
                     {activeTab === 'orders' && (
                         <div className="space-y-3 pb-20">
-                            {orders.map(o => (
-                                <div key={o.id} className="bg-white p-4 rounded-2xl flex justify-between items-center shadow-sm border border-[#F5F5F7]">
-                                    <div>
-                                        <p className="font-bold text-[14px] text-[#1D1D1F] flex items-center gap-2">{o.order_code} <span className="text-[10px] bg-[#E8E8ED] px-1.5 rounded">{o.payment_method}</span></p>
-                                        <p className="text-[12px] text-[#86868B]">{new Date(o.timestamp).toLocaleString()}</p>
+                            {orders.map(o => {
+                                const items = typeof o.items === 'string' ? JSON.parse(o.items) : o.items;
+                                return (
+                                    <div key={o.id} onClick={() => setEditingOrder(o)} className="bg-white p-4 rounded-2xl shadow-sm border border-[#F5F5F7] active:scale-[0.98] transition-all cursor-pointer">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div>
+                                                <p className="font-bold text-[14px] text-[#1D1D1F] flex items-center gap-2 flex-wrap">
+                                                    {o.order_code || `#${o.id}`}
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${o.status === 'completed' ? 'bg-green-100 text-green-700' : o.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-[#E8E8ED] text-[#1D1D1F]'}`}>
+                                                        {o.status || 'completed'}
+                                                    </span>
+                                                    <span className="text-[10px] bg-[#E8E8ED] px-1.5 py-0.5 rounded">{o.payment_method || 'cash'}</span>
+                                                </p>
+                                                <p className="text-[12px] text-[#86868B] mt-0.5">{new Date(o.timestamp).toLocaleString()}</p>
+                                                {o.customer_name && o.customer_name !== 'Khách lẻ' && (
+                                                    <p className="text-[12px] text-[#1D1D1F] font-medium mt-1">👤 {o.customer_name}</p>
+                                                )}
+                                            </div>
+                                            <span className="font-black text-[#0071E3] text-[16px]">{o.total?.toLocaleString()}đ</span>
+                                        </div>
+                                        <div className="text-[11px] text-[#86868B] border-t border-[#F5F5F7] pt-2 mt-2">
+                                            {items?.slice(0, 3).map((item, idx) => (
+                                                <span key={idx} className="inline-block bg-[#F5F5F7] px-2 py-0.5 rounded mr-1 mb-1">
+                                                    {item.displayName || item.name} x{item.quantity}
+                                                </span>
+                                            ))}
+                                            {items?.length > 3 && <span className="text-[#0071E3]">+{items.length - 3} khác</span>}
+                                        </div>
+                                        {o.note && <p className="text-[11px] text-[#86868B] mt-2 italic">📝 {o.note}</p>}
                                     </div>
-                                    <span className="font-black text-[#0071E3]">{o.total?.toLocaleString()}đ</span>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                     {activeTab === 'logs' && (
@@ -267,6 +363,7 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
                 </div>
             </main>
             {(editingProduct || showAddProduct) && <ProductModal product={editingProduct} onClose={() => { setEditingProduct(null); setShowAddProduct(false) }} onSave={() => { refreshData(); setEditingProduct(null); setShowAddProduct(false) }} />}
+            {editingOrder && <OrderModal order={editingOrder} onClose={() => setEditingOrder(null)} onSave={() => { fetchOrders(); setEditingOrder(null); }} />}
             {showImportModal && <div className="fixed inset-0 bg-black/50 z-50"></div>}
         </div>
     );
@@ -286,7 +383,7 @@ const ProductModal = ({ product, onClose, onSave }) => {
             <div className="bg-white w-full sm:max-w-lg h-[90vh] sm:h-auto rounded-t-[2rem] sm:rounded-[2rem] flex flex-col shadow-2xl animate-in slide-in-from-bottom-20 overflow-hidden">
                 <div className="p-4 border-b border-[#F5F5F7] flex justify-between items-center"><h3 className="font-bold text-[16px]">{isEdit ? 'Sửa' : 'Thêm'} sản phẩm</h3><button onClick={onClose} className="p-2 bg-[#F5F5F7] rounded-full hover:bg-[#E8E8ED]"><X size={20} /></button></div>
                 <div className="flex-1 overflow-y-auto p-5 space-y-5">
-                    <div className="flex flex-col items-center gap-3"><div className="w-28 h-28 bg-[#F5F5F7] rounded-2xl overflow-hidden border border-[#E8E8ED] flex items-center justify-center relative">{formData.image ? <img src={formData.image.startsWith('http') || formData.image.startsWith('data') ? formData.image : `${API_URL}${formData.image}`} className="w-full h-full object-cover" /> : <ImageIcon className="text-[#D2D2D7]" />}<input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageChange} accept="image/*" /></div><p className="text[12px] text-[#0071E3] font-bold">Chạm để đổi ảnh</p></div>
+                    <div className="flex flex-col items-center gap-3"><div className="w-28 h-28 bg-[#F5F5F7] rounded-2xl overflow-hidden border border-[#E8E8ED] flex items-center justify-center relative">{formData.image ? <img src={getImageUrl(formData.image)} className="w-full h-full object-cover" /> : <ImageIcon className="text-[#D2D2D7]" />}<input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageChange} accept="image/*" /></div><p className="text[12px] text-[#0071E3] font-bold">Chạm để đổi ảnh</p></div>
                     <div className="space-y-4">
                         <input value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Tên sản phẩm" className="w-full bg-[#F9F9FA] p-4 rounded-xl font-bold outline-none ring-1 ring-transparent focus:ring-[#0071E3]" />
                         <div className="grid grid-cols-2 gap-3">
@@ -297,6 +394,120 @@ const ProductModal = ({ product, onClose, onSave }) => {
                     </div>
                 </div>
                 <div className="p-4 border-t border-[#F5F5F7]"><button onClick={handleSubmit} className="w-full bg-[#0071E3] text-white py-4 rounded-2xl font-bold text-[16px] shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-transform">Lưu sản phẩm</button></div>
+            </div>
+        </div>
+    );
+};
+
+// --- Order Modal Component ---
+const OrderModal = ({ order, onClose, onSave }) => {
+    const [formData, setFormData] = useState({
+        customer_name: order.customer_name || 'Khách lẻ',
+        payment_method: order.payment_method || 'cash',
+        status: order.status || 'completed',
+        note: order.note || ''
+    });
+    const items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
+
+    const handleSubmit = async () => {
+        try {
+            await fetch(`${API_URL}/orders/${order.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+            onSave();
+        } catch (e) { console.error(e); }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center animate-in fade-in">
+            <div className="bg-white w-full sm:max-w-lg max-h-[90vh] rounded-t-[2rem] sm:rounded-[2rem] flex flex-col shadow-2xl animate-in slide-in-from-bottom-20 overflow-hidden">
+                <div className="p-4 border-b border-[#F5F5F7] flex justify-between items-center">
+                    <div>
+                        <h3 className="font-bold text-[16px]">{order.order_code || `Đơn #${order.id}`}</h3>
+                        <p className="text-[12px] text-[#86868B]">{new Date(order.timestamp).toLocaleString()}</p>
+                    </div>
+                    <button onClick={onClose} className="p-2 bg-[#F5F5F7] rounded-full hover:bg-[#E8E8ED]"><X size={20} /></button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                    {/* Order Items */}
+                    <div className="bg-[#F9F9FA] p-4 rounded-2xl">
+                        <h4 className="font-bold text-[13px] text-[#86868B] uppercase mb-3">Sản phẩm</h4>
+                        <div className="space-y-2">
+                            {items?.map((item, idx) => (
+                                <div key={idx} className="flex justify-between items-center py-2 border-b border-[#E8E8ED] last:border-0">
+                                    <div className="flex-1">
+                                        <p className="font-medium text-[13px] text-[#1D1D1F]">{item.displayName || item.name}</p>
+                                        <p className="text-[11px] text-[#86868B]">{item.finalPrice?.toLocaleString()}đ x {item.quantity}</p>
+                                    </div>
+                                    <span className="font-bold text-[#0071E3]">{((item.finalPrice || 0) * item.quantity).toLocaleString()}đ</span>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex justify-between items-center pt-3 mt-2 border-t border-[#D2D2D7]">
+                            <span className="font-bold text-[#1D1D1F]">Tổng cộng</span>
+                            <span className="font-black text-[18px] text-[#0071E3]">{order.total?.toLocaleString()}đ</span>
+                        </div>
+                    </div>
+
+                    {/* Editable Fields */}
+                    <div className="space-y-4">
+                        <div>
+                            <label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Tên khách hàng</label>
+                            <input
+                                value={formData.customer_name}
+                                onChange={e => setFormData({ ...formData, customer_name: e.target.value })}
+                                className="w-full bg-[#F9F9FA] p-3 rounded-xl font-medium outline-none mt-1"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Thanh toán</label>
+                                <select
+                                    value={formData.payment_method}
+                                    onChange={e => setFormData({ ...formData, payment_method: e.target.value })}
+                                    className="w-full bg-[#F9F9FA] p-3 rounded-xl font-medium outline-none mt-1"
+                                >
+                                    <option value="cash">Tiền mặt</option>
+                                    <option value="transfer">Chuyển khoản</option>
+                                    <option value="momo">MoMo</option>
+                                    <option value="card">Thẻ</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Trạng thái</label>
+                                <select
+                                    value={formData.status}
+                                    onChange={e => setFormData({ ...formData, status: e.target.value })}
+                                    className="w-full bg-[#F9F9FA] p-3 rounded-xl font-medium outline-none mt-1"
+                                >
+                                    <option value="completed">Hoàn thành</option>
+                                    <option value="pending">Đang xử lý</option>
+                                    <option value="cancelled">Đã huỷ</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Ghi chú</label>
+                            <textarea
+                                value={formData.note}
+                                onChange={e => setFormData({ ...formData, note: e.target.value })}
+                                placeholder="Thêm ghi chú..."
+                                className="w-full bg-[#F9F9FA] p-3 rounded-xl font-medium outline-none mt-1 min-h-[80px] resize-none"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="p-4 border-t border-[#F5F5F7]">
+                    <button onClick={handleSubmit} className="w-full bg-[#0071E3] text-white py-4 rounded-2xl font-bold text-[16px] shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-transform">
+                        Lưu thay đổi
+                    </button>
+                </div>
             </div>
         </div>
     );

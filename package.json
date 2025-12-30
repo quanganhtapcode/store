@@ -2,10 +2,10 @@
   "name": "gemini-pos",
   "private": true,
   "version": "1.0.0",
-  "type": "module",
   "scripts": {
-    "start": "node server.js",
+    "start": "node server.cjs",
     "dev": "vite",
+    "dev:server": "node server.cjs",
     "build": "vite build",
     "preview": "vite preview"
   },

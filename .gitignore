@@ -1,5 +1,29 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
+
+# Environment files
 .env
+.env.local
+.env.production
+
+# Database
 *.db
+
+# OS files
 .DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Temporary files
+*.tmp
+gemini-pos-nginx.conf
