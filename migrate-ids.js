@@ -7,8 +7,8 @@ const db = new sqlite3.Database(dbPath);
 const generateId = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let result = '';
-    for (let i = 0; i < 7; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
-    return `PRD-${result}`; // Total 11 chars (Ex: PRD-A1B2C3D)
+    for (let i = 0; i < 6; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
+    return `PRD-${result}`; // Total 10 chars (Ex: PRD-A1B2C3)
 };
 
 console.log("🚀 Starting ID Migration...");

@@ -27,8 +27,8 @@ const db = new sqlite3.Database(dbPath);
 const generateId = (prefix) => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let result = '';
-    for (let i = 0; i < 8; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
-    return `${prefix}-${result}`; // Ex: PRD-A1B2C3D4
+    for (let i = 0; i < 6; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
+    return `${prefix}-${result}`; // Total 10 chars (Ex: PRD-A1B2C3)
 };
 
 const generateOrderCode = (index) => {
