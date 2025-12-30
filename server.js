@@ -20,6 +20,11 @@ const imagesDir = path.join(__dirname, 'public/images');
 if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir, { recursive: true });
 app.use('/images', express.static(imagesDir));
 
+// Phục vụ các folder ảnh chất lượng cao
+app.use('/original', express.static(path.join(__dirname, 'original')));
+app.use('/grid', express.static(path.join(__dirname, 'grid')));
+app.use('/detail', express.static(path.join(__dirname, 'detail')));
+
 const dbPath = path.join(__dirname, 'pos.db');
 const db = new sqlite3.Database(dbPath);
 
