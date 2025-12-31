@@ -11,11 +11,8 @@ const IMAGE_BASE_URL = API_URL.replace('/api', '');
 const getImageUrl = (imagePath) => {
     if (!imagePath) return null;
     if (imagePath.startsWith('http') || imagePath.startsWith('data:')) return imagePath;
-    // Fix: provide a fallback if IMAGE_BASE_URL is just /api
-    const base = IMAGE_BASE_URL.endsWith('/') ? IMAGE_BASE_URL.slice(0, -1) : IMAGE_BASE_URL;
-    return `${base}${imagePath.startsWith('/') ? '' : '/'}${imagePath}`;
+    return `${IMAGE_BASE_URL}${imagePath}`;
 };
-
 
 const POSView = ({
     products,
@@ -95,134 +92,129 @@ const POSView = ({
         setShowCartDetail(false);
     };
 
-    const ProductCard = ({ p, size = "md", isGrid = false }) => (
+    const ProductCard = ({ p, size = "md" }) => (
         <button
             key={`${p.id}-${p.saleType}`}
             onClick={() => addToCart(p)}
-            className={`flex-shrink-0 ${isGrid ? 'w-full' : (size === 'sm' ? 'w-36' : 'w-48')} bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-[#F2F2F7] active:scale-[0.96] transition-all text-left relative group overflow-hidden hover:shadow-[0_20px_40px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 duration-500`}
+            className={`w-full max-w-[220px] bg-white p-3.5 rounded-2xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-transparent active:scale-[0.96] transition-all text-left relative group overflow-hidden mx-auto`}
         >
             {p.isCase && (
-                <div className="absolute top-3 right-3 w-8 h-8 bg-emerald-500/90 backdrop-blur-md rounded-full flex items-center justify-center z-10 shadow-lg text-white">
-                    <Package size={15} />
+                <div className="absolute top-2.5 right-2.5 w-7 h-7 bg-emerald-500 rounded-full flex items-center justify-center z-10 shadow-sm">
+                    <Package size={14} className="text-white" />
                 </div>
             )}
-            <div className="w-full aspect-square bg-[#FBFBFD] rounded-t-[2rem] overflow-hidden flex items-center justify-center p-3">
+            <div className="w-full aspect-square bg-[#FBFBFD] rounded-xl mb-2.5 overflow-hidden flex items-center justify-center">
                 {p.image ? (
-                    <img src={getImageUrl(p.image)} alt={p.displayName} loading="lazy" className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-700 ease-out" />
+                    <img src={getImageUrl(p.image)} alt={p.displayName} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
                 ) : (
-                    <div className="text-[#D2D2D7] bg-white w-full h-full rounded-2xl flex items-center justify-center shadow-inner"><ImageIcon size={size === 'sm' ? 24 : 32} /></div>
+                    <div className="text-[#D2D2D7]"><ImageIcon size={size === 'sm' ? 24 : 28} /></div>
                 )}
             </div>
-            <div className="p-4 pt-1">
-                <h4 className={`font-bold text-[#1D1D1F] ${size === 'sm' ? 'text-[12px]' : 'text-[14px]'} leading-tight line-clamp-2 h-[2.5em] tracking-tight group-hover:text-[#0071E3] transition-colors`}>
+            <div className="px-0.5">
+                <h4 className={`font-bold text-[#1D1D1F] ${size === 'sm' ? 'text-[12px]' : 'text-[14px]'} leading-tight line-clamp-2 h-[2.4em]`}>
                     {p.displayName}
                 </h4>
-                <div className="mt-2 flex items-baseline justify-between">
-                    <span className={`${p.isCase ? 'text-emerald-600' : 'text-[#0071E3]'} font-black ${size === 'sm' ? 'text-[14px]' : 'text-[18px]'}`}>
+                <div className="mt-1.5 flex items-baseline gap-1.5">
+                    <span className={`${p.isCase ? 'text-emerald-600' : 'text-[#0071E3]'} font-bold ${size === 'sm' ? 'text-[13px]' : 'text-[16px]'}`}>
                         {p.finalPrice.toLocaleString()}
                     </span>
-                    <span className="text-[10px] text-[#86868B] font-bold uppercase tracking-widest opacity-50">vnd</span>
+                    <span className="text-[10px] text-[#86868B] font-medium italic">vnd</span>
                 </div>
             </div>
         </button>
     );
 
     return (
-        <div className="flex flex-col h-full bg-[#FAFAFC] font-['Inter'] selection:bg-[#0071E3]/10">
-            <header className="bg-white/70 backdrop-blur-2xl sticky top-0 z-40 border-b border-[#000]/[0.05] shadow-[0_2px_40px_rgba(0,0,0,0.02)]">
-                <div className="px-4 py-4 max-w-5xl mx-auto w-full">
-                    <div className="flex gap-3 items-center">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#86868B]" size={18} />
-                            <input
-                                type="text"
-                                placeholder="Tìm tên sản phẩm, thương hiệu..."
-                                className="w-full bg-[#F5F5F7] border-none rounded-2xl py-3.5 pl-11 pr-4 text-[14px] font-semibold outline-none focus:ring-2 focus:ring-[#0071E3]/20 focus:bg-white transition-all placeholder:text-[#86868B] placeholder:font-medium shadow-inner"
-                                value={searchTerm}
-                                onChange={e => setSearchTerm(e.target.value)}
-                            />
-                        </div>
-                        <button
-                            onClick={() => setShowScanner(true)}
-                            className="w-12 h-12 bg-[#1C1C1E] text-white rounded-2xl flex items-center justify-center shadow-xl active:scale-90 transition-all hover:bg-black hover:shadow-[#0071E3]/20"
-                        >
-                            <QrCode size={20} />
-                        </button>
-                        <button
-                            onClick={onAdminClick}
-                            className="w-12 h-12 bg-white border border-[#F2F2F7] text-[#1D1D1F] rounded-2xl flex items-center justify-center active:bg-[#F5F5F7] transition-all shadow-sm hover:border-[#0071E3]/30"
-                        >
-                            <Settings size={22} />
-                        </button>
+        <div className="flex flex-col h-full bg-[#F5F5F7] font-['Inter']">
+            <header className="bg-white/90 backdrop-blur-md sticky top-0 z-30 px-4 py-3.5 border-b border-[#D2D2D7]/30 shadow-sm">
+                <div className="flex gap-3 items-center">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#86868B]" size={18} />
+                        <input
+                            type="text"
+                            placeholder="Tìm kiếm sản phẩm..."
+                            className="w-full bg-[#F5F5F7] border-none rounded-full py-2.5 pl-10 pr-4 text-[13px] font-medium outline-none focus:ring-1 focus:ring-[#0071E3]/30 transition-all placeholder:text-[#86868B]"
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                        />
                     </div>
+                    <button
+                        onClick={() => setShowScanner(true)}
+                        className="w-10 h-10 bg-[#1D1D1F] text-white rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform hover:bg-[#000]"
+                    >
+                        <QrCode size={18} />
+                    </button>
+                    <button
+                        onClick={onAdminClick}
+                        className="w-10 h-10 bg-white border border-[#D2D2D7] text-[#1D1D1F] rounded-full flex items-center justify-center active:bg-gray-50 transition-colors shadow-sm"
+                    >
+                        <Settings size={20} />
+                    </button>
+                </div>
 
-                    <div className="flex gap-2.5 overflow-x-auto scrollbar-hide mt-4 py-1.5 px-0.5">
-                        {['Tất cả', ...new Set(products.map(p => p.category))].map(c => (
-                            <button
-                                key={c}
-                                onClick={() => setSelectedCategory(c)}
-                                className={`px-6 py-2.5 rounded-xl whitespace-nowrap text-[12px] font-black transition-all ${selectedCategory === c ? 'bg-[#0071E3] text-white shadow-[0_8px_20px_rgba(0,113,227,0.3)] scale-[1.05]' : 'bg-white border border-[#F2F2F7] text-[#1D1D1F] hover:bg-[#F2F2F7]'}`}
-                            >
-                                {c}
-                            </button>
-                        ))}
-                    </div>
+                <div className="flex gap-2.5 overflow-x-auto scrollbar-hide mt-3.5 py-1">
+                    {['Tất cả', ...new Set(products.map(p => p.category))].map(c => (
+                        <button
+                            key={c}
+                            onClick={() => setSelectedCategory(c)}
+                            className={`px-5 py-2 rounded-full whitespace-nowrap text-[12px] font-bold transition-all ${selectedCategory === c ? 'bg-[#0071E3] text-white shadow-md' : 'bg-[#E8E8ED] text-[#1D1D1F] hover:bg-[#D2D2D7]/50'}`}
+                        >
+                            {c}
+                        </button>
+                    ))}
                 </div>
             </header>
 
-            <main className="flex-1 overflow-y-auto pb-44 pt-6 max-w-7xl mx-auto w-full px-5">
+            <main className="flex-1 overflow-y-auto pb-36 pt-5">
                 {isSearching ? (
-                    <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <div className="mb-6 flex justify-between items-end">
-                            <div className="space-y-1">
-                                <h3 className="text-[20px] font-black text-[#1D1D1F] tracking-tight">Kết quả tìm kiếm</h3>
-                                <p className="text-[13px] text-[#86868B] font-medium">Tìm thấy {filtered.length} sản phẩm phù hợp</p>
-                            </div>
-                            {selectedCategory !== 'Tất cả' && (
-                                <button onClick={() => setSelectedCategory('Tất cả')} className="text-[12px] font-bold text-[#0071E3] bg-[#0071E3]/10 px-3 py-1.5 rounded-full hover:bg-[#0071E3]/20 transition-colors flex items-center gap-1.5">
-                                    <X size={14} /> Xóa lọc
-                                </button>
-                            )}
+                    <section className="px-4">
+                        <div className="mb-4 flex justify-between items-center">
+                            <h3 className="text-[14px] font-bold text-[#1D1D1F] tracking-tight">Kết quả ({filtered.length})</h3>
                         </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-                            {filtered.map(p => <ProductCard p={p} size="md" isGrid={true} key={`${p.id}-${p.saleType}`} />)}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                            {filtered.map(p => (
+                                <div key={`${p.id}-${p.saleType}`} className="flex justify-center">
+                                    <ProductCard p={p} size="md" />
+                                </div>
+                            ))}
                         </div>
                     </section>
                 ) : (
                     <>
                         {bestSellers.length > 0 && (
-                            <section className="mb-12 animate-in fade-in duration-700">
-                                <div className="mb-5 flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-1.5 h-6 bg-[#0071E3] rounded-full"></div>
-                                        <h3 className="text-[22px] font-black text-[#1D1D1F] tracking-tight">Thịnh hành</h3>
-                                    </div>
-                                    <button className="text-[13px] font-bold text-[#0071E3] hover:underline px-2 transition-all">Xem tất cả</button>
+                            <section className="mb-8">
+                                <div className="px-5 mb-4 flex items-center justify-between">
+                                    <h3 className="text-[15px] font-black text-[#1D1D1F] tracking-tight">Thịnh hành</h3>
+                                    <div className="h-1 w-8 bg-[#0071E3] rounded-full opacity-80"></div>
                                 </div>
-                                <div className="flex gap-5 overflow-x-auto pb-6 scrollbar-hide -mx-2 px-2">
-                                    {bestSellers.map(p => <ProductCard p={p} size="md" key={`best-${p.id}-${p.saleType}`} />)}
+                                <div className="flex gap-3.5 overflow-x-auto px-5 pb-2 scrollbar-hide">
+                                    {bestSellers.map(p => (
+                                        <div key={`best-${p.id}-${p.saleType}`} className="w-40 md:w-48 flex-shrink-0">
+                                            <ProductCard p={p} size="md" />
+                                        </div>
+                                    ))}
                                 </div>
                             </section>
                         )}
 
-                        {Object.entries(productsByBrand).map(([brand, items], idx) => (
-                            <section key={brand} className="mb-12 animate-in fade-in duration-700" style={{ animationDelay: `${idx * 100}ms` }}>
-                                <div className="mb-5 flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-1.5 h-6 bg-[#8E8E93] rounded-full opacity-30"></div>
-                                        <h3 className="text-[20px] font-black text-[#1D1D1F] tracking-tight">{brand}</h3>
-                                    </div>
-                                    <span className="text-[12px] font-black text-[#86868B] bg-[#F2F2F7] px-3 py-1 rounded-full uppercase tracking-widest">{items.length} SP</span>
+                        {Object.entries(productsByBrand).map(([brand, items]) => (
+                            <section key={brand} className="mb-9">
+                                <div className="px-5 mb-3.5 flex items-center justify-between">
+                                    <h3 className="text-[15px] font-bold text-[#1D1D1F] tracking-tight opacity-90">{brand}</h3>
+                                    <span className="text-[11px] font-bold text-[#86868B] bg-[#F5F5F7] px-2 py-0.5 rounded-md">{items.length}</span>
                                 </div>
-                                <div className="flex gap-5 overflow-x-auto pb-6 scrollbar-hide -mx-2 px-2">
-                                    {items.map(p => <ProductCard p={p} size="sm" key={`${p.id}-${p.saleType}`} />)}
+                                <div className="flex gap-3.5 overflow-x-auto px-5 pb-2 scrollbar-hide">
+                                    {items.map(p => (
+                                        <div key={`${p.id}-${p.saleType}`} className="w-36 md:w-40 flex-shrink-0">
+                                            <ProductCard p={p} size="sm" />
+                                        </div>
+                                    ))}
                                 </div>
                             </section>
                         ))}
                     </>
                 )}
             </main>
-
 
             {showCartDetail && (
                 <div className="fixed inset-0 bg-[#1D1D1F]/60 backdrop-blur-md z-[100] flex items-end">
