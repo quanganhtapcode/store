@@ -217,12 +217,12 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 bg-white p-7 rounded-[2.5rem] border border-[#F2F2F7] shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+                <div className="lg:col-span-3 bg-white p-7 rounded-[2.5rem] border border-[#F2F2F7] shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
                     <div className="flex items-center justify-between mb-6">
-                        <h3 className="font-black text-[18px] text-[#1D1D1F] tracking-tight flex items-center gap-2">
+                        <h3 className="font-semibold text-[18px] text-[#1D1D1F] tracking-tight flex items-center gap-2">
                             <Sparkles size={20} className="text-[#FF9500]" /> Top Bán Chạy
                         </h3>
-                        <button className="text-[12px] font-bold text-[#0071E3] bg-[#0071E3]/5 px-3 py-1.5 rounded-full">Chi tiết</button>
+                        <button className="text-[12px] font-medium text-[#0071E3] bg-[#0071E3]/5 px-3 py-1.5 rounded-full">Chi tiết</button>
                     </div>
                     <div className="space-y-4">
                         {stats.topProducts?.map((p, i) => (
@@ -238,23 +238,6 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
                                     <ArrowUpRight size={18} className="text-[#8E8E93] opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </div>
                             </div>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="bg-white p-7 rounded-[2.5rem] border border-[#F2F2F7] shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col">
-                    <h3 className="font-black text-[18px] text-[#1D1D1F] tracking-tight mb-6">Lối tắt nhanh</h3>
-                    <div className="grid grid-cols-2 gap-3 flex-1">
-                        {[
-                            { l: 'Đồng bộ ảnh', i: RefreshCw, c: 'bg-indigo-50 text-indigo-600', fn: syncImages },
-                            { l: 'Xuất báo cáo', i: FileText, c: 'bg-emerald-50 text-emerald-600', fn: () => alert('Tính năng đang phát triển') },
-                            { l: 'Thêm SP mới', i: Plus, c: 'bg-blue-50 text-blue-600', fn: () => setShowAddProduct(true) },
-                            { l: 'Quét kho', i: ScanLine, i: ScanLine, c: 'bg-orange-50 text-orange-600', fn: () => alert('Tính năng đang phát triển') }
-                        ].map((btn, i) => (
-                            <button key={i} onClick={btn.fn} className={`${btn.c} rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:opacity-80 active:scale-95 transition-all text-[12px] font-bold`}>
-                                <btn.i size={20} />
-                                <span className="text-[10px] text-center">{btn.l}</span>
-                            </button>
                         ))}
                     </div>
                 </div>
