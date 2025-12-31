@@ -281,74 +281,47 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
 
         return (
             <div className="space-y-5 pb-20">
-                {/* Search + Add - Sticky at top */}
-                <div className="sticky top-0 bg-[#F5F5F7] z-20 pb-3 pt-2 -mx-4 px-4 shadow-sm">
-                    <div className="flex gap-2">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#86868B]" size={18} />
-                            <input
-                                type="text"
-                                placeholder="Tìm sản phẩm, mã vạch, thương hiệu..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full bg-white pl-10 pr-4 py-3.5 rounded-2xl text-[14px] font-medium outline-none shadow-sm border border-[#E8E8ED] focus:border-[#0071E3] focus:ring-2 focus:ring-[#0071E3]/20"
-                            />
-                            {searchTerm && (
-                                <button
-                                    onClick={() => setSearchTerm('')}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 bg-[#86868B] rounded-full"
-                                >
-                                    <X size={12} className="text-white" />
-                                </button>
-                            )}
+                {/* Thịnh hành - Horizontal scroll */}
+                {searchTerm === '' && (
+                    <div>
+                        <div className="flex items-center gap-2 mb-3">
+                            <Sparkles size={18} className="text-[#FF9500]" />
+                            <h3 className="font-bold text-[16px] text-[#1D1D1F]">Thịnh hành</h3>
+                            <span className="text-[12px] text-[#86868B]">({trendingProducts.length})</span>
                         </div>
-                        <button onClick={() => setShowAddProduct(true)} className="bg-[#1D1D1F] text-white w-12 rounded-2xl flex items-center justify-center shadow-lg active:scale-90 transition-all">
-                            <Plus size={24} />
-                        </button>
+                        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
+                            {trendingProducts.map(p => (
+                                <ProductCard key={p.id} p={p} size="small" />
+                            ))}
+                        </div>
                     </div>
+                )}
 
-                    {/* Thịnh hành - Horizontal scroll */}
-                    {searchTerm === '' && (
-                        <div>
-                            <div className="flex items-center gap-2 mb-3">
-                                <Sparkles size={18} className="text-[#FF9500]" />
-                                <h3 className="font-bold text-[16px] text-[#1D1D1F]">Thịnh hành</h3>
-                                <span className="text-[12px] text-[#86868B]">({trendingProducts.length})</span>
-                            </div>
-                            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
-                                {trendingProducts.map(p => (
-                                    <ProductCard key={p.id} p={p} size="small" />
-                                ))}
+                {/* Theo Brand - Horizontal scroll sections */}
+                {Object.entries(productsByBrand).map(([brand, items]) => (
+                    <div key={brand}>
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                                <Package size={18} className="text-[#0071E3]" />
+                                <h3 className="font-bold text-[16px] text-[#1D1D1F]">{brand}</h3>
+                                <span className="text-[12px] text-[#86868B]">({items.length})</span>
                             </div>
                         </div>
-                    )}
-
-                    {/* Theo Brand - Horizontal scroll sections */}
-                    {Object.entries(productsByBrand).map(([brand, items]) => (
-                        <div key={brand}>
-                            <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                    <Package size={18} className="text-[#0071E3]" />
-                                    <h3 className="font-bold text-[16px] text-[#1D1D1F]">{brand}</h3>
-                                    <span className="text-[12px] text-[#86868B]">({items.length})</span>
-                                </div>
-                            </div>
-                            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
-                                {items.map(p => (
-                                    <ProductCard key={p.id} p={p} />
-                                ))}
-                            </div>
+                        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
+                            {items.map(p => (
+                                <ProductCard key={p.id} p={p} />
+                            ))}
                         </div>
-                    ))}
+                    </div>
+                ))}
 
-                    {/* Empty state */}
-                    {Object.keys(productsByBrand).length === 0 && (
-                        <div className="text-center py-10 text-[#86868B]">
-                            <Package size={48} className="mx-auto mb-3 opacity-50" />
-                            <p className="font-medium">Không tìm thấy sản phẩm</p>
-                        </div>
-                    )}
-                </div>
+                {/* Empty state */}
+                {Object.keys(productsByBrand).length === 0 && (
+                    <div className="text-center py-10 text-[#86868B]">
+                        <Package size={48} className="mx-auto mb-3 opacity-50" />
+                        <p className="font-medium">Không tìm thấy sản phẩm</p>
+                    </div>
+                )}
             </div>
         );
     };
@@ -469,6 +442,34 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
                         </button>
                     ))}
                 </div>
+
+                {/* Search Bar - Only show on products tab, outside of ProductsTab to prevent focus loss */}
+                {activeTab === 'products' && (
+                    <div className="flex gap-2 mt-3">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#86868B]" size={18} />
+                            <input
+                                type="text"
+                                placeholder="Tìm sản phẩm, mã vạch, thương hiệu..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                autoComplete="off"
+                                className="w-full bg-[#F5F5F7] pl-10 pr-10 py-3 rounded-2xl text-[14px] font-medium outline-none border border-transparent focus:border-[#0071E3] focus:bg-white transition-all"
+                            />
+                            {searchTerm && (
+                                <button
+                                    onClick={() => setSearchTerm('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 bg-[#86868B] rounded-full hover:bg-[#6e6e73]"
+                                >
+                                    <X size={12} className="text-white" />
+                                </button>
+                            )}
+                        </div>
+                        <button onClick={() => setShowAddProduct(true)} className="bg-[#1D1D1F] text-white w-12 rounded-2xl flex items-center justify-center shadow-lg active:scale-90 transition-all">
+                            <Plus size={22} />
+                        </button>
+                    </div>
+                )}
             </div>
             <main className="flex-1 overflow-y-auto p-4 scroll-smooth" onScroll={handleScroll}>
                 <div className="max-w-4xl mx-auto">
