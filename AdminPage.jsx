@@ -6,6 +6,7 @@ import {
     List as ListIcon, MoreHorizontal, Camera, Calendar, FileText, CheckCircle, XCircle, Clock, Truck, BarChart3, RefreshCw
 } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
+import OrderModal from './OrderModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 const IMAGE_BASE_URL = API_URL.replace('/api', ''); // Remove /api for images
@@ -394,120 +395,6 @@ const ProductModal = ({ product, onClose, onSave }) => {
                     </div>
                 </div>
                 <div className="p-4 border-t border-[#F5F5F7]"><button onClick={handleSubmit} className="w-full bg-[#0071E3] text-white py-4 rounded-2xl font-bold text-[16px] shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-transform">Lưu sản phẩm</button></div>
-            </div>
-        </div>
-    );
-};
-
-// --- Order Modal Component ---
-const OrderModal = ({ order, onClose, onSave }) => {
-    const [formData, setFormData] = useState({
-        customer_name: order.customer_name || 'Khách lẻ',
-        payment_method: order.payment_method || 'cash',
-        status: order.status || 'completed',
-        note: order.note || ''
-    });
-    const items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
-
-    const handleSubmit = async () => {
-        try {
-            await fetch(`${API_URL}/orders/${order.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
-            });
-            onSave();
-        } catch (e) { console.error(e); }
-    };
-
-    return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center animate-in fade-in">
-            <div className="bg-white w-full sm:max-w-lg max-h-[90vh] rounded-t-[2rem] sm:rounded-[2rem] flex flex-col shadow-2xl animate-in slide-in-from-bottom-20 overflow-hidden">
-                <div className="p-4 border-b border-[#F5F5F7] flex justify-between items-center">
-                    <div>
-                        <h3 className="font-bold text-[16px]">{order.order_code || `Đơn #${order.id}`}</h3>
-                        <p className="text-[12px] text-[#86868B]">{new Date(order.timestamp).toLocaleString()}</p>
-                    </div>
-                    <button onClick={onClose} className="p-2 bg-[#F5F5F7] rounded-full hover:bg-[#E8E8ED]"><X size={20} /></button>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-5 space-y-5">
-                    {/* Order Items */}
-                    <div className="bg-[#F9F9FA] p-4 rounded-2xl">
-                        <h4 className="font-bold text-[13px] text-[#86868B] uppercase mb-3">Sản phẩm</h4>
-                        <div className="space-y-2">
-                            {items?.map((item, idx) => (
-                                <div key={idx} className="flex justify-between items-center py-2 border-b border-[#E8E8ED] last:border-0">
-                                    <div className="flex-1">
-                                        <p className="font-medium text-[13px] text-[#1D1D1F]">{item.displayName || item.name}</p>
-                                        <p className="text-[11px] text-[#86868B]">{item.finalPrice?.toLocaleString()}đ x {item.quantity}</p>
-                                    </div>
-                                    <span className="font-bold text-[#0071E3]">{((item.finalPrice || 0) * item.quantity).toLocaleString()}đ</span>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="flex justify-between items-center pt-3 mt-2 border-t border-[#D2D2D7]">
-                            <span className="font-bold text-[#1D1D1F]">Tổng cộng</span>
-                            <span className="font-black text-[18px] text-[#0071E3]">{order.total?.toLocaleString()}đ</span>
-                        </div>
-                    </div>
-
-                    {/* Editable Fields */}
-                    <div className="space-y-4">
-                        <div>
-                            <label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Tên khách hàng</label>
-                            <input
-                                value={formData.customer_name}
-                                onChange={e => setFormData({ ...formData, customer_name: e.target.value })}
-                                className="w-full bg-[#F9F9FA] p-3 rounded-xl font-medium outline-none mt-1"
-                            />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Thanh toán</label>
-                                <select
-                                    value={formData.payment_method}
-                                    onChange={e => setFormData({ ...formData, payment_method: e.target.value })}
-                                    className="w-full bg-[#F9F9FA] p-3 rounded-xl font-medium outline-none mt-1"
-                                >
-                                    <option value="cash">Tiền mặt</option>
-                                    <option value="transfer">Chuyển khoản</option>
-                                    <option value="momo">MoMo</option>
-                                    <option value="card">Thẻ</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Trạng thái</label>
-                                <select
-                                    value={formData.status}
-                                    onChange={e => setFormData({ ...formData, status: e.target.value })}
-                                    className="w-full bg-[#F9F9FA] p-3 rounded-xl font-medium outline-none mt-1"
-                                >
-                                    <option value="completed">Hoàn thành</option>
-                                    <option value="pending">Đang xử lý</option>
-                                    <option value="cancelled">Đã huỷ</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Ghi chú</label>
-                            <textarea
-                                value={formData.note}
-                                onChange={e => setFormData({ ...formData, note: e.target.value })}
-                                placeholder="Thêm ghi chú..."
-                                className="w-full bg-[#F9F9FA] p-3 rounded-xl font-medium outline-none mt-1 min-h-[80px] resize-none"
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                <div className="p-4 border-t border-[#F5F5F7]">
-                    <button onClick={handleSubmit} className="w-full bg-[#0071E3] text-white py-4 rounded-2xl font-bold text-[16px] shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-transform">
-                        Lưu thay đổi
-                    </button>
-                </div>
             </div>
         </div>
     );

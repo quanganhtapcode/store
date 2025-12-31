@@ -294,18 +294,86 @@ app.get('/api/orders/:id', (req, res) => {
     });
 });
 
-// UPDATE ORDER
+// UPDATE ORDER (Full edit: items, price, quantity, customer info)
 app.put('/api/orders/:id', (req, res) => {
     const { id } = req.params;
-    const { customer_name, payment_method, status, note } = req.body;
-    db.run(`UPDATE orders SET customer_name = ?, payment_method = ?, status = ?, note = ? WHERE id = ?`,
-        [customer_name, payment_method, status, note, id],
-        function (err) {
-            if (err) return res.status(500).json({ error: err.message });
-            logActivity('UPDATE_ORDER', `Updated order #${id}`);
-            res.json({ success: true, changes: this.changes });
-        }
-    );
+    const { customer_name, payment_method, status, note, items, total } = req.body;
+
+    // First get old order for logging
+    db.get("SELECT * FROM orders WHERE id = ?", [id], (err, oldOrder) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!oldOrder) return res.status(404).json({ error: 'Order not found' });
+
+        const oldItems = typeof oldOrder.items === 'string' ? JSON.parse(oldOrder.items) : oldOrder.items;
+        const newItems = items || oldItems;
+        const newTotal = total !== undefined ? total : oldOrder.total;
+        const itemsStr = JSON.stringify(newItems);
+
+        // Build update query
+        db.run(`UPDATE orders SET 
+                customer_name = ?, 
+                payment_method = ?, 
+                status = ?, 
+                note = ?,
+                items = ?,
+                total = ?
+                WHERE id = ?`,
+            [
+                customer_name || oldOrder.customer_name,
+                payment_method || oldOrder.payment_method,
+                status || oldOrder.status,
+                note !== undefined ? note : oldOrder.note,
+                itemsStr,
+                newTotal,
+                id
+            ],
+            function (err) {
+                if (err) return res.status(500).json({ error: err.message });
+
+                // Log detailed changes
+                const changes = [];
+                if (customer_name && customer_name !== oldOrder.customer_name) {
+                    changes.push(`Tên KH: ${oldOrder.customer_name} → ${customer_name}`);
+                }
+                if (status && status !== oldOrder.status) {
+                    changes.push(`Trạng thái: ${oldOrder.status} → ${status}`);
+                }
+                if (total !== undefined && total !== oldOrder.total) {
+                    changes.push(`Tổng tiền: ${oldOrder.total?.toLocaleString()}đ → ${total?.toLocaleString()}đ`);
+                }
+                if (items && JSON.stringify(oldItems) !== JSON.stringify(items)) {
+                    // Compare items
+                    const oldCount = oldItems?.length || 0;
+                    const newCount = items?.length || 0;
+                    if (oldCount !== newCount) {
+                        changes.push(`Số SP: ${oldCount} → ${newCount}`);
+                    }
+                    changes.push('Đã sửa chi tiết sản phẩm');
+                }
+
+                const logMessage = changes.length > 0
+                    ? `Order #${id} (${oldOrder.order_code}): ${changes.join(', ')}`
+                    : `Order #${id} (${oldOrder.order_code}): Đã cập nhật`;
+
+                logActivity('UPDATE_ORDER', logMessage);
+
+                res.json({
+                    success: true,
+                    changes: this.changes,
+                    order: {
+                        id,
+                        order_code: oldOrder.order_code,
+                        items: newItems,
+                        total: newTotal,
+                        customer_name: customer_name || oldOrder.customer_name,
+                        payment_method: payment_method || oldOrder.payment_method,
+                        status: status || oldOrder.status,
+                        note: note !== undefined ? note : oldOrder.note
+                    }
+                });
+            }
+        );
+    });
 });
 
 // GET LOGS (Nhật ký hoạt động)
