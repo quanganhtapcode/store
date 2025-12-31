@@ -18,30 +18,114 @@ const getImageUrl = (imagePath) => {
     return `${IMAGE_BASE_URL}${imagePath}`;
 };
 
-// --- Scanner Component (Strict Environment Mode - Như POS ngoài) ---
+// --- OPTIMIZED Scanner Component (Fast scanning from distance) ---
 const BarcodeScanner = ({ onResult, onClose }) => {
     const scannerRef = useRef(null);
+
     useEffect(() => {
         const startScanner = async () => {
-            if (scannerRef.current) try { await scannerRef.current.stop(); scannerRef.current.clear(); } catch (e) { }
-            const html5QrCode = new Html5Qrcode("reader");
+            if (scannerRef.current) {
+                try { await scannerRef.current.stop(); scannerRef.current.clear(); } catch (e) { }
+            }
+
+            const html5QrCode = new Html5Qrcode("reader", {
+                // Enable more barcode formats for better detection
+                formatsToSupport: [
+                    Html5QrcodeSupportedFormats.QR_CODE,
+                    Html5QrcodeSupportedFormats.EAN_13,
+                    Html5QrcodeSupportedFormats.EAN_8,
+                    Html5QrcodeSupportedFormats.UPC_A,
+                    Html5QrcodeSupportedFormats.UPC_E,
+                    Html5QrcodeSupportedFormats.CODE_128,
+                    Html5QrcodeSupportedFormats.CODE_39,
+                    Html5QrcodeSupportedFormats.CODE_93,
+                    Html5QrcodeSupportedFormats.ITF,
+                    Html5QrcodeSupportedFormats.CODABAR
+                ],
+                verbose: false
+            });
             scannerRef.current = html5QrCode;
+
             try {
-                await html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
-                    (decodedText) => { html5QrCode.stop().then(() => { onResult(decodedText); new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play().catch(() => { }); }); },
-                    () => { }
+                // Get available cameras
+                const cameras = await Html5Qrcode.getCameras();
+                const cameraId = cameras.find(c => c.label.toLowerCase().includes('back'))?.id || cameras[0]?.id;
+
+                await html5QrCode.start(
+                    cameraId || { facingMode: "environment" },
+                    {
+                        fps: 30,                    // Higher FPS = faster scanning
+                        qrbox: { width: 350, height: 200 },  // Wider box for barcodes
+                        aspectRatio: 16 / 9,          // Better for barcodes (horizontal)
+                        disableFlip: false,
+                        // IMPORTANT: Higher resolution for scanning from distance
+                        videoConstraints: {
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 },
+                            focusMode: "continuous",  // Auto-focus
+                            zoom: 1.5                 // Slight zoom for distance
+                        }
+                    },
+                    (decodedText) => {
+                        // Success callback
+                        html5QrCode.stop().then(() => {
+                            onResult(decodedText);
+                            // Play beep sound
+                            const beep = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQMCI6bO2NSVJxQVkM7Q0qswFBKPx8TAqiMh');
+                            beep.play().catch(() => { });
+                        });
+                    },
+                    () => { } // Error callback (ignore)
                 );
-            } catch (err) { }
+            } catch (err) {
+                console.error("Scanner error:", err);
+            }
         };
+
         setTimeout(startScanner, 100);
-        return () => { if (scannerRef.current?.isScanning) scannerRef.current.stop().catch(console.error); };
+
+        return () => {
+            if (scannerRef.current?.isScanning) {
+                scannerRef.current.stop().catch(console.error);
+            }
+        };
     }, [onResult]);
+
     return (
         <div className="fixed inset-0 bg-black z-[120] flex flex-col items-center justify-center">
-            <button onClick={onClose} className="absolute top-6 right-6 text-white p-3 bg-white/20 rounded-full z-50 backdrop-blur-md active:scale-90 transition-all"><X size={28} /></button>
+            <button onClick={onClose} className="absolute top-6 right-6 text-white p-3 bg-white/20 rounded-full z-50 backdrop-blur-md active:scale-90 transition-all">
+                <X size={28} />
+            </button>
+
+            <div className="absolute top-6 left-6 text-white z-50 bg-black/50 px-4 py-2 rounded-lg backdrop-blur-md">
+                <p className="text-[14px] font-bold">📷 Quét mã vạch</p>
+                <p className="text-[11px] text-white/70">Hướng camera vào mã - giữ cách ~20cm</p>
+            </div>
+
             <div className="w-full h-full relative flex flex-col items-center justify-center bg-black">
-                <div id="reader" className="w-full max-w-lg aspect-square bg-black overflow-hidden rounded-lg"></div>
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center"><div className="w-[260px] h-[260px] border-2 border-white/50 rounded-lg relative shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]"><div className="absolute top-1/2 left-0 right-0 h-[1px] bg-red-500 animate-[ping_2s_infinite]"></div></div></div>
+                <div id="reader" className="w-full max-w-2xl aspect-video bg-black overflow-hidden"></div>
+
+                {/* Scanning overlay - horizontal for barcodes */}
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                    <div className="w-[360px] h-[150px] border-2 border-green-400 rounded-lg relative shadow-[0_0_0_9999px_rgba(0,0,0,0.6)]">
+                        {/* Corner markers */}
+                        <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-green-400 rounded-tl-lg"></div>
+                        <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-green-400 rounded-tr-lg"></div>
+                        <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-green-400 rounded-bl-lg"></div>
+                        <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-green-400 rounded-br-lg"></div>
+
+                        {/* Scanning line animation */}
+                        <div className="absolute top-0 left-4 right-4 h-full overflow-hidden">
+                            <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-red-500 to-transparent animate-bounce" style={{ animationDuration: '1.5s' }}></div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Bottom hint */}
+                <div className="absolute bottom-10 left-0 right-0 text-center text-white/80 text-[13px]">
+                    <p>Đặt mã vạch trong khung xanh</p>
+                    <p className="text-[11px] text-white/50 mt-1">Hỗ trợ: EAN-13, EAN-8, UPC, Code-128, QR Code</p>
+                </div>
             </div>
         </div>
     );
