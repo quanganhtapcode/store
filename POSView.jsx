@@ -199,63 +199,75 @@ const POSView = ({
 
             {showCartDetail && (
                 <div className="fixed inset-0 bg-[#1D1D1F]/60 backdrop-blur-md z-[100] flex items-end">
-                    <div className="bg-white w-full max-h-[75vh] rounded-t-[2.5rem] p-6 animate-in slide-in-from-bottom-10 shadow-[0_-10px_40px_rgba(0,0,0,0.1)]">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-[18px] font-black text-[#1D1D1F]">Giỏ hàng của bạn ({cart.length})</h3>
+                    <div className="bg-white w-full max-h-[85vh] rounded-t-[2.5rem] p-5 animate-in slide-in-from-bottom-10 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col">
+                        {/* Header */}
+                        <div className="flex justify-between items-center mb-4 flex-shrink-0">
+                            <h3 className="text-[20px] font-black text-[#1D1D1F]">Giỏ hàng ({cart.length})</h3>
                             <button onClick={() => setShowCartDetail(false)} className="p-2.5 bg-[#F5F5F7] rounded-full hover:bg-[#E8E8ED] transition-colors">
-                                <X size={20} className="text-[#1D1D1F]" />
+                                <X size={22} className="text-[#1D1D1F]" />
                             </button>
                         </div>
 
-                        <div className="space-y-3.5 max-h-[50vh] overflow-y-auto mb-6 pr-1">
+                        {/* Cart Items - Scrollable */}
+                        <div className="flex-1 overflow-y-auto space-y-3 mb-4 -mx-2 px-2">
                             {cart.map((item, idx) => (
-                                <div key={`cart-${item.id}-${item.saleType}-${idx}`} className="flex items-center gap-4 bg-[#F9F9FA] p-3.5 rounded-2xl border border-transparent shadow-sm">
-                                    <div className="w-16 h-16 bg-white rounded-xl overflow-hidden flex-shrink-0 border border-[#F5F5F7]">
+                                <div key={`cart-${item.id}-${item.saleType}-${idx}`} className="flex items-start gap-3 bg-[#F9F9FA] p-3 rounded-2xl border border-transparent">
+                                    {/* Image */}
+                                    <div className="w-20 h-20 bg-white rounded-xl overflow-hidden flex-shrink-0 border border-[#F5F5F7]">
                                         {item.image ? (
                                             <img src={getImageUrl(item.image)} alt={item.displayName} className="w-full h-full object-cover" />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-[#D2D2D7]">
-                                                <ImageIcon size={24} />
+                                                <ImageIcon size={28} />
                                             </div>
                                         )}
                                     </div>
+
+                                    {/* Info */}
                                     <div className="flex-1 min-w-0">
-                                        <h4 className="font-bold text-[#1D1D1F] text-[14px] truncate mb-1">{item.displayName}</h4>
-                                        <p className="text-[#0071E3] font-bold text-[13px]">{item.finalPrice.toLocaleString()}đ</p>
+                                        <h4 className="font-bold text-[#1D1D1F] text-[14px] leading-tight mb-1.5 line-clamp-2">{item.displayName}</h4>
+                                        <p className={`font-bold text-[16px] ${item.isCase ? 'text-emerald-600' : 'text-[#0071E3]'}`}>
+                                            {item.finalPrice.toLocaleString()}đ
+                                        </p>
+
+                                        {/* Quantity controls */}
+                                        <div className="flex items-center justify-between mt-2">
+                                            <div className="flex items-center gap-2 bg-white p-1 rounded-full shadow-sm border border-[#E8E8ED]">
+                                                <button
+                                                    onClick={() => updateQuantity(item.id, item.saleType, -1)}
+                                                    className="w-8 h-8 bg-[#F5F5F7] rounded-full flex items-center justify-center active:scale-90 transition-all"
+                                                >
+                                                    <Minus size={14} className="text-[#1D1D1F]" />
+                                                </button>
+                                                <span className="font-black text-[#1D1D1F] text-[16px] w-8 text-center">{item.quantity}</span>
+                                                <button
+                                                    onClick={() => updateQuantity(item.id, item.saleType, 1)}
+                                                    className="w-8 h-8 bg-[#0071E3] rounded-full flex items-center justify-center active:scale-90 transition-all text-white"
+                                                >
+                                                    <Plus size={14} />
+                                                </button>
+                                            </div>
+                                            <button
+                                                onClick={() => removeFromCart(item.id, item.saleType)}
+                                                className="p-2 bg-red-50 text-red-500 rounded-full active:scale-90 transition-all"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-2.5 bg-white p-1 rounded-full shadow-sm border border-[#F5F5F7]">
-                                        <button
-                                            onClick={() => updateQuantity(item.id, item.saleType, -1)}
-                                            className="w-8 h-8 bg-[#F5F5F7] rounded-full flex items-center justify-center active:scale-90 transition-all hover:bg-[#E8E8ED]"
-                                        >
-                                            <Minus size={14} className="text-[#1D1D1F]" />
-                                        </button>
-                                        <span className="font-bold text-[#1D1D1F] text-[14px] w-6 text-center">{item.quantity}</span>
-                                        <button
-                                            onClick={() => updateQuantity(item.id, item.saleType, 1)}
-                                            className="w-8 h-8 bg-[#0071E3] rounded-full flex items-center justify-center active:scale-90 transition-all shadow-md text-white"
-                                        >
-                                            <Plus size={14} />
-                                        </button>
-                                    </div>
-                                    <button
-                                        onClick={() => removeFromCart(item.id, item.saleType)}
-                                        className="w-8 h-8 bg-red-50 text-red-500 rounded-full flex items-center justify-center active:scale-90 transition-all ml-1"
-                                    >
-                                        <Trash2 size={14} />
-                                    </button>
                                 </div>
                             ))}
                         </div>
 
-                        <div className="space-y-3">
-                            <div className="flex justify-between items-center p-5 bg-[#F9F9FA] rounded-3xl border border-[#F5F5F7]">
-                                <span className="font-bold text-[#86868B] text-[13px] uppercase tracking-wider">Tổng thanh toán</span>
-                                <span className="font-black text-[#1D1D1F] text-[22px]">{cart.reduce((s, i) => s + (i.finalPrice * i.quantity), 0).toLocaleString()}đ</span>
+                        {/* Footer - Fixed */}
+                        <div className="flex-shrink-0 space-y-3 pt-3 border-t border-[#F5F5F7]">
+                            <div className="flex justify-between items-center p-4 bg-gradient-to-r from-[#F5F5F7] to-[#E8E8ED] rounded-2xl">
+                                <span className="font-bold text-[#86868B] text-[14px] uppercase tracking-wide">Tổng cộng</span>
+                                <span className="font-black text-[#1D1D1F] text-[28px]">{cart.reduce((s, i) => s + (i.finalPrice * i.quantity), 0).toLocaleString()}đ</span>
                             </div>
                             <button
                                 onClick={() => { checkout(); setShowCartDetail(false); }}
-                                className="w-full bg-[#0071E3] text-white py-4.5 rounded-2xl font-bold text-[16px] active:scale-[0.98] transition-all shadow-lg hover:shadow-blue-500/30 hover:bg-[#0077ED]"
+                                className="w-full bg-[#0071E3] text-white py-5 rounded-2xl font-bold text-[18px] active:scale-[0.98] transition-all shadow-lg shadow-blue-500/30"
                             >
                                 Xác nhận thanh toán
                             </button>

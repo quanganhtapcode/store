@@ -59,6 +59,7 @@ const QRScanner = ({ onResult, onClose }) => {
 
                             html5QrCode.stop().then(() => {
                                 onResult(decodedText);
+                                onClose(); // Đóng scanner sau khi scan
                                 scannerRef.current = null;
                             }).catch(err => console.error("Stop failed", err));
                         },

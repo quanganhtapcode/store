@@ -12,7 +12,7 @@ const QRScanner = ({ onResult, onClose }) => {
         const html5QrCode = new Html5Qrcode(scannerId);
         scannerRef.current = html5QrCode;
 
-        const config = { 
+        const config = {
             fps: 20, // Tăng lên 20 để quét mượt hơn (mặc định là 10)
             qrbox: { width: 250, height: 250 }, // Vùng quét
             aspectRatio: 1.0, // Tỉ lệ khung hình vuông giúp xử lý nhanh hơn trên mobile
@@ -28,6 +28,7 @@ const QRScanner = ({ onResult, onClose }) => {
                 // Dừng scanner ngay lập tức để tránh quét lặp lại
                 html5QrCode.stop().then(() => {
                     onResult(decodedText);
+                    onClose(); // Đóng scanner sau khi scan thành công
                     scannerRef.current = null;
                 }).catch(err => console.error("Stop failed", err));
             },
@@ -64,10 +65,10 @@ const QRScanner = ({ onResult, onClose }) => {
                 <div className="relative w-full aspect-square overflow-hidden rounded-[2.5rem] border-4 border-indigo-500/50 shadow-2xl shadow-indigo-500/20 bg-black">
                     {/* Thẻ div chứa camera */}
                     <div id={scannerId} className="w-full h-full" />
-                    
+
                     {/* Hiệu ứng khung ngắm (Overlay trang trí) */}
                     <div className="absolute inset-0 pointer-events-none border-[30px] border-black/30 rounded-[2rem]"></div>
-                    
+
                     {/* Đường line quét (Animation) */}
                     <div className="absolute top-0 left-0 w-full h-1 bg-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.8)] animate-[scan_2s_infinite_linear] opacity-80 z-10"></div>
                 </div>
