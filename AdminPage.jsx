@@ -179,38 +179,89 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
 
     // --- TABS ---
     const DashboardTab = () => (
-        <div className="space-y-4 pb-20">
-            <div className="grid grid-cols-2 gap-3">
-                <div className="bg-[#1D1D1F] text-white p-5 rounded-[2rem] shadow-lg col-span-2">
-                    <p className="text-[12px] opacity-60 font-bold uppercase tracking-wider mb-1">Doanh thu hôm nay</p>
-                    <h2 className="text-[32px] font-black">{stats.todayRevenue?.toLocaleString()}đ</h2>
-                    <div className="mt-2 flex gap-2">
-                        <span className="bg-white/20 px-2 py-1 rounded-lg text-[11px] font-bold">{stats.todayOrders} đơn</span>
+        <div className="space-y-6 pb-20 animate-in fade-in duration-700">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-[#1C1C1E] text-white p-6 rounded-[2.5rem] shadow-2xl col-span-1 sm:col-span-2 lg:col-span-2 flex flex-col justify-between min-h-[160px] relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-[#0071E3] blur-[80px] opacity-20 group-hover:opacity-40 transition-opacity"></div>
+                    <div>
+                        <p className="text-[12px] opacity-50 font-black uppercase tracking-[0.2em] mb-2">Doanh thu hôm nay</p>
+                        <h2 className="text-[42px] font-black tracking-tighter leading-none">{stats.todayRevenue?.toLocaleString()}<span className="text-[20px] ml-1 opacity-50 font-bold">đ</span></h2>
+                    </div>
+                    <div className="mt-4 flex items-center gap-3">
+                        <span className="bg-white/10 backdrop-blur-md px-4 py-1.5 rounded-full text-[12px] font-bold border border-white/5">{stats.todayOrders} đơn hàng</span>
+                        <div className="flex -space-x-2">
+                            {[1, 2, 3].map(i => <div key={i} className="w-6 h-6 rounded-full border-2 border-[#1C1C1E] bg-[#F5F5F7]"></div>)}
+                        </div>
                     </div>
                 </div>
-                <div className="bg-white p-5 rounded-[2rem] border border-[#F5F5F7] shadow-sm">
-                    <p className="text-[11px] text-[#86868B] font-bold uppercase">Tháng này</p>
-                    <p className="text-[20px] font-black text-[#0071E3] mt-1">{stats.monthRevenue?.toLocaleString()}đ</p>
+
+                <div className="bg-white p-6 rounded-[2.5rem] border border-[#F2F2F7] shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col justify-between">
+                    <div className="w-10 h-10 bg-[#FF9500]/10 text-[#FF9500] rounded-xl flex items-center justify-center mb-4">
+                        <TrendingUp size={20} />
+                    </div>
+                    <div>
+                        <p className="text-[11px] text-[#8E8E93] font-black uppercase tracking-widest">Tháng này</p>
+                        <p className="text-[24px] font-black text-[#1D1D1F] mt-1">{stats.monthRevenue?.toLocaleString()}đ</p>
+                    </div>
                 </div>
-                <div className="bg-white p-5 rounded-[2rem] border border-[#F5F5F7] shadow-sm">
-                    <p className="text-[11px] text-[#86868B] font-bold uppercase">Kho hàng</p>
-                    <p className="text-[20px] font-black text-[#1D1D1F] mt-1">{products.length} <span className="text-[14px] font-bold text-[#86868B]">sản phẩm</span></p>
+
+                <div className="bg-white p-6 rounded-[2.5rem] border border-[#F2F2F7] shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col justify-between">
+                    <div className="w-10 h-10 bg-[#0071E3]/10 text-[#0071E3] rounded-xl flex items-center justify-center mb-4">
+                        <Package size={20} />
+                    </div>
+                    <div>
+                        <p className="text-[11px] text-[#8E8E93] font-black uppercase tracking-widest">Kho hàng</p>
+                        <p className="text-[24px] font-black text-[#1D1D1F] mt-1">{products.length} <span className="text-[14px] text-[#8E8E93] font-bold">mã</span></p>
+                    </div>
                 </div>
             </div>
 
-            <div className="bg-white p-5 rounded-[2rem] border border-[#F5F5F7] shadow-sm">
-                <h3 className="font-bold text-[#1D1D1F] mb-4 flex items-center gap-2"><TrendingUp size={18} /> Top Bán Chạy</h3>
-                <div className="space-y-3">
-                    {stats.topProducts?.map((p, i) => (
-                        <div key={i} className="flex justify-between items-center py-2 border-b border-[#F5F5F7] last:border-0">
-                            <span className="text-[13px] font-medium text-[#1D1D1F] truncate max-w-[70%]">{i + 1}. {p.name}</span>
-                            <span className="text-[12px] font-bold text-[#0071E3]">{p.total_sold} đã bán</span>
-                        </div>
-                    ))}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 bg-white p-7 rounded-[2.5rem] border border-[#F2F2F7] shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="font-black text-[18px] text-[#1D1D1F] tracking-tight flex items-center gap-2">
+                            <Sparkles size={20} className="text-[#FF9500]" /> Top Bán Chạy
+                        </h3>
+                        <button className="text-[12px] font-bold text-[#0071E3] bg-[#0071E3]/5 px-3 py-1.5 rounded-full">Chi tiết</button>
+                    </div>
+                    <div className="space-y-4">
+                        {stats.topProducts?.map((p, i) => (
+                            <div key={i} className="flex items-center gap-4 p-3 rounded-2xl hover:bg-[#F5F5F7] transition-colors group">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-[14px] ${i === 0 ? 'bg-[#FFD700] text-white shadow-lg shadow-[#FFD700]/30' : 'bg-[#F2F2F7] text-[#8E8E93]'}`}>
+                                    {i + 1}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-[14px] font-bold text-[#1D1D1F] truncate group-hover:text-[#0071E3] transition-colors">{p.name}</p>
+                                    <p className="text-[11px] text-[#8E8E93] font-medium uppercase tracking-wider">{p.total_sold} sản phẩm đã bán</p>
+                                </div>
+                                <div className="text-right">
+                                    <ArrowUpRight size={18} className="text-[#8E8E93] opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="bg-white p-7 rounded-[2.5rem] border border-[#F2F2F7] shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col">
+                    <h3 className="font-black text-[18px] text-[#1D1D1F] tracking-tight mb-6">Lối tắt nhanh</h3>
+                    <div className="grid grid-cols-2 gap-3 flex-1">
+                        {[
+                            { l: 'Đồng bộ ảnh', i: RefreshCw, c: 'bg-indigo-50 text-indigo-600', fn: syncImages },
+                            { l: 'Xuất báo cáo', i: FileText, c: 'bg-emerald-50 text-emerald-600', fn: () => alert('Tính năng đang phát triển') },
+                            { l: 'Thêm SP mới', i: Plus, c: 'bg-blue-50 text-blue-600', fn: () => setShowAddProduct(true) },
+                            { l: 'Quét kho', i: ScanLine, i: ScanLine, c: 'bg-orange-50 text-orange-600', fn: () => alert('Tính năng đang phát triển') }
+                        ].map((btn, i) => (
+                            <button key={i} onClick={btn.fn} className={`${btn.c} rounded-2xl p-4 flex flex-col items-center justify-center gap-2 hover:opacity-80 active:scale-95 transition-all text-[12px] font-bold`}>
+                                <btn.i size={20} />
+                                <span className="text-[10px] text-center">{btn.l}</span>
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
         </div>
     );
+
 
     const ProductsTab = () => {
         // Helper: Normalize text for search (remove accents)
@@ -261,69 +312,93 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
         const ProductCard = ({ p, size = 'normal' }) => (
             <div
                 onClick={() => setEditingProduct(p)}
-                className={`bg-white rounded-2xl overflow-hidden shadow-sm border border-[#F5F5F7] active:scale-[0.97] transition-all cursor-pointer flex-shrink-0 ${size === 'small' ? 'w-32' : 'w-40'}`}
+                className={`bg-white rounded-[2rem] overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-[#F2F2F7] active:scale-[0.97] transition-all cursor-pointer flex-shrink-0 group hover:shadow-[0_20px_40px_rgba(0,0,0,0.08)] duration-500 ${size === 'small' ? 'w-36' : 'w-44'}`}
             >
-                <div className={`${size === 'small' ? 'h-28' : 'h-36'} bg-[#F9F9FA] flex items-center justify-center relative overflow-hidden`}>
-                    {p.image ? <img src={getImageUrl(p.image)} loading="lazy" className="w-full h-full object-cover" /> : <ImageIcon size={28} className="text-[#D2D2D7]" />}
-                    <div className="absolute top-2 left-2 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-white/90 shadow-sm">
+                <div className={`${size === 'small' ? 'h-32' : 'h-40'} bg-[#FBFBFD] flex items-center justify-center relative overflow-hidden p-3`}>
+                    {p.image ? (
+                        <img src={getImageUrl(p.image)} alt={p.name} loading="lazy" className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-700 ease-out" />
+                    ) : (
+                        <ImageIcon size={32} className="text-[#D2D2D7]" />
+                    )}
+                    <div className="absolute top-3 left-3 px-2 py-1 rounded-xl text-[10px] font-black bg-white/90 backdrop-blur-md shadow-sm text-[#1D1D1F] border border-black/5">
                         {p.stock}
                     </div>
                 </div>
-                <div className="p-2.5">
-                    <h4 className="font-bold text-[#1D1D1F] text-[12px] line-clamp-2 h-[2.4em] mb-1">{p.name}</h4>
-                    <p className="text-[#0071E3] font-black text-[14px]">{p.price?.toLocaleString()}đ</p>
+                <div className="p-4 pt-1">
+                    <h4 className="font-bold text-[#1D1D1F] text-[13px] line-clamp-2 h-[2.6em] mb-1 tracking-tight group-hover:text-[#0071E3] transition-colors">{p.name}</h4>
+                    <div className="flex items-baseline justify-between mt-1">
+                        <p className="text-[#0071E3] font-black text-[16px]">{p.price?.toLocaleString()}đ</p>
+                    </div>
                     {p.case_price > 0 && (
-                        <p className="text-[10px] text-[#FF9500] font-bold">Thùng: {p.case_price?.toLocaleString()}đ</p>
+                        <p className="text-[10px] text-[#FF9500] font-black mt-0.5 opacity-80 uppercase tracking-tighter">Thùng: {p.case_price?.toLocaleString()}đ</p>
                     )}
                 </div>
             </div>
         );
 
         return (
-            <div className="space-y-5 pb-20">
+            <div className="space-y-8 pb-20 animate-in fade-in duration-700">
+                {/* Search summary when filtering */}
+                {searchTerm && (
+                    <div className="bg-[#0071E3]/5 p-4 rounded-2xl flex items-center justify-between border border-[#0071E3]/10 mb-4">
+                        <p className="text-[13px] font-bold text-[#0071E3]">Tìm thấy {Object.values(productsByBrand).flat().length} sản phẩm</p>
+                        <button onClick={() => setSearchTerm('')} className="text-[12px] font-black text-[#0071E3] uppercase tracking-wider">Xóa tìm kiếm</button>
+                    </div>
+                )}
+
                 {/* Thịnh hành - Horizontal scroll */}
                 {searchTerm === '' && (
-                    <div>
-                        <div className="flex items-center gap-2 mb-3">
-                            <Sparkles size={18} className="text-[#FF9500]" />
-                            <h3 className="font-bold text-[16px] text-[#1D1D1F]">Thịnh hành</h3>
-                            <span className="text-[12px] text-[#86868B]">({trendingProducts.length})</span>
+                    <section>
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                                <Sparkles size={22} className="text-[#FF9500]" />
+                                <h3 className="font-black text-[18px] text-[#1D1D1F] tracking-tight">Thịnh hành nhất</h3>
+                            </div>
                         </div>
-                        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
+                        <div className="flex gap-5 overflow-x-auto pb-6 scrollbar-hide -mx-4 px-4">
                             {trendingProducts.map(p => (
                                 <ProductCard key={p.id} p={p} size="small" />
                             ))}
                         </div>
-                    </div>
+                    </section>
                 )}
 
                 {/* Theo Brand - Horizontal scroll sections */}
-                {Object.entries(productsByBrand).map(([brand, items]) => (
-                    <div key={brand}>
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                                <Package size={18} className="text-[#0071E3]" />
-                                <h3 className="font-bold text-[16px] text-[#1D1D1F]">{brand}</h3>
-                                <span className="text-[12px] text-[#86868B]">({items.length})</span>
+                {Object.entries(productsByBrand).map(([brand, items], idx) => (
+                    <section key={brand} className="animate-in fade-in transition-all" style={{ animationDelay: `${idx * 100}ms` }}>
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-white border border-[#F2F2F7] rounded-2xl flex items-center justify-center shadow-sm text-[#0071E3]">
+                                    <Package size={20} />
+                                </div>
+                                <div>
+                                    <h3 className="font-black text-[18px] text-[#1D1D1F] tracking-tight leading-none">{brand}</h3>
+                                    <p className="text-[11px] text-[#8E8E93] font-bold mt-1 uppercase tracking-widest">{items.length} sản phẩm</p>
+                                </div>
                             </div>
                         </div>
-                        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
+                        <div className="flex gap-5 overflow-x-auto pb-6 scrollbar-hide -mx-4 px-4">
                             {items.map(p => (
                                 <ProductCard key={p.id} p={p} />
                             ))}
                         </div>
-                    </div>
+                    </section>
                 ))}
 
                 {/* Empty state */}
                 {Object.keys(productsByBrand).length === 0 && (
-                    <div className="text-center py-10 text-[#86868B]">
-                        <Package size={48} className="mx-auto mb-3 opacity-50" />
-                        <p className="font-medium">Không tìm thấy sản phẩm</p>
+                    <div className="text-center py-20 bg-white rounded-[3rem] border border-dashed border-[#D2D2D7]">
+                        <div className="w-20 h-20 bg-[#F5F5F7] rounded-full flex items-center justify-center mx-auto mb-6">
+                            <Package size={32} className="text-[#D2D2D7]" />
+                        </div>
+                        <p className="font-black text-[#1D1D1F] text-[18px]">Không tìm thấy sản phẩm nào</p>
+                        <p className="text-[#8E8E93] mt-2">Thử thay đổi từ khóa hoặc bộ lọc của bạn</p>
+                        <button onClick={() => setSearchTerm('')} className="mt-6 bg-[#0071E3] text-white px-8 py-3 rounded-full font-bold shadow-lg shadow-[#0071E3]/20">Để tôi tìm lại</button>
                     </div>
                 )}
             </div>
         );
+
     };
 
     // Import Tab helper functions (outside component to prevent re-render)
