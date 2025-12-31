@@ -264,7 +264,7 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
                 className={`bg-white rounded-2xl overflow-hidden shadow-sm border border-[#F5F5F7] active:scale-[0.97] transition-all cursor-pointer flex-shrink-0 ${size === 'small' ? 'w-32' : 'w-40'}`}
             >
                 <div className={`${size === 'small' ? 'h-28' : 'h-36'} bg-[#F9F9FA] flex items-center justify-center relative overflow-hidden`}>
-                    {p.image ? <img src={getImageUrl(p.image)} className="w-full h-full object-cover" /> : <ImageIcon size={28} className="text-[#D2D2D7]" />}
+                    {p.image ? <img src={getImageUrl(p.image)} loading="lazy" className="w-full h-full object-cover" /> : <ImageIcon size={28} className="text-[#D2D2D7]" />}
                     <div className="absolute top-2 left-2 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-white/90 shadow-sm">
                         {p.stock}
                     </div>
@@ -378,7 +378,7 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
                 className={`bg-white rounded-2xl overflow-hidden border-2 transition-all cursor-pointer active:scale-[0.97] flex-shrink-0 w-36 ${importCart.some(i => i.id === p.id) ? 'border-[#0071E3] shadow-lg' : 'border-transparent shadow-sm'}`}
             >
                 <div className="h-28 bg-[#F9F9FA] flex items-center justify-center overflow-hidden relative">
-                    {p.image ? <img src={getImageUrl(p.image)} className="w-full h-full object-cover" /> : <ImageIcon size={28} className="text-[#D2D2D7]" />}
+                    {p.image ? <img src={getImageUrl(p.image)} loading="lazy" className="w-full h-full object-cover" /> : <ImageIcon size={28} className="text-[#D2D2D7]" />}
                     {importCart.some(i => i.id === p.id) && (
                         <div className="absolute top-2 right-2 bg-[#0071E3] text-white text-[11px] px-2 py-0.5 rounded-full font-bold">
                             +{importCart.find(i => i.id === p.id)?.quantity}
@@ -412,7 +412,7 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
                             {importCart.map((i, idx) => (
                                 <div key={idx} className="bg-white/10 backdrop-blur rounded-xl p-3 flex items-center gap-3">
                                     <div className="w-12 h-12 bg-white/20 rounded-lg overflow-hidden flex-shrink-0">
-                                        {i.image ? <img src={getImageUrl(i.image)} className="w-full h-full object-cover" /> : <Package className="w-full h-full p-2 text-white/50" />}
+                                        {i.image ? <img src={getImageUrl(i.image)} loading="lazy" className="w-full h-full object-cover" /> : <Package className="w-full h-full p-2 text-white/50" />}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="font-medium text-[13px] truncate">{i.name}</p>
@@ -534,16 +534,10 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
             </div>
             <main className="flex-1 overflow-y-auto p-4 scroll-smooth" onScroll={handleScroll}>
                 <div className="max-w-4xl mx-auto">
-                    {/* Dashboard tab - conditional render (no images) */}
+                    {/* Tabs - conditional render with lazy loading images */}
                     {activeTab === 'dashboard' && <DashboardTab />}
-
-                    {/* Products & Import tabs - keep mounted, use CSS to hide (preserve image cache) */}
-                    <div className={activeTab === 'products' ? '' : 'hidden'}>
-                        <ProductsTab />
-                    </div>
-                    <div className={activeTab === 'import' ? '' : 'hidden'}>
-                        <ImportTab />
-                    </div>
+                    {activeTab === 'products' && <ProductsTab />}
+                    {activeTab === 'import' && <ImportTab />}
 
                     {/* Orders tab */}
                     {activeTab === 'orders' && (

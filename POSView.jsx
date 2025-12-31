@@ -105,7 +105,7 @@ const POSView = ({
             )}
             <div className="w-full aspect-square bg-[#FBFBFD] rounded-xl mb-2.5 overflow-hidden flex items-center justify-center">
                 {p.image ? (
-                    <img src={getImageUrl(p.image)} alt={p.displayName} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
+                    <img src={getImageUrl(p.image)} alt={p.displayName} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
                 ) : (
                     <div className="text-[#D2D2D7]"><ImageIcon size={size === 'sm' ? 24 : 28} /></div>
                 )}
@@ -222,7 +222,7 @@ const POSView = ({
                                     {/* Image */}
                                     <div className="w-20 h-20 bg-white rounded-xl overflow-hidden flex-shrink-0 border border-[#F5F5F7]">
                                         {item.image ? (
-                                            <img src={getImageUrl(item.image)} alt={item.displayName} className="w-full h-full object-cover" />
+                                            <img src={getImageUrl(item.image)} alt={item.displayName} loading="lazy" className="w-full h-full object-cover" />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-[#D2D2D7]">
                                                 <ImageIcon size={28} />
