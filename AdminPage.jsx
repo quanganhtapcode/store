@@ -471,11 +471,53 @@ const ProductModal = ({ product, onClose, onSave }) => {
                     <div className="flex flex-col items-center gap-3"><div className="w-28 h-28 bg-[#F5F5F7] rounded-2xl overflow-hidden border border-[#E8E8ED] flex items-center justify-center relative">{formData.image ? <img src={getImageUrl(formData.image)} className="w-full h-full object-cover" /> : <ImageIcon className="text-[#D2D2D7]" />}<input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageChange} accept="image/*" /></div><p className="text[12px] text-[#0071E3] font-bold">Chạm để đổi ảnh</p></div>
                     <div className="space-y-4">
                         <input value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Tên sản phẩm" className="w-full bg-[#F9F9FA] p-4 rounded-xl font-bold outline-none ring-1 ring-transparent focus:ring-[#0071E3]" />
+
+                        {/* Giá lẻ và Giá thùng */}
                         <div className="grid grid-cols-2 gap-3">
-                            <div><label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Giá lẻ (VND)</label><input type="number" value={formData.price} onChange={e => setFormData({ ...formData, price: parseInt(e.target.value) || 0 })} className="w-full bg-[#F9F9FA] p-3 rounded-xl font-bold text-[#0071E3] outline-none" /></div>
-                            <div><label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Tồn kho</label><input type="number" value={formData.stock} onChange={e => setFormData({ ...formData, stock: parseInt(e.target.value) || 0 })} className="w-full bg-[#F9F9FA] p-3 rounded-xl font-medium outline-none" /></div>
+                            <div>
+                                <label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Giá lẻ (VND)</label>
+                                <input type="number" value={formData.price} onChange={e => setFormData({ ...formData, price: parseInt(e.target.value) || 0 })} className="w-full bg-[#F9F9FA] p-3 rounded-xl font-bold text-[#0071E3] outline-none" />
+                            </div>
+                            <div>
+                                <label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Giá thùng (VND)</label>
+                                <input type="number" value={formData.case_price || 0} onChange={e => setFormData({ ...formData, case_price: parseInt(e.target.value) || 0 })} className="w-full bg-[#F9F9FA] p-3 rounded-xl font-bold text-[#FF9500] outline-none" />
+                            </div>
                         </div>
-                        <div><label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Mã vạch</label><div className="relative mt-1"><input value={formData.code || ''} onChange={e => setFormData({ ...formData, code: e.target.value })} placeholder="Quét hoặc nhập mã..." className="w-full bg-[#F9F9FA] pl-4 pr-12 py-3.5 rounded-xl font-mono text-[14px] outline-none" /><button onClick={() => setIsScanning(true)} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-white rounded-lg shadow-sm border border-[#E8E8ED] hover:scale-105 transition-transform"><ScanLine size={18} className="text-[#1D1D1F]" /></button></div></div>
+
+                        {/* Số lượng/thùng và Tồn kho */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">SL/Thùng</label>
+                                <input type="number" value={formData.units_per_case || 1} onChange={e => setFormData({ ...formData, units_per_case: parseInt(e.target.value) || 1 })} className="w-full bg-[#F9F9FA] p-3 rounded-xl font-medium outline-none" />
+                            </div>
+                            <div>
+                                <label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Tồn kho</label>
+                                <input type="number" value={formData.stock} onChange={e => setFormData({ ...formData, stock: parseInt(e.target.value) || 0 })} className="w-full bg-[#F9F9FA] p-3 rounded-xl font-medium outline-none" />
+                            </div>
+                        </div>
+
+                        {/* Brand & Category */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Thương hiệu</label>
+                                <input value={formData.brand || ''} onChange={e => setFormData({ ...formData, brand: e.target.value })} placeholder="VD: Castrol, Total..." className="w-full bg-[#F9F9FA] p-3 rounded-xl font-medium outline-none" />
+                            </div>
+                            <div>
+                                <label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Danh mục</label>
+                                <input value={formData.category || ''} onChange={e => setFormData({ ...formData, category: e.target.value })} placeholder="VD: Nhớt, Nước mát..." className="w-full bg-[#F9F9FA] p-3 rounded-xl font-medium outline-none" />
+                            </div>
+                        </div>
+
+                        {/* Mã vạch */}
+                        <div>
+                            <label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Mã vạch (Barcode)</label>
+                            <div className="relative mt-1">
+                                <input value={formData.code || ''} onChange={e => setFormData({ ...formData, code: e.target.value })} placeholder="Quét hoặc nhập mã..." className="w-full bg-[#F9F9FA] pl-4 pr-12 py-3.5 rounded-xl font-mono text-[14px] outline-none" />
+                                <button onClick={() => setIsScanning(true)} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-white rounded-lg shadow-sm border border-[#E8E8ED] hover:scale-105 transition-transform">
+                                    <ScanLine size={18} className="text-[#1D1D1F]" />
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div className="p-4 border-t border-[#F5F5F7]"><button onClick={handleSubmit} className="w-full bg-[#0071E3] text-white py-4 rounded-2xl font-bold text-[16px] shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-transform">Lưu sản phẩm</button></div>
