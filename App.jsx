@@ -78,7 +78,7 @@ const App = () => {
             if (res.ok) {
                 setLastOrder(order);
                 setCart([]);
-                setShowReceipt(true);
+                // Không hiện popup receipt nữa - xong luôn
                 fetchData();
             }
         } catch (error) {

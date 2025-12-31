@@ -351,11 +351,12 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
         return grouped;
     }, [importProducts]);
 
-    const addToImport = (p) => {
+    const addToImport = (p, isCase = false) => {
+        const qty = isCase ? (p.units_per_case || 1) : 1;
         setImportCart(prev => {
             const ex = prev.find(i => i.id === p.id);
-            if (ex) return prev.map(i => i.id === p.id ? { ...i, quantity: i.quantity + 1 } : i);
-            return [...prev, { ...p, quantity: 1, importPrice: p.price * 0.7 }];
+            if (ex) return prev.map(i => i.id === p.id ? { ...i, quantity: i.quantity + qty } : i);
+            return [...prev, { ...p, quantity: qty, importPrice: p.price * 0.7 }];
         });
     };
 
@@ -373,21 +374,24 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
 
     const ImportTab = () => {
         const ImportProductCard = ({ p }) => (
-            <div
-                onClick={() => addToImport(p)}
-                className={`bg-white rounded-2xl overflow-hidden border-2 transition-all cursor-pointer active:scale-[0.97] flex-shrink-0 w-36 ${importCart.some(i => i.id === p.id) ? 'border-[#0071E3] shadow-lg' : 'border-transparent shadow-sm'}`}
-            >
-                <div className="h-28 bg-[#F9F9FA] flex items-center justify-center overflow-hidden relative">
+            <div className={`bg-white rounded-2xl overflow-hidden border-2 transition-all flex-shrink-0 w-36 ${importCart.some(i => i.id === p.id) ? 'border-[#0071E3] shadow-lg' : 'border-transparent shadow-sm'}`}>
+                <div className="h-24 bg-[#F9F9FA] flex items-center justify-center overflow-hidden relative" onClick={() => addToImport(p)}>
                     {p.image ? <img src={getImageUrl(p.image)} loading="lazy" className="w-full h-full object-cover" /> : <ImageIcon size={28} className="text-[#D2D2D7]" />}
                     {importCart.some(i => i.id === p.id) && (
-                        <div className="absolute top-2 right-2 bg-[#0071E3] text-white text-[11px] px-2 py-0.5 rounded-full font-bold">
+                        <div className="absolute top-1 right-1 bg-[#0071E3] text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
                             +{importCart.find(i => i.id === p.id)?.quantity}
                         </div>
                     )}
                 </div>
                 <div className="p-2">
-                    <p className="font-bold text-[11px] text-[#1D1D1F] line-clamp-2 h-[2.4em]">{p.name}</p>
-                    <span className="text-[10px] text-[#86868B]">Tồn: {p.stock}</span>
+                    <p className="font-bold text-[10px] text-[#1D1D1F] line-clamp-1">{p.name}</p>
+                    <p className="text-[9px] text-[#86868B]">Tồn: {p.stock} {p.units_per_case > 1 && `• Thùng ${p.units_per_case}`}</p>
+                    <div className="flex gap-1 mt-1.5">
+                        <button onClick={() => addToImport(p)} className="flex-1 bg-[#0071E3] text-white text-[9px] py-1 rounded-lg font-bold active:scale-95">+1</button>
+                        {p.units_per_case > 1 && (
+                            <button onClick={() => addToImport(p, true)} className="flex-1 bg-[#34C759] text-white text-[9px] py-1 rounded-lg font-bold active:scale-95">+{p.units_per_case}</button>
+                        )}
+                    </div>
                 </div>
             </div>
         );
