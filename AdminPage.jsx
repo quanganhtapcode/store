@@ -129,6 +129,7 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
 
     // Import State
     const [importCart, setImportCart] = useState([]);
+    const [importSearch, setImportSearch] = useState('');
     const [showImportModal, setShowImportModal] = useState(false);
 
     // Order State
@@ -190,11 +191,9 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
                     <p className="text-[11px] text-[#86868B] font-bold uppercase">Tháng này</p>
                     <p className="text-[20px] font-black text-[#0071E3] mt-1">{stats.monthRevenue?.toLocaleString()}đ</p>
                 </div>
-                <div className="bg-white p-5 rounded-[2rem] border border-[#F5F5F7] shadow-sm" onClick={syncImages}>
-                    <p className="text-[11px] text-[#86868B] font-bold uppercase">Hệ thống</p>
-                    <div className="flex items-center gap-2 mt-2 text-[#1D1D1F] font-bold text-[13px]">
-                        <RefreshCw size={16} /> Đồng bộ ảnh
-                    </div>
+                <div className="bg-white p-5 rounded-[2rem] border border-[#F5F5F7] shadow-sm">
+                    <p className="text-[11px] text-[#86868B] font-bold uppercase">Kho hàng</p>
+                    <p className="text-[20px] font-black text-[#1D1D1F] mt-1">{products.length} <span className="text-[14px] font-bold text-[#86868B]">sản phẩm</span></p>
                 </div>
             </div>
 
@@ -326,34 +325,75 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
         );
     };
 
-    const ImportTab = () => {
-        const [importSearch, setImportSearch] = useState('');
-        const importProducts = useMemo(() =>
-            products.filter(p => p.name.toLowerCase().includes(importSearch.toLowerCase()) || p.id.includes(importSearch)),
-            [products, importSearch]
+    // Import Tab helper functions (outside component to prevent re-render)
+    const importProducts = useMemo(() => {
+        const normalizeText = (text) => {
+            if (!text) return '';
+            return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+        };
+        const searchNorm = normalizeText(importSearch);
+        if (!searchNorm.trim()) return products;
+        return products.filter(p =>
+            normalizeText(p.name).includes(searchNorm) ||
+            normalizeText(p.brand).includes(searchNorm) ||
+            (p.code && p.code.includes(importSearch))
         );
+    }, [products, importSearch]);
 
-        const addToImport = (p) => {
-            setImportCart(prev => {
-                const ex = prev.find(i => i.id === p.id);
-                if (ex) return prev.map(i => i.id === p.id ? { ...i, quantity: i.quantity + 1 } : i);
-                return [...prev, { ...p, quantity: 1, importPrice: p.price * 0.7 }];
+    const importProductsByBrand = useMemo(() => {
+        const grouped = {};
+        importProducts.forEach(p => {
+            const brand = p.brand || 'Khác';
+            if (!grouped[brand]) grouped[brand] = [];
+            grouped[brand].push(p);
+        });
+        return grouped;
+    }, [importProducts]);
+
+    const addToImport = (p) => {
+        setImportCart(prev => {
+            const ex = prev.find(i => i.id === p.id);
+            if (ex) return prev.map(i => i.id === p.id ? { ...i, quantity: i.quantity + 1 } : i);
+            return [...prev, { ...p, quantity: 1, importPrice: p.price * 0.7 }];
+        });
+    };
+
+    const submitImport = async () => {
+        if (importCart.length === 0) return;
+        const total_cost = importCart.reduce((s, i) => s + (i.importPrice * i.quantity), 0);
+        try {
+            await fetch(`${API_URL}/imports`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items: importCart, total_cost, note: 'Nhập hàng nhanh' })
             });
-        };
-        const submitImport = async () => {
-            if (importCart.length === 0) return;
-            const total_cost = importCart.reduce((s, i) => s + (i.importPrice * i.quantity), 0);
-            try {
-                await fetch(`${API_URL}/imports`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ items: importCart, total_cost, note: 'Nhập hàng nhanh' })
-                });
-                alert('Đã nhập kho thành công!'); setImportCart([]); refreshData();
-            } catch (e) { alert('Lỗi nhập kho'); }
-        };
+            alert('Đã nhập kho thành công!'); setImportCart([]); refreshData();
+        } catch (e) { alert('Lỗi nhập kho'); }
+    };
+
+    const ImportTab = () => {
+        const ImportProductCard = ({ p }) => (
+            <div
+                onClick={() => addToImport(p)}
+                className={`bg-white rounded-2xl overflow-hidden border-2 transition-all cursor-pointer active:scale-[0.97] flex-shrink-0 w-36 ${importCart.some(i => i.id === p.id) ? 'border-[#0071E3] shadow-lg' : 'border-transparent shadow-sm'}`}
+            >
+                <div className="h-28 bg-[#F9F9FA] flex items-center justify-center overflow-hidden relative">
+                    {p.image ? <img src={getImageUrl(p.image)} className="w-full h-full object-cover" /> : <ImageIcon size={28} className="text-[#D2D2D7]" />}
+                    {importCart.some(i => i.id === p.id) && (
+                        <div className="absolute top-2 right-2 bg-[#0071E3] text-white text-[11px] px-2 py-0.5 rounded-full font-bold">
+                            +{importCart.find(i => i.id === p.id)?.quantity}
+                        </div>
+                    )}
+                </div>
+                <div className="p-2">
+                    <p className="font-bold text-[11px] text-[#1D1D1F] line-clamp-2 h-[2.4em]">{p.name}</p>
+                    <span className="text-[10px] text-[#86868B]">Tồn: {p.stock}</span>
+                </div>
+            </div>
+        );
 
         return (
             <div className="space-y-4 pb-20">
+                {/* Cart */}
                 <div className="bg-gradient-to-br from-[#1D1D1F] to-[#2D2D2F] p-5 rounded-3xl shadow-xl text-white">
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="font-bold text-[16px] flex items-center gap-2">
@@ -375,17 +415,15 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="font-medium text-[13px] truncate">{i.name}</p>
-                                        <p className="text-[11px] text-white/60">Tồn hiện tại: {i.stock}</p>
+                                        <p className="text-[11px] text-white/60">Tồn: {i.stock}</p>
                                     </div>
                                     <div className="flex flex-col gap-1 items-end">
-                                        <div className="flex items-center gap-1 bg-white/20 rounded-lg px-2 py-1">
-                                            <button onClick={() => setImportCart(prev => prev.map((pi, pii) => pii === idx ? { ...pi, quantity: Math.max(1, pi.quantity - 1) } : pi))} className="text-white/70 hover:text-white">-</button>
-                                            <input type="number" className="w-10 bg-transparent text-center text-[13px] font-bold" value={i.quantity} onChange={(e) => setImportCart(prev => prev.map((pi, pii) => pii === idx ? { ...pi, quantity: parseInt(e.target.value) || 1 } : pi))} />
-                                            <button onClick={() => setImportCart(prev => prev.map((pi, pii) => pii === idx ? { ...pi, quantity: pi.quantity + 1 } : pi))} className="text-white/70 hover:text-white">+</button>
+                                        <div className="flex items-center gap-2 bg-white/20 rounded-lg px-2 py-1">
+                                            <button onClick={() => setImportCart(prev => prev.map((pi, pii) => pii === idx ? { ...pi, quantity: Math.max(1, pi.quantity - 1) } : pi))} className="text-white/70 hover:text-white px-1">-</button>
+                                            <span className="w-8 text-center text-[13px] font-bold">{i.quantity}</span>
+                                            <button onClick={() => setImportCart(prev => prev.map((pi, pii) => pii === idx ? { ...pi, quantity: pi.quantity + 1 } : pi))} className="text-white/70 hover:text-white px-1">+</button>
                                         </div>
-                                        <button onClick={() => setImportCart(prev => prev.filter((_, pii) => pii !== idx))} className="text-red-400 text-[11px] hover:text-red-300">
-                                            Xóa
-                                        </button>
+                                        <button onClick={() => setImportCart(prev => prev.filter((_, pii) => pii !== idx))} className="text-red-400 text-[11px] hover:text-red-300">Xóa</button>
                                     </div>
                                 </div>
                             ))}
@@ -397,26 +435,29 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
                         </div>
                     )}
                 </div>
-                <div className="relative">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#86868B]" size={18} />
-                    <input type="text" placeholder="Tìm sản phẩm để nhập kho..." value={importSearch} onChange={(e) => setImportSearch(e.target.value)} className="w-full bg-white pl-11 pr-4 py-3.5 rounded-2xl text-[14px] font-medium outline-none shadow-sm border border-[#F5F5F7]" />
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {importProducts.slice(0, 30).map(p => (
-                        <div key={p.id} onClick={() => addToImport(p)} className={`bg-white rounded-2xl overflow-hidden border-2 transition-all cursor-pointer active:scale-[0.97] ${importCart.some(i => i.id === p.id) ? 'border-[#0071E3] shadow-lg' : 'border-transparent shadow-sm'}`}>
-                            <div className="aspect-square bg-[#F9F9FA] flex items-center justify-center overflow-hidden">
-                                {p.image ? <img src={getImageUrl(p.image)} className="w-full h-full object-cover" /> : <ImageIcon size={28} className="text-[#D2D2D7]" />}
-                            </div>
-                            <div className="p-2.5">
-                                <p className="font-bold text-[12px] text-[#1D1D1F] line-clamp-2 h-[2.4em]">{p.name}</p>
-                                <div className="flex justify-between items-center mt-1">
-                                    <span className="text-[11px] text-[#86868B]">Tồn: {p.stock}</span>
-                                    {importCart.some(i => i.id === p.id) && <span className="text-[10px] bg-[#0071E3] text-white px-1.5 py-0.5 rounded-full font-bold">+{importCart.find(i => i.id === p.id)?.quantity}</span>}
-                                </div>
-                            </div>
+
+                {/* Products by brand - horizontal scroll */}
+                {Object.entries(importProductsByBrand).map(([brand, items]) => (
+                    <div key={brand}>
+                        <div className="flex items-center gap-2 mb-3">
+                            <Package size={18} className="text-[#0071E3]" />
+                            <h3 className="font-bold text-[15px] text-[#1D1D1F]">{brand}</h3>
+                            <span className="text-[12px] text-[#86868B]">({items.length})</span>
                         </div>
-                    ))}
-                </div>
+                        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
+                            {items.map(p => (
+                                <ImportProductCard key={p.id} p={p} />
+                            ))}
+                        </div>
+                    </div>
+                ))}
+
+                {Object.keys(importProductsByBrand).length === 0 && (
+                    <div className="text-center py-10 text-[#86868B]">
+                        <Package size={48} className="mx-auto mb-3 opacity-50" />
+                        <p className="font-medium">Không tìm thấy sản phẩm</p>
+                    </div>
+                )}
             </div>
         );
     };
@@ -443,7 +484,7 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
                     ))}
                 </div>
 
-                {/* Search Bar - Only show on products tab, outside of ProductsTab to prevent focus loss */}
+                {/* Search Bar - Products tab */}
                 {activeTab === 'products' && (
                     <div className="flex gap-2 mt-3">
                         <div className="relative flex-1">
@@ -457,10 +498,7 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
                                 className="w-full bg-[#F5F5F7] pl-10 pr-10 py-3 rounded-2xl text-[14px] font-medium outline-none border border-transparent focus:border-[#0071E3] focus:bg-white transition-all"
                             />
                             {searchTerm && (
-                                <button
-                                    onClick={() => setSearchTerm('')}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 bg-[#86868B] rounded-full hover:bg-[#6e6e73]"
-                                >
+                                <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 bg-[#86868B] rounded-full hover:bg-[#6e6e73]">
                                     <X size={12} className="text-white" />
                                 </button>
                             )}
@@ -468,6 +506,28 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
                         <button onClick={() => setShowAddProduct(true)} className="bg-[#1D1D1F] text-white w-12 rounded-2xl flex items-center justify-center shadow-lg active:scale-90 transition-all">
                             <Plus size={22} />
                         </button>
+                    </div>
+                )}
+
+                {/* Search Bar - Import tab */}
+                {activeTab === 'import' && (
+                    <div className="flex gap-2 mt-3">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#86868B]" size={18} />
+                            <input
+                                type="text"
+                                placeholder="Tìm sản phẩm để nhập kho..."
+                                value={importSearch}
+                                onChange={(e) => setImportSearch(e.target.value)}
+                                autoComplete="off"
+                                className="w-full bg-[#F5F5F7] pl-10 pr-10 py-3 rounded-2xl text-[14px] font-medium outline-none border border-transparent focus:border-[#0071E3] focus:bg-white transition-all"
+                            />
+                            {importSearch && (
+                                <button onClick={() => setImportSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 bg-[#86868B] rounded-full hover:bg-[#6e6e73]">
+                                    <X size={12} className="text-white" />
+                                </button>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>
