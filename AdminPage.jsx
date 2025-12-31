@@ -31,7 +31,7 @@ const QRScanner = ({ onResult, onClose }) => {
             try {
                 // 1. Lấy danh sách camera để tìm camera sau
                 const devices = await Html5Qrcode.getCameras();
-                
+
                 if (devices && devices.length) {
                     // Tìm camera có tên chứa 'back', 'sau', 'environment'
                     const backCamera = devices.find(device => {
@@ -42,20 +42,20 @@ const QRScanner = ({ onResult, onClose }) => {
                     // Lấy ID camera sau (nếu có) hoặc lấy cái đầu tiên
                     const cameraId = backCamera ? backCamera.id : devices[0].id;
 
-                    const config = { 
+                    const config = {
                         fps: 25, // Tăng FPS lên cao để bắt nét nhanh
-                        qrbox: { width: 250, height: 250 }, 
+                        qrbox: { width: 250, height: 250 },
                         aspectRatio: 1.0,
-                        disableFlip: false, 
+                        disableFlip: false,
                     };
 
                     await html5QrCode.start(
-                        cameraId, 
+                        cameraId,
                         config,
                         (decodedText) => {
                             // Play beep sound
                             const beep = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQMCI6bO2NSVJxQVkM7Q0qswFBKPx8TAqiMh');
-                            beep.play().catch(() => {});
+                            beep.play().catch(() => { });
 
                             html5QrCode.stop().then(() => {
                                 onResult(decodedText);
@@ -174,7 +174,7 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
     const filteredProducts = useMemo(() => products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || (p.code && p.code.includes(searchTerm))), [products, searchTerm]);
     const displayedProducts = useMemo(() => filteredProducts.slice(0, displayLimit), [filteredProducts, displayLimit]);
     const handleScroll = (e) => { if (e.target.scrollHeight - e.target.scrollTop <= e.target.clientHeight + 200 && displayLimit < filteredProducts.length) setDisplayLimit(prev => prev + 20); };
-    
+
     // --- TABS ---
     const DashboardTab = () => (
         <div className="space-y-4 pb-20">
@@ -212,32 +212,104 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
         </div>
     );
 
-    const ProductsTab = () => (
-        <div className="space-y-4">
-            <div className="sticky top-0 bg-[#F5F5F7] z-10 pb-2 pt-1 flex gap-2">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#86868B]" size={18} />
-                    <input type="text" placeholder="Tìm..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-white pl-10 pr-4 py-3.5 rounded-2xl text-[14px] font-medium outline-none shadow-sm" />
+    const ProductsTab = () => {
+        // Group products by brand
+        const trendingProducts = useMemo(() =>
+            [...products].sort((a, b) => (b.total_sold || 0) - (a.total_sold || 0)).slice(0, 10),
+            [products]
+        );
+
+        const productsByBrand = useMemo(() => {
+            const grouped = {};
+            products.filter(p =>
+                p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (p.code && p.code.includes(searchTerm))
+            ).forEach(p => {
+                const brand = p.brand || 'Khác';
+                if (!grouped[brand]) grouped[brand] = [];
+                grouped[brand].push(p);
+            });
+            return grouped;
+        }, [products, searchTerm]);
+
+        const ProductCard = ({ p, size = 'normal' }) => (
+            <div
+                onClick={() => setEditingProduct(p)}
+                className={`bg-white rounded-2xl overflow-hidden shadow-sm border border-[#F5F5F7] active:scale-[0.97] transition-all cursor-pointer flex-shrink-0 ${size === 'small' ? 'w-32' : 'w-40'}`}
+            >
+                <div className={`${size === 'small' ? 'h-28' : 'h-36'} bg-[#F9F9FA] flex items-center justify-center relative overflow-hidden`}>
+                    {p.image ? <img src={getImageUrl(p.image)} className="w-full h-full object-cover" /> : <ImageIcon size={28} className="text-[#D2D2D7]" />}
+                    <div className="absolute top-2 left-2 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-white/90 shadow-sm">
+                        {p.stock}
+                    </div>
                 </div>
-                <button onClick={() => setShowAddProduct(true)} className="bg-[#1D1D1F] text-white w-12 rounded-2xl flex items-center justify-center shadow-lg active:scale-90 transition-all"><Plus size={24} /></button>
+                <div className="p-2.5">
+                    <h4 className="font-bold text-[#1D1D1F] text-[12px] line-clamp-2 h-[2.4em] mb-1">{p.name}</h4>
+                    <p className="text-[#0071E3] font-black text-[14px]">{p.price?.toLocaleString()}đ</p>
+                    {p.case_price > 0 && (
+                        <p className="text-[10px] text-[#FF9500] font-bold">Thùng: {p.case_price?.toLocaleString()}đ</p>
+                    )}
+                </div>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pb-20">
-                {displayedProducts.map(p => (
-                    <div key={p.id} onClick={() => setEditingProduct(p)} className="bg-white rounded-[1.5rem] overflow-hidden shadow-sm border border-[#F5F5F7] active:scale-[0.98] transition-all relative group">
-                        <div className="absolute top-2 left-2 px-2 py-1 rounded-lg text-[10px] font-bold z-10 bg-white/90 shadow-sm">Kho: {p.stock}</div>
-                        <div className="aspect-square bg-[#F9F9FA] flex items-center justify-center relative overflow-hidden">
-                            {p.image ? <img src={getImageUrl(p.image)} className="w-full h-full object-cover" /> : <ImageIcon size={32} className="text-[#D2D2D7]" />}
+        );
+
+        return (
+            <div className="space-y-5 pb-20">
+                {/* Search + Add */}
+                <div className="sticky top-0 bg-[#F5F5F7] z-10 pb-3 pt-1 flex gap-2">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#86868B]" size={18} />
+                        <input type="text" placeholder="Tìm sản phẩm, mã vạch..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-white pl-10 pr-4 py-3.5 rounded-2xl text-[14px] font-medium outline-none shadow-sm" />
+                    </div>
+                    <button onClick={() => setShowAddProduct(true)} className="bg-[#1D1D1F] text-white w-12 rounded-2xl flex items-center justify-center shadow-lg active:scale-90 transition-all">
+                        <Plus size={24} />
+                    </button>
+                </div>
+
+                {/* Thịnh hành - Horizontal scroll */}
+                {searchTerm === '' && (
+                    <div>
+                        <div className="flex items-center gap-2 mb-3">
+                            <Sparkles size={18} className="text-[#FF9500]" />
+                            <h3 className="font-bold text-[16px] text-[#1D1D1F]">Thịnh hành</h3>
+                            <span className="text-[12px] text-[#86868B]">({trendingProducts.length})</span>
                         </div>
-                        <div className="p-3">
-                            <h4 className="font-bold text-[#1D1D1F] text-[13px] line-clamp-2 h-[2.5em] mb-1">{p.name}</h4>
-                            <p className="text-[#0071E3] font-black text-[15px]">{p.price.toLocaleString()}đ</p>
-                            <p className="text-[10px] text-[#86868B] mt-1 truncate">ID: {p.id}</p>
+                        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
+                            {trendingProducts.map(p => (
+                                <ProductCard key={p.id} p={p} size="small" />
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Theo Brand - Horizontal scroll sections */}
+                {Object.entries(productsByBrand).map(([brand, items]) => (
+                    <div key={brand}>
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                                <Package size={18} className="text-[#0071E3]" />
+                                <h3 className="font-bold text-[16px] text-[#1D1D1F]">{brand}</h3>
+                                <span className="text-[12px] text-[#86868B]">({items.length})</span>
+                            </div>
+                        </div>
+                        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
+                            {items.map(p => (
+                                <ProductCard key={p.id} p={p} />
+                            ))}
                         </div>
                     </div>
                 ))}
+
+                {/* Empty state */}
+                {Object.keys(productsByBrand).length === 0 && (
+                    <div className="text-center py-10 text-[#86868B]">
+                        <Package size={48} className="mx-auto mb-3 opacity-50" />
+                        <p className="font-medium">Không tìm thấy sản phẩm</p>
+                    </div>
+                )}
             </div>
-        </div>
-    );
+        );
+    };
 
     const ImportTab = () => {
         const [importSearch, setImportSearch] = useState('');
@@ -250,7 +322,7 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
             setImportCart(prev => {
                 const ex = prev.find(i => i.id === p.id);
                 if (ex) return prev.map(i => i.id === p.id ? { ...i, quantity: i.quantity + 1 } : i);
-                return [...prev, { ...p, quantity: 1, importPrice: p.price * 0.7 }]; 
+                return [...prev, { ...p, quantity: 1, importPrice: p.price * 0.7 }];
             });
         };
         const submitImport = async () => {
