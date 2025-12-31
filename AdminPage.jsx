@@ -213,6 +213,16 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
     );
 
     const ProductsTab = () => {
+        // Helper: Normalize text for search (remove accents)
+        const normalizeText = (text) => {
+            if (!text) return '';
+            return text.toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/đ/g, 'd')
+                .replace(/Đ/g, 'D');
+        };
+
         // Group products by brand
         const trendingProducts = useMemo(() =>
             [...products].sort((a, b) => (b.total_sold || 0) - (a.total_sold || 0)).slice(0, 10),
@@ -221,10 +231,26 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
 
         const productsByBrand = useMemo(() => {
             const grouped = {};
-            products.filter(p =>
-                p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (p.code && p.code.includes(searchTerm))
-            ).forEach(p => {
+            const searchNorm = normalizeText(searchTerm);
+
+            products.filter(p => {
+                if (!searchTerm.trim()) return true;
+
+                // Search in multiple fields
+                const nameNorm = normalizeText(p.name);
+                const brandNorm = normalizeText(p.brand);
+                const codeNorm = normalizeText(p.code);
+                const categoryNorm = normalizeText(p.category);
+
+                // Split search into words and check if all match
+                const searchWords = searchNorm.split(/\s+/).filter(w => w.length > 0);
+                return searchWords.every(word =>
+                    nameNorm.includes(word) ||
+                    brandNorm.includes(word) ||
+                    codeNorm.includes(word) ||
+                    categoryNorm.includes(word)
+                );
+            }).forEach(p => {
                 const brand = p.brand || 'Khác';
                 if (!grouped[brand]) grouped[brand] = [];
                 grouped[brand].push(p);
@@ -255,58 +281,74 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
 
         return (
             <div className="space-y-5 pb-20">
-                {/* Search + Add */}
-                <div className="sticky top-0 bg-[#F5F5F7] z-10 pb-3 pt-1 flex gap-2">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#86868B]" size={18} />
-                        <input type="text" placeholder="Tìm sản phẩm, mã vạch..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-white pl-10 pr-4 py-3.5 rounded-2xl text-[14px] font-medium outline-none shadow-sm" />
-                    </div>
-                    <button onClick={() => setShowAddProduct(true)} className="bg-[#1D1D1F] text-white w-12 rounded-2xl flex items-center justify-center shadow-lg active:scale-90 transition-all">
-                        <Plus size={24} />
-                    </button>
-                </div>
-
-                {/* Thịnh hành - Horizontal scroll */}
-                {searchTerm === '' && (
-                    <div>
-                        <div className="flex items-center gap-2 mb-3">
-                            <Sparkles size={18} className="text-[#FF9500]" />
-                            <h3 className="font-bold text-[16px] text-[#1D1D1F]">Thịnh hành</h3>
-                            <span className="text-[12px] text-[#86868B]">({trendingProducts.length})</span>
+                {/* Search + Add - Sticky at top */}
+                <div className="sticky top-0 bg-[#F5F5F7] z-20 pb-3 pt-2 -mx-4 px-4 shadow-sm">
+                    <div className="flex gap-2">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#86868B]" size={18} />
+                            <input
+                                type="text"
+                                placeholder="Tìm sản phẩm, mã vạch, thương hiệu..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full bg-white pl-10 pr-4 py-3.5 rounded-2xl text-[14px] font-medium outline-none shadow-sm border border-[#E8E8ED] focus:border-[#0071E3] focus:ring-2 focus:ring-[#0071E3]/20"
+                            />
+                            {searchTerm && (
+                                <button
+                                    onClick={() => setSearchTerm('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 bg-[#86868B] rounded-full"
+                                >
+                                    <X size={12} className="text-white" />
+                                </button>
+                            )}
                         </div>
-                        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
-                            {trendingProducts.map(p => (
-                                <ProductCard key={p.id} p={p} size="small" />
-                            ))}
-                        </div>
+                        <button onClick={() => setShowAddProduct(true)} className="bg-[#1D1D1F] text-white w-12 rounded-2xl flex items-center justify-center shadow-lg active:scale-90 transition-all">
+                            <Plus size={24} />
+                        </button>
                     </div>
-                )}
 
-                {/* Theo Brand - Horizontal scroll sections */}
-                {Object.entries(productsByBrand).map(([brand, items]) => (
-                    <div key={brand}>
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                                <Package size={18} className="text-[#0071E3]" />
-                                <h3 className="font-bold text-[16px] text-[#1D1D1F]">{brand}</h3>
-                                <span className="text-[12px] text-[#86868B]">({items.length})</span>
+                    {/* Thịnh hành - Horizontal scroll */}
+                    {searchTerm === '' && (
+                        <div>
+                            <div className="flex items-center gap-2 mb-3">
+                                <Sparkles size={18} className="text-[#FF9500]" />
+                                <h3 className="font-bold text-[16px] text-[#1D1D1F]">Thịnh hành</h3>
+                                <span className="text-[12px] text-[#86868B]">({trendingProducts.length})</span>
+                            </div>
+                            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
+                                {trendingProducts.map(p => (
+                                    <ProductCard key={p.id} p={p} size="small" />
+                                ))}
                             </div>
                         </div>
-                        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
-                            {items.map(p => (
-                                <ProductCard key={p.id} p={p} />
-                            ))}
-                        </div>
-                    </div>
-                ))}
+                    )}
 
-                {/* Empty state */}
-                {Object.keys(productsByBrand).length === 0 && (
-                    <div className="text-center py-10 text-[#86868B]">
-                        <Package size={48} className="mx-auto mb-3 opacity-50" />
-                        <p className="font-medium">Không tìm thấy sản phẩm</p>
-                    </div>
-                )}
+                    {/* Theo Brand - Horizontal scroll sections */}
+                    {Object.entries(productsByBrand).map(([brand, items]) => (
+                        <div key={brand}>
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                    <Package size={18} className="text-[#0071E3]" />
+                                    <h3 className="font-bold text-[16px] text-[#1D1D1F]">{brand}</h3>
+                                    <span className="text-[12px] text-[#86868B]">({items.length})</span>
+                                </div>
+                            </div>
+                            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
+                                {items.map(p => (
+                                    <ProductCard key={p.id} p={p} />
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+
+                    {/* Empty state */}
+                    {Object.keys(productsByBrand).length === 0 && (
+                        <div className="text-center py-10 text-[#86868B]">
+                            <Package size={48} className="mx-auto mb-3 opacity-50" />
+                            <p className="font-medium">Không tìm thấy sản phẩm</p>
+                        </div>
+                    )}
+                </div>
             </div>
         );
     };
