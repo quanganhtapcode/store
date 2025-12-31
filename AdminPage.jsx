@@ -534,9 +534,18 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
             </div>
             <main className="flex-1 overflow-y-auto p-4 scroll-smooth" onScroll={handleScroll}>
                 <div className="max-w-4xl mx-auto">
+                    {/* Dashboard tab - conditional render (no images) */}
                     {activeTab === 'dashboard' && <DashboardTab />}
-                    {activeTab === 'products' && <ProductsTab />}
-                    {activeTab === 'import' && <ImportTab />}
+
+                    {/* Products & Import tabs - keep mounted, use CSS to hide (preserve image cache) */}
+                    <div className={activeTab === 'products' ? '' : 'hidden'}>
+                        <ProductsTab />
+                    </div>
+                    <div className={activeTab === 'import' ? '' : 'hidden'}>
+                        <ImportTab />
+                    </div>
+
+                    {/* Orders tab */}
                     {activeTab === 'orders' && (
                         <div className="space-y-3 pb-20">
                             {orders.map(o => {
