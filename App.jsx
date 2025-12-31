@@ -58,12 +58,13 @@ const App = () => {
         });
     };
 
-    const checkout = async () => {
+    const checkout = async (paymentMethod = 'cash') => {
         if (cart.length === 0) return;
         const total = cart.reduce((s, i) => s + (i.finalPrice * i.quantity), 0);
         const order = {
             items: cart,
             total,
+            payment_method: paymentMethod,
             timestamp: Date.now()
         };
 

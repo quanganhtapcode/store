@@ -28,6 +28,7 @@ const POSView = ({
     setCart
 }) => {
     const [showCartDetail, setShowCartDetail] = useState(false);
+    const [showPaymentChoice, setShowPaymentChoice] = useState(false);
 
     const expandedProducts = useMemo(() => {
         const result = [];
@@ -83,6 +84,12 @@ const POSView = ({
             }
             return item;
         }).filter(item => item.quantity > 0));
+    };
+
+    const handlePayment = (method) => {
+        checkout(method); // Pass payment method to checkout
+        setShowPaymentChoice(false);
+        setShowCartDetail(false);
     };
 
     const ProductCard = ({ p, size = "md" }) => (
@@ -265,19 +272,27 @@ const POSView = ({
                                 <span className="font-bold text-[#86868B] text-[14px] uppercase tracking-wide">Tổng cộng</span>
                                 <span className="font-black text-[#1D1D1F] text-[28px]">{cart.reduce((s, i) => s + (i.finalPrice * i.quantity), 0).toLocaleString()}đ</span>
                             </div>
-                            <button
-                                onClick={() => { checkout(); setShowCartDetail(false); }}
-                                className="w-full bg-[#0071E3] text-white py-5 rounded-2xl font-bold text-[18px] active:scale-[0.98] transition-all shadow-lg shadow-blue-500/30"
-                            >
-                                Xác nhận thanh toán
-                            </button>
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    onClick={() => handlePayment('cash')}
+                                    className="bg-[#34C759] text-white py-5 rounded-2xl font-bold text-[16px] active:scale-[0.98] transition-all shadow-lg flex items-center justify-center gap-2"
+                                >
+                                    💵 Tiền mặt
+                                </button>
+                                <button
+                                    onClick={() => handlePayment('transfer')}
+                                    className="bg-[#0071E3] text-white py-5 rounded-2xl font-bold text-[16px] active:scale-[0.98] transition-all shadow-lg flex items-center justify-center gap-2"
+                                >
+                                    📱 Chuyển khoản
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             )}
 
             {cart.length > 0 && !showCartDetail && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-40px)] max-w-[380px] z-50 animate-in slide-in-from-bottom-5">
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-40px)] max-w-[380px] z-50">
                     <div
                         onClick={() => setShowCartDetail(true)}
                         className="bg-[#1D1D1F]/95 backdrop-blur-xl rounded-[2.5rem] p-2.5 flex items-center shadow-2xl border border-white/10 overflow-hidden cursor-pointer active:scale-[0.98] transition-all hover:bg-[#000]"
@@ -296,8 +311,8 @@ const POSView = ({
                             </div>
                         </div>
                         <button
-                            onClick={(e) => { e.stopPropagation(); checkout(); }}
-                            className="bg-[#0071E3] text-white px-8 py-3.5 rounded-full font-bold text-[14px] active:scale-95 transition-all shadow-lg hover:bg-[#0077ED]"
+                            onClick={(e) => { e.stopPropagation(); setShowCartDetail(true); }}
+                            className="bg-[#0071E3] text-white px-6 py-3.5 rounded-full font-bold text-[14px] active:scale-95 transition-all shadow-lg"
                         >
                             Thanh toán
                         </button>
