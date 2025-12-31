@@ -27,9 +27,9 @@ const QRScanner = ({ onResult, onClose }) => {
                 // Khi quét thành công
                 // Dừng scanner ngay lập tức để tránh quét lặp lại
                 html5QrCode.stop().then(() => {
-                    onResult(decodedText);
-                    onClose(); // Đóng scanner sau khi scan thành công
                     scannerRef.current = null;
+                    onClose(); // Đóng scanner trước
+                    onResult(decodedText); // Sau đó xử lý kết quả
                 }).catch(err => console.error("Stop failed", err));
             },
             (errorMessage) => {
