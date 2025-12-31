@@ -164,16 +164,49 @@ app.post('/api/products/sync-images', async (req, res) => {
     });
 });
 
+// --- Helper: Save base64 image to file ---
+const saveBase64Image = (base64Data, productId) => {
+    if (!base64Data || !base64Data.startsWith('data:image')) return null;
+
+    try {
+        // Extract base64 content
+        const matches = base64Data.match(/^data:image\/(\w+);base64,(.+)$/);
+        if (!matches) return null;
+
+        const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
+        const data = matches[2];
+        const filename = `${productId}.${ext}`;
+        const filepath = path.join(imagesDir, filename);
+
+        // Write file
+        fs.writeFileSync(filepath, Buffer.from(data, 'base64'));
+        console.log(`✅ Saved image: ${filename}`);
+
+        return `/images/${filename}`;
+    } catch (err) {
+        console.error('Failed to save image:', err);
+        return null;
+    }
+};
+
 app.post('/api/products', (req, res) => {
     const p = req.body;
     const id = generateId('PRD'); // ID Chuyên nghiệp 10 ký tự
+
+    // Auto save base64 image to file
+    let imagePath = p.image;
+    if (p.image && p.image.startsWith('data:image')) {
+        const savedPath = saveBase64Image(p.image, id);
+        if (savedPath) imagePath = savedPath;
+    }
+
     db.run(`INSERT INTO products (id, name, brand, category, price, case_price, units_per_case, stock, code, image, total_sold) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-        [id, p.name, p.brand, p.category, p.price, p.case_price, p.units_per_case, p.stock, p.code, p.image],
+        [id, p.name, p.brand, p.category, p.price, p.case_price, p.units_per_case, p.stock, p.code, imagePath],
         function (err) {
             if (err) return res.status(500).json({ error: err.message });
             logActivity('ADD_PRODUCT', `Added ${p.name}`);
-            res.json({ id, success: true });
+            res.json({ id, success: true, image: imagePath });
         }
     );
 });
@@ -287,12 +320,20 @@ app.get('/api/logs', (req, res) => {
 app.put('/api/products/:id', (req, res) => {
     const { id } = req.params;
     const p = req.body;
+
+    // Auto save base64 image to file
+    let imagePath = p.image;
+    if (p.image && p.image.startsWith('data:image')) {
+        const savedPath = saveBase64Image(p.image, id);
+        if (savedPath) imagePath = savedPath;
+    }
+
     db.run(`UPDATE products SET name = ?, brand = ?, category = ?, price = ?, case_price = ?, units_per_case = ?, stock = ?, code = ?, image = ? WHERE id = ?`,
-        [p.name, p.brand, p.category, p.price, p.case_price, p.units_per_case, p.stock, p.code, p.image, id],
+        [p.name, p.brand, p.category, p.price, p.case_price, p.units_per_case, p.stock, p.code, imagePath, id],
         function (err) {
             if (err) return res.status(500).json({ error: err.message });
             logActivity('UPDATE_PRODUCT', `Updated ${p.name}`);
-            res.json({ success: true, changes: this.changes });
+            res.json({ success: true, changes: this.changes, image: imagePath });
         }
     );
 });
