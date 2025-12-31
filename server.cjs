@@ -15,13 +15,24 @@ app.use(cors({ origin: '*', credentials: true })); // Allow all origins explicit
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
-// --- Static Image Serving (Tối ưu tốc độ) ---
+// --- Static Image Serving (Tối ưu tốc độ + Cache) ---
 const imagesDir = path.join(__dirname, 'public/images');
 if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir, { recursive: true });
-app.use('/images', express.static(imagesDir));
 
-// Served via /images from public/images
-// Structure will be: /images/original/..., /images/grid/..., /images/detail/...
+// Cache images for 30 days (immutable since image content rarely changes)
+app.use('/images', express.static(imagesDir, {
+    maxAge: '30d',           // Cache 30 ngày
+    etag: true,              // Enable ETag for validation
+    lastModified: true,      // Enable Last-Modified header
+    immutable: true          // Tell browser: this file won't change
+}));
+
+// Also serve public folder with caching
+app.use(express.static(path.join(__dirname, 'public'), {
+    maxAge: '7d'
+}));
+
+// Structure: /images/original/..., /images/grid/..., /images/detail/...
 
 const dbPath = path.join(__dirname, 'pos.db');
 const db = new sqlite3.Database(dbPath);
