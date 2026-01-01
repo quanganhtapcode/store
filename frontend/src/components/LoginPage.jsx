@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Lock, User, Eye, EyeOff, AlertCircle, Loader2, ShieldCheck, Sparkles } from 'lucide-react';
+import { Lock, User, Eye, EyeOff, AlertCircle, Loader2, ChevronLeft } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
-const LoginPage = ({ onLogin }) => {
+const LoginPage = ({ onLogin, onBack }) => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -40,63 +40,54 @@ const LoginPage = ({ onLogin }) => {
     };
 
     return (
-        <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4 font-['Inter'] relative overflow-hidden">
-            {/* Animated Background */}
-            <div className="absolute inset-0">
-                {/* Gradient orbs */}
-                <div className="absolute top-1/4 -left-20 w-96 h-96 bg-blue-600/30 rounded-full blur-[120px] animate-pulse"></div>
-                <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-purple-600/30 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }}></div>
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-500/10 rounded-full blur-[150px]"></div>
-
-                {/* Grid pattern */}
-                <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:50px_50px]"></div>
-            </div>
-
-            <div className="relative w-full max-w-md">
-                {/* Logo/Title */}
-                <div className="text-center mb-10">
-                    <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 rounded-3xl mb-5 shadow-2xl shadow-indigo-500/30 relative">
-                        <ShieldCheck className="w-10 h-10 text-white" />
-                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full border-2 border-[#0a0a0f] flex items-center justify-center">
-                            <Sparkles size={10} className="text-white" />
-                        </div>
-                    </div>
-                    <h1 className="text-3xl font-black text-white mb-2 tracking-tight">
-                        Gemini POS
-                    </h1>
-                    <p className="text-white/40 text-sm font-medium">
-                        Hệ thống Quản trị Bán hàng Chuyên nghiệp
-                    </p>
+        <div className="min-h-screen bg-[#F5F5F7] flex flex-col font-['Inter']">
+            {/* Header */}
+            <header className="bg-white/90 backdrop-blur-md px-4 py-3.5 border-b border-[#D2D2D7]/30 shadow-sm">
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => window.history.back()}
+                        className="w-10 h-10 bg-[#F5F5F7] text-[#1D1D1F] rounded-full flex items-center justify-center active:scale-90 transition-transform"
+                    >
+                        <ChevronLeft size={22} />
+                    </button>
+                    <h1 className="font-black text-[17px] text-[#1D1D1F]">Đăng nhập Quản trị</h1>
                 </div>
+            </header>
 
-                {/* Login Form */}
-                <form onSubmit={handleSubmit} className="bg-white/[0.03] backdrop-blur-xl p-8 rounded-[2rem] border border-white/[0.08] shadow-2xl relative overflow-hidden">
-                    {/* Form glow effect */}
-                    <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-40 h-40 bg-blue-500/20 rounded-full blur-3xl"></div>
+            {/* Content */}
+            <main className="flex-1 flex items-center justify-center p-5">
+                <div className="w-full max-w-sm">
+                    {/* Logo */}
+                    <div className="text-center mb-8">
+                        <div className="inline-flex items-center justify-center w-16 h-16 bg-[#1D1D1F] rounded-2xl mb-4 shadow-lg">
+                            <Lock className="w-7 h-7 text-white" />
+                        </div>
+                        <h2 className="text-2xl font-black text-[#1D1D1F] tracking-tight">Gemini POS</h2>
+                        <p className="text-[#86868B] text-sm mt-1 font-medium">Hệ thống Quản trị Bán hàng</p>
+                    </div>
 
-                    <div className="relative">
+                    {/* Form */}
+                    <form onSubmit={handleSubmit} className="bg-white p-6 rounded-3xl shadow-lg border border-[#E8E8ED]">
                         {error && (
-                            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-3 text-red-400 animate-in slide-in-from-top-2">
-                                <AlertCircle size={20} />
+                            <div className="mb-5 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600">
+                                <AlertCircle size={18} />
                                 <span className="text-sm font-medium">{error}</span>
                             </div>
                         )}
 
                         {/* Username */}
-                        <div className="mb-5">
-                            <label className="block text-white/50 text-xs font-bold uppercase tracking-wider mb-2 ml-1">
+                        <div className="mb-4">
+                            <label className="block text-[#86868B] text-xs font-bold uppercase tracking-wider mb-2 ml-1">
                                 Tài khoản
                             </label>
-                            <div className="relative group">
-                                <div className="absolute left-0 top-0 bottom-0 w-14 flex items-center justify-center">
-                                    <User className="text-white/30 group-focus-within:text-blue-400 transition-colors" size={20} />
-                                </div>
+                            <div className="relative">
+                                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-[#86868B]" size={18} />
                                 <input
                                     type="text"
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
                                     placeholder="Nhập tài khoản"
-                                    className="w-full bg-white/5 border border-white/10 rounded-2xl pl-14 pr-4 py-4 text-white placeholder:text-white/25 outline-none focus:border-blue-500/50 focus:bg-white/[0.08] focus:ring-4 focus:ring-blue-500/10 transition-all font-medium"
+                                    className="w-full bg-[#F5F5F7] border border-[#E8E8ED] rounded-xl pl-12 pr-4 py-3.5 text-[#1D1D1F] placeholder:text-[#86868B] outline-none focus:border-[#0071E3] focus:ring-2 focus:ring-[#0071E3]/10 transition-all text-[15px] font-medium"
                                     required
                                     autoComplete="username"
                                 />
@@ -104,66 +95,54 @@ const LoginPage = ({ onLogin }) => {
                         </div>
 
                         {/* Password */}
-                        <div className="mb-8">
-                            <label className="block text-white/50 text-xs font-bold uppercase tracking-wider mb-2 ml-1">
+                        <div className="mb-6">
+                            <label className="block text-[#86868B] text-xs font-bold uppercase tracking-wider mb-2 ml-1">
                                 Mật khẩu
                             </label>
-                            <div className="relative group">
-                                <div className="absolute left-0 top-0 bottom-0 w-14 flex items-center justify-center">
-                                    <Lock className="text-white/30 group-focus-within:text-blue-400 transition-colors" size={20} />
-                                </div>
+                            <div className="relative">
+                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-[#86868B]" size={18} />
                                 <input
                                     type={showPassword ? 'text' : 'password'}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     placeholder="Nhập mật khẩu"
-                                    className="w-full bg-white/5 border border-white/10 rounded-2xl pl-14 pr-14 py-4 text-white placeholder:text-white/25 outline-none focus:border-blue-500/50 focus:bg-white/[0.08] focus:ring-4 focus:ring-blue-500/10 transition-all font-medium"
+                                    className="w-full bg-[#F5F5F7] border border-[#E8E8ED] rounded-xl pl-12 pr-12 py-3.5 text-[#1D1D1F] placeholder:text-[#86868B] outline-none focus:border-[#0071E3] focus:ring-2 focus:ring-[#0071E3]/10 transition-all text-[15px] font-medium"
                                     required
                                     autoComplete="current-password"
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors p-1"
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[#86868B] hover:text-[#1D1D1F] transition-colors"
                                 >
-                                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                 </button>
                             </div>
                         </div>
 
-                        {/* Submit Button */}
+                        {/* Submit */}
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 text-white py-4 rounded-2xl font-bold text-base shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2 relative overflow-hidden group"
+                            className="w-full bg-[#1D1D1F] text-white py-4 rounded-2xl font-bold text-[15px] shadow-lg active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 hover:bg-black"
                         >
-                            {/* Button shine effect */}
-                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-
                             {loading ? (
                                 <>
-                                    <Loader2 className="animate-spin" size={20} />
+                                    <Loader2 className="animate-spin" size={18} />
                                     <span>Đang đăng nhập...</span>
                                 </>
                             ) : (
-                                <>
-                                    <span>Đăng nhập</span>
-                                </>
+                                <span>Đăng nhập</span>
                             )}
                         </button>
-                    </div>
-                </form>
+                    </form>
 
-                {/* Footer */}
-                <div className="text-center mt-8 space-y-2">
-                    <p className="text-white/20 text-xs">
-                        🔒 Kết nối được bảo mật bằng SSL
-                    </p>
-                    <p className="text-white/30 text-xs">
-                        © 2024 Gemini POS - Phiên bản 2.0
+                    {/* Footer */}
+                    <p className="text-center text-[#86868B] text-xs mt-6 font-medium">
+                        © 2024 Gemini POS
                     </p>
                 </div>
-            </div>
+            </main>
         </div>
     );
 };

@@ -147,14 +147,14 @@ const POSView = ({
                     </button>
                     <button
                         onClick={onStatsClick}
-                        className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform"
+                        className="w-10 h-10 bg-white border border-[#D2D2D7] text-[#1D1D1F] rounded-full flex items-center justify-center active:bg-gray-50 transition-colors shadow-sm"
                         title="Thống kê"
                     >
                         <BarChart3 size={18} />
                     </button>
                     <button
                         onClick={onAdminClick}
-                        className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-full flex items-center justify-center active:scale-90 transition-all shadow-lg"
+                        className="w-10 h-10 bg-white border border-[#D2D2D7] text-[#1D1D1F] rounded-full flex items-center justify-center active:bg-gray-50 transition-colors shadow-sm"
                         title="Quản trị"
                     >
                         <Lock size={16} />
