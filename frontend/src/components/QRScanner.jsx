@@ -3,124 +3,129 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { X } from 'lucide-react';
 
 const QRScanner = ({ onResult, onClose }) => {
-    // Dùng ref để kiểm soát instance của scanner, tránh khởi tạo nhiều lần
     const scannerRef = useRef(null);
-    const scannerId = "reader-element-id"; // ID cố định cho thẻ div
+    const scannerId = "reader-element-id";
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
+        // Create instance
         const html5QrCode = new Html5Qrcode(scannerId);
         scannerRef.current = html5QrCode;
 
+        const config = {
+            fps: 30, // High FPS for quick scanning
+            qrbox: (viewfinderWidth, viewfinderHeight) => {
+                const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                return {
+                    width: Math.floor(minEdge * 0.75),
+                    height: Math.floor(minEdge * 0.75),
+                };
+            },
+            aspectRatio: 1.0,
+            disableFlip: false
+        };
+
+        const successCallback = (decodedText) => {
+            // Play success sound
+            const beep = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQMCI6bO2NSVJxQVkM7Q0qswFBKPx8TAqiMh');
+            beep.play().catch(() => { });
+
+            // Stop scanner
+            html5QrCode.stop().then(() => {
+                scannerRef.current = null;
+                onClose();
+                onResult(decodedText);
+            }).catch(err => console.error("Stop failed", err));
+        };
+
         const startScanner = async () => {
             try {
-                // 1. Get List of Cameras
-                const devices = await Html5Qrcode.getCameras();
+                // Method 1: Try direct environment camera (Fastest)
+                await html5QrCode.start(
+                    { facingMode: "environment" },
+                    config,
+                    successCallback,
+                    (errorMessage) => { /* ignore frame errors */ }
+                );
+                setIsLoading(false);
+            } catch (err) {
+                console.warn("Direct start failed, trying device list...", err);
 
-                if (devices && devices.length) {
-                    // Try to find 'back' camera
-                    const backCamera = devices.find(device => {
-                        const label = device.label.toLowerCase();
-                        return label.includes('back') || label.includes('sau') || label.includes('environment');
-                    });
+                // Method 2: Fallback to listing cameras
+                try {
+                    const devices = await Html5Qrcode.getCameras();
+                    if (devices && devices.length) {
+                        const backCamera = devices.find(d =>
+                            d.label.toLowerCase().includes('back') ||
+                            d.label.toLowerCase().includes('sau') ||
+                            d.label.toLowerCase().includes('environment')
+                        );
+                        const cameraId = backCamera ? backCamera.id : devices[0].id;
 
-                    // Use back camera if found, else first available
-                    const cameraId = backCamera ? backCamera.id : devices[0].id;
-
-                    const config = {
-                        fps: 30,
-                        qrbox: (viewfinderWidth, viewfinderHeight) => {
-                            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                            return {
-                                width: Math.floor(minEdge * 0.75),
-                                height: Math.floor(minEdge * 0.75),
-                            };
-                        },
-                        aspectRatio: 1.0,
-                        disableFlip: false,
-                        experimentalFeatures: {
-                            useBarCodeDetectorIfSupported: true
-                        }
-                    };
-
-                    await html5QrCode.start(
-                        cameraId, // Use specific camera ID
-                        config,
-                        (decodedText) => {
-                            // Play beep sound
-                            const beep = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQMCI6bO2NSVJxQVkM7Q0qswFBKPx8TAqiMh');
-                            beep.play().catch(() => { });
-
-                            html5QrCode.stop().then(() => {
-                                scannerRef.current = null;
-                                onClose();
-                                onResult(decodedText);
-                            }).catch(err => console.error("Stop failed", err));
-                        },
-                        (errorMessage) => { /* ignore */ }
-                    );
-                } else {
-                    console.error("No cameras found.");
-                    alert("Không tìm thấy camera trên thiết bị này.");
+                        await html5QrCode.start(cameraId, config, successCallback, () => { });
+                        setIsLoading(false);
+                    } else {
+                        alert("Không tìm thấy camera");
+                        onClose();
+                    }
+                } catch (e) {
+                    console.error("Camera init error:", e);
+                    alert("Lỗi camera: " + e.message);
                     onClose();
                 }
-            } catch (err) {
-                console.error("Camera start error:", err);
-                alert("Lỗi khởi động camera: " + err);
-                onClose();
             }
         };
 
-        startScanner();
+        // Small delay to ensure DOM is ready
+        setTimeout(startScanner, 50);
 
-
-        // Cleanup function: Chạy khi component unmount (đóng modal)
         return () => {
             if (scannerRef.current && scannerRef.current.isScanning) {
-                scannerRef.current.stop().catch(err => console.log("Cleanup stop error", err));
-                scannerRef.current = null;
+                scannerRef.current.stop().catch(e => console.error(e));
+                scannerRef.current.clear();
             }
         };
-    }, []); // Empty dependency array đảm bảo chỉ chạy 1 lần
+    }, []);
 
     return (
-        <div className="fixed inset-0 bg-black/95 z-[200] flex flex-col items-center justify-center p-4 text-white animate-in fade-in duration-200">
-            <div className="w-full max-w-sm relative flex flex-col items-center">
-                {/* Nút đóng */}
-                <button
-                    onClick={onClose}
-                    className="absolute -top-16 right-0 p-3 bg-white/10 hover:bg-white/20 active:scale-95 transition-all rounded-full backdrop-blur-sm z-50"
-                    aria-label="Close scanner"
-                >
-                    <X size={28} />
-                </button>
+        <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center animate-in fade-in duration-200">
+            {/* Close Button */}
+            <button
+                onClick={() => {
+                    if (scannerRef.current && scannerRef.current.isScanning) {
+                        scannerRef.current.stop().catch(() => { }).finally(onClose);
+                    } else {
+                        onClose();
+                    }
+                }}
+                className="absolute top-4 right-4 text-white/80 hover:text-white p-2 z-50 bg-black/20 rounded-full backdrop-blur-md"
+            >
+                <X size={32} />
+            </button>
 
-                {/* Khu vực Camera */}
-                <div className="relative w-full aspect-square overflow-hidden rounded-[2.5rem] border-4 border-indigo-500/50 shadow-2xl shadow-indigo-500/20 bg-black">
-                    {/* Thẻ div chứa camera */}
-                    <div id={scannerId} className="w-full h-full" />
-
-                    {/* Hiệu ứng khung ngắm (Overlay trang trí) */}
-                    <div className="absolute inset-0 pointer-events-none border-[30px] border-black/30 rounded-[2rem]"></div>
-
-                    {/* Đường line quét (Animation) */}
-                    <div className="absolute top-0 left-0 w-full h-1 bg-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.8)] animate-[scan_2s_infinite_linear] opacity-80 z-10"></div>
+            <div className="w-full max-w-md relative px-4">
+                {/* Scanner Viewport */}
+                <div id={scannerId} className="w-full overflow-hidden rounded-3xl shadow-2xl bg-black border-2 border-white/10">
+                    {/* Placeholder prevents layout shift */}
+                    <div className="aspect-square bg-black"></div>
                 </div>
 
-                <div className="mt-8 text-center space-y-2">
-                    <h3 className="text-xl font-bold uppercase tracking-widest text-indigo-400">Đang quét mã</h3>
-                    <p className="text-slate-400 text-sm font-medium">Di chuyển camera lại gần mã QR/Barcode</p>
-                </div>
+                {/* Loading UI */}
+                {isLoading && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-black z-10 rounded-3xl">
+                        <div className="w-12 h-12 border-4 border-white/20 border-t-blue-500 rounded-full animate-spin mb-4"></div>
+                        <p className="font-medium animate-pulse text-blue-400">Đang khởi động Camera...</p>
+                    </div>
+                )}
+
+                {/* Guide Text */}
+                {!isLoading && (
+                    <div className="text-center mt-6 animate-in slide-in-from-bottom-4">
+                        <p className="text-white font-bold text-lg">Quét mã vạch</p>
+                        <p className="text-white/60 text-sm">Di chuyển camera vào mã sản phẩm</p>
+                    </div>
+                )}
             </div>
-
-            {/* Thêm style animation cho đường kẻ quét */}
-            <style jsx>{`
-                @keyframes scan {
-                    0% { transform: translateY(0); opacity: 0; }
-                    10% { opacity: 1; }
-                    90% { opacity: 1; }
-                    100% { transform: translateY(300px); opacity: 0; }
-                }
-            `}</style>
         </div>
     );
 };
