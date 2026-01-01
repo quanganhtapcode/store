@@ -201,7 +201,34 @@ app.post('/api/products/sync-images', async (req, res) => {
     });
 });
 
-// --- Helper: Save base64 image to file ---
+// --- Helper: Delete old images of a product (all extensions) ---
+const deleteOldImages = (productId) => {
+    const extensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+    let deleted = [];
+
+    extensions.forEach(ext => {
+        const oldPath = path.join(imagesDir, `${productId}.${ext}`);
+        if (fs.existsSync(oldPath)) {
+            fs.unlinkSync(oldPath);
+            deleted.push(`${productId}.${ext}`);
+        }
+    });
+
+    if (deleted.length > 0) {
+        console.log(`🗑️ Deleted old images: ${deleted.join(', ')}`);
+    }
+
+    return deleted;
+};
+
+// --- Image Config ---
+const IMAGE_CONFIG = {
+    maxSizeBytes: 5 * 1024 * 1024,  // 5MB max
+    allowedFormats: ['jpeg', 'jpg', 'png', 'webp', 'gif'],
+    outputFormat: 'jpg'              // Always save as JPG
+};
+
+// --- Helper: Save base64 image to file (IMPROVED) ---
 const saveBase64Image = (base64Data, productId) => {
     if (!base64Data || !base64Data.startsWith('data:image')) return null;
 
@@ -210,14 +237,34 @@ const saveBase64Image = (base64Data, productId) => {
         const matches = base64Data.match(/^data:image\/(\w+);base64,(.+)$/);
         if (!matches) return null;
 
-        const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
+        const originalFormat = matches[1].toLowerCase();
         const data = matches[2];
-        const filename = `${productId}.${ext}`;
+        const buffer = Buffer.from(data, 'base64');
+
+        // Check file size
+        if (buffer.length > IMAGE_CONFIG.maxSizeBytes) {
+            console.error(`❌ Image too large: ${(buffer.length / 1024 / 1024).toFixed(2)}MB (max: ${IMAGE_CONFIG.maxSizeBytes / 1024 / 1024}MB)`);
+            return null;
+        }
+
+        // Check format
+        if (!IMAGE_CONFIG.allowedFormats.includes(originalFormat)) {
+            console.error(`❌ Invalid format: ${originalFormat}. Allowed: ${IMAGE_CONFIG.allowedFormats.join(', ')}`);
+            return null;
+        }
+
+        // Delete old images first (all extensions)
+        deleteOldImages(productId);
+
+        // Always save as JPG for consistency
+        const filename = `${productId}.${IMAGE_CONFIG.outputFormat}`;
         const filepath = path.join(imagesDir, filename);
 
         // Write file
-        fs.writeFileSync(filepath, Buffer.from(data, 'base64'));
-        console.log(`✅ Saved image: ${filename}`);
+        fs.writeFileSync(filepath, buffer);
+
+        const sizeMB = (buffer.length / 1024 / 1024).toFixed(2);
+        console.log(`✅ Saved image: ${filename} (${sizeMB}MB, from ${originalFormat})`);
 
         return `/images/${filename}`;
     } catch (err) {
