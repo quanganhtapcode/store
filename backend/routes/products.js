@@ -21,15 +21,13 @@ const saveImage = (imageData, productId) => {
     const buffer = Buffer.from(matches[2], 'base64');
     const fileName = `${productId}.${ext}`;
 
-    // Save to multiple sizes (mock logic handles folders)
-    // Structure: public/images/original/
+    // Save to public/images (Flat structure)
     const publicDir = path.join(__dirname, '../public/images');
-    const originalDir = path.join(publicDir, 'original');
 
-    if (!fs.existsSync(originalDir)) fs.mkdirSync(originalDir, { recursive: true });
+    if (!fs.existsSync(publicDir)) fs.mkdirSync(publicDir, { recursive: true });
 
-    fs.writeFileSync(path.join(originalDir, fileName), buffer);
-    return `/images/original/${fileName}`;
+    fs.writeFileSync(path.join(publicDir, fileName), buffer);
+    return `/images/${fileName}`;
 };
 
 // GET PRODUCTS

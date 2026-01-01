@@ -56,6 +56,7 @@ app.use('/images', express.static(imagesDir, {
     immutable: true,
     setHeaders: (res, path) => {
         res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Cache-Control', 'public, max-age=2592000, immutable');
     }
 }));
 
