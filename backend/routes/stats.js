@@ -2,16 +2,9 @@ const express = require('express');
 const router = express.Router();
 const { db, dbAll } = require('../config/database');
 
-// Simple Cache
-let statsCache = { data: null, expiry: 0 };
-
 // GET GENERAL STATS
 router.get('/', (req, res) => {
-    // Return cached data if valid
-    if (statsCache.data && Date.now() < statsCache.expiry) {
-        return res.json(statsCache.data);
-    }
-
+    // Realtime Stats (No Cache)
     const today = new Date().setHours(0, 0, 0, 0);
     const firstDayOfMonth = new Date(new Date().setDate(1)).setHours(0, 0, 0, 0);
 
@@ -33,12 +26,6 @@ router.get('/', (req, res) => {
                 db.all("SELECT name, total_sold FROM products ORDER BY total_sold DESC LIMIT 5", (e3, r3) => {
                     if (e3) return res.status(500).json({ error: e3.message });
                     result.topProducts = r3;
-
-                    // Update cache
-                    statsCache = {
-                        data: result,
-                        expiry: Date.now() + 5 * 60 * 1000 // Cache 5 mins
-                    };
 
                     res.json(result);
                 });
