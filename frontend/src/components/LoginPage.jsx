@@ -62,7 +62,7 @@ const LoginPage = ({ onLogin, onBack }) => {
                         <div className="inline-flex items-center justify-center w-16 h-16 bg-[#1D1D1F] rounded-2xl mb-4 shadow-lg">
                             <Lock className="w-7 h-7 text-white" />
                         </div>
-                        <h2 className="text-2xl font-black text-[#1D1D1F] tracking-tight">Gemini POS</h2>
+                        <h2 className="text-2xl font-black text-[#1D1D1F] tracking-tight">CÁT HẢI POS</h2>
                         <p className="text-[#86868B] text-sm mt-1 font-medium">Hệ thống Quản trị Bán hàng</p>
                     </div>
 
@@ -139,7 +139,7 @@ const LoginPage = ({ onLogin, onBack }) => {
 
                     {/* Footer */}
                     <p className="text-center text-[#86868B] text-xs mt-6 font-medium">
-                        © 2024 Gemini POS
+                        © 2025 CÁT HẢI POS
                     </p>
                 </div>
             </main>

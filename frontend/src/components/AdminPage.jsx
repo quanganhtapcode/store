@@ -187,70 +187,94 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
     const handleScroll = (e) => { if (e.target.scrollHeight - e.target.scrollTop <= e.target.clientHeight + 200 && displayLimit < filteredProducts.length) setDisplayLimit(prev => prev + 20); };
 
     // --- TABS ---
-    const DashboardTab = () => (
-        <div className="space-y-4 pb-20">
-            <div className="grid grid-cols-2 gap-3">
-                <div className="bg-[#1D1D1F] text-white p-5 rounded-[2rem] shadow-lg col-span-2">
-                    <p className="text-[12px] opacity-60 font-bold uppercase tracking-wider mb-1">Doanh thu hôm nay</p>
-                    <h2 className="text-[32px] font-black">{stats.todayRevenue?.toLocaleString()}đ</h2>
-                    <div className="mt-2 flex gap-2">
-                        <span className="bg-white/20 px-2 py-1 rounded-lg text-[11px] font-bold">{stats.todayOrders} đơn</span>
+    const DashboardTab = () => {
+        const lowStockProducts = useMemo(() => products.filter(p => p.stock <= 5), [products]);
+
+        return (
+            <div className="space-y-4 pb-20">
+                {/* Low Stock Alert */}
+                {lowStockProducts.length > 0 && (
+                    <div className="bg-red-50 p-5 rounded-[2rem] border border-red-100 shadow-sm animate-in fade-in slide-in-from-top-4">
+                        <h3 className="font-bold text-red-600 mb-3 flex items-center gap-2">
+                            <AlertCircle size={20} /> Sắp hết hàng ({lowStockProducts.length})
+                        </h3>
+                        <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
+                            {lowStockProducts.map(p => (
+                                <div key={p.id} className="bg-white/80 backdrop-blur p-2.5 rounded-xl border border-red-100 w-32 flex-shrink-0" onClick={() => { setEditingProduct(p); setActiveTab('products') }}>
+                                    <p className="text-[11px] font-bold text-[#1D1D1F] line-clamp-1 mb-1">{p.name}</p>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-[10px] text-red-500 font-black bg-red-100 px-1.5 py-0.5 rounded">Còn {p.stock}</span>
+                                        <span className="text-[10px] text-[#86868B]">Chạm sửa</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-[#1D1D1F] text-white p-5 rounded-[2rem] shadow-lg col-span-2">
+                        <p className="text-[12px] opacity-60 font-bold uppercase tracking-wider mb-1">Doanh thu hôm nay</p>
+                        <h2 className="text-[32px] font-black">{stats.todayRevenue?.toLocaleString()}đ</h2>
+                        <div className="mt-2 flex gap-2">
+                            <span className="bg-white/20 px-2 py-1 rounded-lg text-[11px] font-bold">{stats.todayOrders} đơn</span>
+                        </div>
+                    </div>
+                    <div className="bg-white p-5 rounded-[2rem] border border-[#F5F5F7] shadow-sm">
+                        <p className="text-[11px] text-[#86868B] font-bold uppercase">Tháng này</p>
+                        <p className="text-[20px] font-black text-[#0071E3] mt-1">{stats.monthRevenue?.toLocaleString()}đ</p>
+                    </div>
+                    <div className="bg-white p-5 rounded-[2rem] border border-[#F5F5F7] shadow-sm">
+                        <p className="text-[11px] text-[#86868B] font-bold uppercase">Kho hàng</p>
+                        <p className="text-[20px] font-black text-[#1D1D1F] mt-1">{products.length} <span className="text-[14px] font-bold text-[#86868B]">sản phẩm</span></p>
                     </div>
                 </div>
-                <div className="bg-white p-5 rounded-[2rem] border border-[#F5F5F7] shadow-sm">
-                    <p className="text-[11px] text-[#86868B] font-bold uppercase">Tháng này</p>
-                    <p className="text-[20px] font-black text-[#0071E3] mt-1">{stats.monthRevenue?.toLocaleString()}đ</p>
-                </div>
-                <div className="bg-white p-5 rounded-[2rem] border border-[#F5F5F7] shadow-sm">
-                    <p className="text-[11px] text-[#86868B] font-bold uppercase">Kho hàng</p>
-                    <p className="text-[20px] font-black text-[#1D1D1F] mt-1">{products.length} <span className="text-[14px] font-bold text-[#86868B]">sản phẩm</span></p>
-                </div>
-            </div>
 
-            <div className="bg-white p-5 rounded-[2rem] border border-[#F5F5F7] shadow-sm">
-                <h3 className="font-bold text-[#1D1D1F] mb-4 flex items-center gap-2"><TrendingUp size={18} /> Top Bán Chạy (Tổng thể)</h3>
-                <div className="space-y-3">
-                    {stats.topProducts?.map((p, i) => (
-                        <div key={i} className="flex justify-between items-center py-2 border-b border-[#F5F5F7] last:border-0">
-                            <span className="text-[13px] font-medium text-[#1D1D1F] truncate max-w-[70%]">{i + 1}. {p.name}</span>
-                            <span className="text-[12px] font-bold text-[#0071E3]">{p.total_sold} đã bán</span>
-                        </div>
-                    ))}
+                <div className="bg-white p-5 rounded-[2rem] border border-[#F5F5F7] shadow-sm">
+                    <h3 className="font-bold text-[#1D1D1F] mb-4 flex items-center gap-2"><TrendingUp size={18} /> Top Bán Chạy (Tổng thể)</h3>
+                    <div className="space-y-3">
+                        {stats.topProducts?.map((p, i) => (
+                            <div key={i} className="flex justify-between items-center py-2 border-b border-[#F5F5F7] last:border-0">
+                                <span className="text-[13px] font-medium text-[#1D1D1F] truncate max-w-[70%]">{i + 1}. {p.name}</span>
+                                <span className="text-[12px] font-bold text-[#0071E3]">{p.total_sold} đã bán</span>
+                            </div>
+                        ))}
+                    </div>
                 </div>
-            </div>
 
-            {/* Monthly Detailed Stats */}
-            <div className="bg-white p-5 rounded-[2rem] border border-[#F5F5F7] shadow-sm">
-                <h3 className="font-bold text-[#1D1D1F] mb-4 flex items-center gap-2">📊 Chi tiết doanh thu tháng này</h3>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left text-[13px]">
-                        <thead>
-                            <tr className="border-b border-[#F5F5F7]">
-                                <th className="pb-2 font-bold text-[#86868B] pl-2">Sản phẩm</th>
-                                <th className="pb-2 font-bold text-[#86868B] text-right">SL</th>
-                                <th className="pb-2 font-bold text-[#86868B] text-right pr-2">Doanh thu</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {stats.productsMonthly?.slice(0, 10).map((p, i) => (
-                                <tr key={i} className="border-b border-[#F5F5F7] last:border-0 hover:bg-gray-50 transition-colors">
-                                    <td className="py-3 font-medium text-[#1D1D1F] pl-2 truncate max-w-[150px]">{i + 1}. {p.name}</td>
-                                    <td className="py-3 text-right font-bold text-[#1D1D1F]">{p.total_sold}</td>
-                                    <td className="py-3 text-right font-bold text-[#0071E3] pr-2">{p.revenue?.toLocaleString()}</td>
+                {/* Monthly Detailed Stats */}
+                <div className="bg-white p-5 rounded-[2rem] border border-[#F5F5F7] shadow-sm">
+                    <h3 className="font-bold text-[#1D1D1F] mb-4 flex items-center gap-2">📊 Chi tiết doanh thu tháng này</h3>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-[13px]">
+                            <thead>
+                                <tr className="border-b border-[#F5F5F7]">
+                                    <th className="pb-2 font-bold text-[#86868B] pl-2">Sản phẩm</th>
+                                    <th className="pb-2 font-bold text-[#86868B] text-right">SL</th>
+                                    <th className="pb-2 font-bold text-[#86868B] text-right pr-2">Doanh thu</th>
                                 </tr>
-                            ))}
-                            {(!stats.productsMonthly || stats.productsMonthly.length === 0) && (
-                                <tr><td colSpan="3" className="py-4 text-center text-[#86868B]">Chưa có dữ liệu tháng này</td></tr>
-                            )}
-                        </tbody>
-                    </table>
-                    {stats.productsMonthly?.length > 10 && (
-                        <p className="text-center text-[#86868B] text-[11px] mt-3 font-medium">...và {stats.productsMonthly.length - 10} sản phẩm khác</p>
-                    )}
+                            </thead>
+                            <tbody>
+                                {stats.productsMonthly?.slice(0, 10).map((p, i) => (
+                                    <tr key={i} className="border-b border-[#F5F5F7] last:border-0 hover:bg-gray-50 transition-colors">
+                                        <td className="py-3 font-medium text-[#1D1D1F] pl-2 truncate max-w-[150px]">{i + 1}. {p.name}</td>
+                                        <td className="py-3 text-right font-bold text-[#1D1D1F]">{p.total_sold}</td>
+                                        <td className="py-3 text-right font-bold text-[#0071E3] pr-2">{p.revenue?.toLocaleString()}</td>
+                                    </tr>
+                                ))}
+                                {(!stats.productsMonthly || stats.productsMonthly.length === 0) && (
+                                    <tr><td colSpan="3" className="py-4 text-center text-[#86868B]">Chưa có dữ liệu tháng này</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                        {stats.productsMonthly?.length > 10 && (
+                            <p className="text-center text-[#86868B] text-[11px] mt-3 font-medium">...và {stats.productsMonthly.length - 10} sản phẩm khác</p>
+                        )}
+                    </div>
                 </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     const ProductsTab = () => {
         // Helper: Normalize text for search (remove accents)
