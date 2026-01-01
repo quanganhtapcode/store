@@ -14,6 +14,7 @@ const port = 3001;
 // --- Authentication Config ---
 const AUTH_CONFIG = {
     // Default credentials (should be overridden by environment variables)
+    // Default credentials (should be overridden by environment variables)
     username: process.env.ADMIN_USERNAME || 'admin',
     password: process.env.ADMIN_PASSWORD || 'gemini2024',
     // Secret key for token generation
@@ -58,7 +59,13 @@ const verifyToken = (req, res, next) => {
 };
 
 // --- Middlewares ---
-app.use(cors({ origin: '*', credentials: true }));
+// Cho phép CORS từ biến môi trường (an toàn hơn)
+app.use(cors({
+    origin: process.env.FRONTEND_URL || '*',
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
@@ -108,7 +115,15 @@ const getDbPath = () => {
 };
 
 const dbPath = getDbPath();
-const db = new sqlite3.Database(dbPath);
+const db = new sqlite3.Database(dbPath, (err) => {
+    if (err) {
+        console.error('❌ Database opening error:', err);
+    } else {
+        console.log('✅ Connected to SQLite database.');
+        // WAL Mode for generic performance
+        db.run("PRAGMA journal_mode = WAL;");
+    }
+});
 
 // --- Promisify Database for async/await support ---
 const dbRun = (sql, params = []) => {
@@ -252,25 +267,75 @@ db.serialize(() => {
         timestamp INTEGER
     )`);
 
-    // 4. IMPORT NOTES (Phiếu nhập hàng - Chuyên nghiệp)
+    // 4. IMPORT NOTES
     db.run(`CREATE TABLE IF NOT EXISTS import_notes (
         id TEXT PRIMARY KEY,
         timestamp INTEGER,
         total_cost INTEGER,
         note TEXT,
-        items TEXT -- JSON list of imported items
+        items TEXT
     )`);
 
-    // Migration logic (Safe column adding)
-    const addCol = (tbl, col, type) => {
-        db.all(`PRAGMA table_info(${tbl})`, (e, r) => {
-            if (!r.some(x => x.name === col)) {
-                db.run(`ALTER TABLE ${tbl} ADD COLUMN ${col} ${type}`);
-            }
+    // 5. ORDER ITEMS (Normalized Data for better stats)
+    db.run(`CREATE TABLE IF NOT EXISTS order_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_id INTEGER,
+        product_id TEXT,
+        quantity INTEGER,
+        price INTEGER,
+        FOREIGN KEY(order_id) REFERENCES orders(id),
+        FOREIGN KEY(product_id) REFERENCES products(id)
+    )`);
+
+    // Check migration
+    db.get("SELECT COUNT(*) as count FROM order_items", (err, row) => {
+        if (!err && row.count === 0) {
+            // Run migration if empty
+            // migrateOrderItems(); // Uncomment if you want automatic migration on start
+        }
+    });
+});
+
+// Helper Function: Migrate old JSON items to new table
+const migrateOrderItems = () => {
+    console.log("🔄 Starting Migration: JSON -> order_items...");
+    db.all("SELECT id, items FROM orders", [], (err, rows) => {
+        if (err) return console.error("Migration Read Error:", err);
+
+        db.serialize(() => {
+            db.run("BEGIN TRANSACTION");
+            const stmt = db.prepare("INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)");
+
+            rows.forEach(order => {
+                try {
+                    const items = JSON.parse(order.items);
+                    items.forEach(item => {
+                        stmt.run(order.id, item.id, item.quantity, item.finalPrice || item.price);
+                    });
+                } catch (e) { /* ignore bad json */ }
+            });
+
+            stmt.finalize();
+            db.run("COMMIT", (err) => {
+                if (err) console.error("Migration Commit Error:", err);
+                else console.log("✅ Migration Completed: All orders migrated to order_items table.");
+            });
         });
-    };
-    addCol('products', 'total_sold', 'INTEGER DEFAULT 0');
-    addCol('orders', 'order_code', 'TEXT');
+    });
+};
+
+// Start migration 5 seconds after boot to not block initial requests 
+setTimeout(migrateOrderItems, 5000);
+// Migration logic (Safe column adding)
+const addCol = (tbl, col, type) => {
+    db.all(`PRAGMA table_info(${tbl})`, (e, r) => {
+        if (!r.some(x => x.name === col)) {
+            db.run(`ALTER TABLE ${tbl} ADD COLUMN ${col} ${type}`);
+        }
+    });
+};
+addCol('products', 'total_sold', 'INTEGER DEFAULT 0');
+addCol('orders', 'order_code', 'TEXT');
 });
 
 // --- Image Download Utility ---
@@ -519,13 +584,22 @@ app.post('/api/orders', async (req, res) => {
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [orderCode, total, timestamp || Date.now(), itemsStr, customer_name || 'Khách lẻ', payment_method || 'cash', 'completed', note || '']
         );
+        const orderId = orderResult.lastID;
 
-        // 5. Update stock & sold count (within same transaction)
+        // 5. Update stock & Insert order_items (within same transaction)
         for (const item of items) {
             const qty = item.saleType === 'case' ? (item.quantity * (item.units_per_case || 1)) : item.quantity;
+
+            // Update Stock
             await dbRun(
                 `UPDATE products SET stock = stock - ?, total_sold = total_sold + ? WHERE id = ?`,
                 [qty, qty, item.id]
+            );
+
+            // Insert into order_items for normalized reporting
+            await dbRun(
+                `INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)`,
+                [orderId, item.id, item.quantity, item.finalPrice || item.price || 0]
             );
         }
 
