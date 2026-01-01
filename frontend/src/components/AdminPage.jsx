@@ -126,7 +126,7 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
     // Data States
     const [orders, setOrders] = useState([]);
     const [logs, setLogs] = useState([]);
-    const [stats, setStats] = useState({ todayRevenue: 0, todayOrders: 0, monthRevenue: 0, topProducts: [] });
+    const [stats, setStats] = useState({ todayRevenue: 0, todayOrders: 0, monthRevenue: 0, topProducts: [], productsMonthly: [] });
     const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
 
     // Import State
@@ -152,8 +152,15 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
     }, []);
 
     const fetchStats = useCallback(async () => {
-        const res = await fetch(`${API_URL}/stats`);
-        setStats(await res.json());
+        try {
+            const [res, prodRes] = await Promise.all([
+                fetch(`${API_URL}/stats`),
+                fetch(`${API_URL}/stats/monthly-products`)
+            ]);
+            const data = await res.json();
+            const prodData = await prodRes.json();
+            setStats({ ...data, productsMonthly: prodData });
+        } catch (e) { console.error(e); }
     }, []);
 
     const syncImages = async () => {
@@ -201,7 +208,7 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
             </div>
 
             <div className="bg-white p-5 rounded-[2rem] border border-[#F5F5F7] shadow-sm">
-                <h3 className="font-bold text-[#1D1D1F] mb-4 flex items-center gap-2"><TrendingUp size={18} /> Top Bán Chạy</h3>
+                <h3 className="font-bold text-[#1D1D1F] mb-4 flex items-center gap-2"><TrendingUp size={18} /> Top Bán Chạy (Tổng thể)</h3>
                 <div className="space-y-3">
                     {stats.topProducts?.map((p, i) => (
                         <div key={i} className="flex justify-between items-center py-2 border-b border-[#F5F5F7] last:border-0">
@@ -209,6 +216,37 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
                             <span className="text-[12px] font-bold text-[#0071E3]">{p.total_sold} đã bán</span>
                         </div>
                     ))}
+                </div>
+            </div>
+
+            {/* Monthly Detailed Stats */}
+            <div className="bg-white p-5 rounded-[2rem] border border-[#F5F5F7] shadow-sm">
+                <h3 className="font-bold text-[#1D1D1F] mb-4 flex items-center gap-2">📊 Chi tiết doanh thu tháng này</h3>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-[13px]">
+                        <thead>
+                            <tr className="border-b border-[#F5F5F7]">
+                                <th className="pb-2 font-bold text-[#86868B] pl-2">Sản phẩm</th>
+                                <th className="pb-2 font-bold text-[#86868B] text-right">SL</th>
+                                <th className="pb-2 font-bold text-[#86868B] text-right pr-2">Doanh thu</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {stats.productsMonthly?.slice(0, 10).map((p, i) => (
+                                <tr key={i} className="border-b border-[#F5F5F7] last:border-0 hover:bg-gray-50 transition-colors">
+                                    <td className="py-3 font-medium text-[#1D1D1F] pl-2 truncate max-w-[150px]">{i + 1}. {p.name}</td>
+                                    <td className="py-3 text-right font-bold text-[#1D1D1F]">{p.total_sold}</td>
+                                    <td className="py-3 text-right font-bold text-[#0071E3] pr-2">{p.revenue?.toLocaleString()}</td>
+                                </tr>
+                            ))}
+                            {(!stats.productsMonthly || stats.productsMonthly.length === 0) && (
+                                <tr><td colSpan="3" className="py-4 text-center text-[#86868B]">Chưa có dữ liệu tháng này</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                    {stats.productsMonthly?.length > 10 && (
+                        <p className="text-center text-[#86868B] text-[11px] mt-3 font-medium">...và {stats.productsMonthly.length - 10} sản phẩm khác</p>
+                    )}
                 </div>
             </div>
         </div>

@@ -8,58 +8,70 @@ const QRScanner = ({ onResult, onClose }) => {
     const scannerId = "reader-element-id"; // ID cố định cho thẻ div
 
     useEffect(() => {
-        // Khởi tạo scanner
         const html5QrCode = new Html5Qrcode(scannerId);
         scannerRef.current = html5QrCode;
 
-        const config = {
-            fps: 30, // Tăng lên 30 FPS để mượt như Native App
-            // Responsive qrbox: 75% kích thước khung hình
-            qrbox: (viewfinderWidth, viewfinderHeight) => {
-                const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                return {
-                    width: Math.floor(minEdge * 0.75),
-                    height: Math.floor(minEdge * 0.75),
-                };
-            },
-            aspectRatio: 1.0,
-            disableFlip: false,
-            // QUAN TRỌNG: Sử dụng BarcodeDetector API của trình duyệt (quét bằng phần cứng)
-            // Nhanh hơn gấp 5-10 lần so với giải mã bằng WebAssembly thuần
-            experimentalFeatures: {
-                useBarCodeDetectorIfSupported: true
+        const startScanner = async () => {
+            try {
+                // 1. Get List of Cameras
+                const devices = await Html5Qrcode.getCameras();
+
+                if (devices && devices.length) {
+                    // Try to find 'back' camera
+                    const backCamera = devices.find(device => {
+                        const label = device.label.toLowerCase();
+                        return label.includes('back') || label.includes('sau') || label.includes('environment');
+                    });
+
+                    // Use back camera if found, else first available
+                    const cameraId = backCamera ? backCamera.id : devices[0].id;
+
+                    const config = {
+                        fps: 30,
+                        qrbox: (viewfinderWidth, viewfinderHeight) => {
+                            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                            return {
+                                width: Math.floor(minEdge * 0.75),
+                                height: Math.floor(minEdge * 0.75),
+                            };
+                        },
+                        aspectRatio: 1.0,
+                        disableFlip: false,
+                        experimentalFeatures: {
+                            useBarCodeDetectorIfSupported: true
+                        }
+                    };
+
+                    await html5QrCode.start(
+                        cameraId, // Use specific camera ID
+                        config,
+                        (decodedText) => {
+                            // Play beep sound
+                            const beep = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQMCI6bO2NSVJxQVkM7Q0qswFBKPx8TAqiMh');
+                            beep.play().catch(() => { });
+
+                            html5QrCode.stop().then(() => {
+                                scannerRef.current = null;
+                                onClose();
+                                onResult(decodedText);
+                            }).catch(err => console.error("Stop failed", err));
+                        },
+                        (errorMessage) => { /* ignore */ }
+                    );
+                } else {
+                    console.error("No cameras found.");
+                    alert("Không tìm thấy camera trên thiết bị này.");
+                    onClose();
+                }
+            } catch (err) {
+                console.error("Camera start error:", err);
+                alert("Lỗi khởi động camera: " + err);
+                onClose();
             }
         };
 
-        // Bắt đầu quét
-        html5QrCode.start(
-            {
-                facingMode: "environment", // Camera sau
-                // Ép độ phân giải cao để nét hơn
-                videoConstraints: {
-                    width: { min: 720, ideal: 1280, max: 1920 },
-                    height: { min: 720, ideal: 1280, max: 1080 },
-                    // Yêu cầu tự động lấy nét liên tục (cho Chrome Android)
-                    focusMode: "continuous",
-                }
-            },
-            config,
-            (decodedText) => {
-                // Khi quét thành công
-                // Dừng scanner ngay lập tức
-                html5QrCode.stop().then(() => {
-                    scannerRef.current = null;
-                    onClose();
-                    onResult(decodedText);
-                }).catch(err => console.error("Stop failed", err));
-            },
-            (errorMessage) => {
-                // Bỏ qua lỗi quét từng frame (rất quan trọng để không spam console)
-            }
-        ).catch(err => {
-            console.error("Camera start error:", err);
-            // Xử lý lỗi nếu không mở được camera (ví dụ: quyền truy cập)
-        });
+        startScanner();
+
 
         // Cleanup function: Chạy khi component unmount (đóng modal)
         return () => {

@@ -587,6 +587,48 @@ app.get('/api/stats', (req, res) => {
     });
 });
 
+// STATS DETAILED (Thống kê chi tiết sản phẩm tháng này)
+app.get('/api/stats/monthly-products', (req, res) => {
+    const firstDayOfMonth = new Date(new Date().setDate(1)).setHours(0, 0, 0, 0);
+
+    // Lấy tất cả đơn hàng trong tháng
+    db.all("SELECT items, timestamp FROM orders WHERE timestamp >= ?", [firstDayOfMonth], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+
+        const productStats = {};
+
+        rows.forEach(order => {
+            try {
+                const items = JSON.parse(order.items);
+                items.forEach(item => {
+                    if (!productStats[item.id]) {
+                        productStats[item.id] = {
+                            id: item.id,
+                            name: item.displayName || item.name,
+                            image: item.image,
+                            total_sold: 0,
+                            revenue: 0,
+                            cases_sold: 0
+                        };
+                    }
+
+                    const p = productStats[item.id];
+                    const qty = item.saleType === 'case' ? (item.quantity * (item.units_per_case || 1)) : item.quantity;
+                    const revenue = (item.finalPrice || 0) * item.quantity;
+
+                    p.total_sold += qty;
+                    p.revenue += revenue;
+                    if (item.saleType === 'case') p.cases_sold += item.quantity;
+                });
+            } catch (e) { /* ignore parse error */ }
+        });
+
+        // Convert to array and sort by revenue
+        const result = Object.values(productStats).sort((a, b) => b.revenue - a.revenue);
+        res.json(result);
+    });
+});
+
 
 // GET ORDERS (Lấy danh sách đơn hàng - với Pagination)
 app.get('/api/orders', (req, res) => {
