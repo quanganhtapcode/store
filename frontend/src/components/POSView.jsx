@@ -152,13 +152,6 @@ const POSView = ({
                     >
                         <BarChart3 size={18} />
                     </button>
-                    <button
-                        onClick={onAdminClick}
-                        className="w-10 h-10 bg-white border border-[#D2D2D7] text-[#1D1D1F] rounded-full flex items-center justify-center active:bg-gray-50 transition-colors shadow-sm"
-                        title="Quản trị"
-                    >
-                        <Lock size={16} />
-                    </button>
                 </div>
 
                 <div className="flex gap-2.5 overflow-x-auto scrollbar-hide mt-3.5 py-1">
