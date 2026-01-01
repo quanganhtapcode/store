@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Html5Qrcode } from "html5-qrcode";
 import OrderModal from './OrderModal';
+import { LogOut } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 const IMAGE_BASE_URL = API_URL.replace('/api', '');
@@ -117,7 +118,7 @@ const QRScanner = ({ onResult, onClose }) => {
 };
 
 // --- Main Admin Component ---
-const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
+const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, authUser, onLogout }) => {
     const [activeTab, setActiveTab] = useState('dashboard');
     const [editingProduct, setEditingProduct] = useState(null);
     const [showAddProduct, setShowAddProduct] = useState(false);
@@ -364,10 +365,19 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
         if (importCart.length === 0) return;
         const total_cost = importCart.reduce((s, i) => s + (i.importPrice * i.quantity), 0);
         try {
-            await fetch(`${API_URL}/imports`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
+            const res = await fetch(`${API_URL}/imports`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
                 body: JSON.stringify({ items: importCart, total_cost, note: 'Nhập hàng nhanh' })
             });
+            if (res.status === 401) {
+                alert('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+                onLogout();
+                return;
+            }
             alert('Đã nhập kho thành công!'); setImportCart([]); refreshData();
         } catch (e) { alert('Lỗi nhập kho'); }
     };
@@ -473,7 +483,9 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
                 <div className="flex items-center justify-between mb-3">
                     <button onClick={onBackToPos} className="w-9 h-9 bg-[#F5F5F7] rounded-full flex items-center justify-center text-[#1D1D1F]"><ChevronLeft size={20} /></button>
                     <span className="font-black text-[16px]">Quản trị Hệ thống</span>
-                    <div className="w-9"></div>
+                    <button onClick={onLogout} className="w-9 h-9 bg-red-500/10 hover:bg-red-500/20 rounded-full flex items-center justify-center text-red-500 transition-colors" title="Đăng xuất">
+                        <LogOut size={18} />
+                    </button>
                 </div>
                 <div className="flex bg-[#F5F5F7] p-1 rounded-2xl overflow-x-auto scrollbar-hide">
                     {[
@@ -587,20 +599,39 @@ const AdminPage = ({ products, history, refreshData, onBackToPos }) => {
                     )}
                 </div>
             </main>
-            {(editingProduct || showAddProduct) && <ProductModal product={editingProduct} onClose={() => { setEditingProduct(null); setShowAddProduct(false) }} onSave={() => { refreshData(); setEditingProduct(null); setShowAddProduct(false) }} />}
+            {(editingProduct || showAddProduct) && <ProductModal product={editingProduct} authToken={authToken} onLogout={onLogout} onClose={() => { setEditingProduct(null); setShowAddProduct(false) }} onSave={() => { refreshData(); setEditingProduct(null); setShowAddProduct(false) }} />}
             {editingOrder && <OrderModal order={editingOrder} onClose={() => setEditingOrder(null)} onSave={() => { fetchOrders(); setEditingOrder(null); }} />}
             {showImportModal && <div className="fixed inset-0 bg-black/50 z-50"></div>}
         </div>
     );
 };
 
-const ProductModal = ({ product, onClose, onSave }) => {
+const ProductModal = ({ product, onClose, onSave, authToken, onLogout }) => {
     const isEdit = !!product;
     const [formData, setFormData] = useState(product || { name: '', brand: '', category: '', price: 0, case_price: 0, units_per_case: 1, stock: 0, code: '', image: '' });
     const [isScanning, setIsScanning] = useState(false);
     const handleImageChange = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onloadend = () => setFormData({ ...formData, image: reader.result }); reader.readAsDataURL(file); } };
     const handleScanResult = (code) => { setFormData({ ...formData, code }); setIsScanning(false); };
-    const handleSubmit = async () => { try { const url = isEdit ? `${API_URL}/products/${formData.id}` : `${API_URL}/products`; const method = isEdit ? 'PUT' : 'POST'; await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData) }); onSave(); } catch (e) { console.error(e); } };
+    const handleSubmit = async () => {
+        try {
+            const url = isEdit ? `${API_URL}/products/${formData.id}` : `${API_URL}/products`;
+            const method = isEdit ? 'PUT' : 'POST';
+            const res = await fetch(url, {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify(formData)
+            });
+            if (res.status === 401) {
+                alert('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+                onLogout();
+                return;
+            }
+            onSave();
+        } catch (e) { console.error(e); }
+    };
 
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center animate-in fade-in">

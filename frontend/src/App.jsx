@@ -4,8 +4,30 @@ import QRScanner from './components/QRScanner';
 import POSView from './components/POSView';
 import AdminPage from './components/AdminPage';
 import ReceiptModal from './components/ReceiptModal';
+import LoginPage from './components/LoginPage';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
+// Auth helper functions
+const getAuthToken = () => localStorage.getItem('auth_token');
+const getAuthUser = () => {
+    try {
+        return JSON.parse(localStorage.getItem('auth_user'));
+    } catch {
+        return null;
+    }
+};
+const isAuthenticated = () => {
+    const token = getAuthToken();
+    const expiry = localStorage.getItem('auth_expiry');
+    if (!token || !expiry) return false;
+    return Date.now() < parseInt(expiry);
+};
+const logout = () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
+    localStorage.removeItem('auth_expiry');
+};
 
 const App = () => {
     const navigate = useNavigate();
@@ -19,6 +41,10 @@ const App = () => {
     const [showReceipt, setShowReceipt] = useState(false);
     const [lastOrder, setLastOrder] = useState(null);
     const [showScanner, setShowScanner] = useState(false);
+
+    // Auth States
+    const [authToken, setAuthToken] = useState(getAuthToken());
+    const [authUser, setAuthUser] = useState(getAuthUser());
 
     // Fetch Data from SQL API
     const fetchData = async () => {
@@ -38,7 +64,35 @@ const App = () => {
 
     useEffect(() => {
         fetchData();
+        // Check auth status on mount
+        if (!isAuthenticated()) {
+            setAuthToken(null);
+            setAuthUser(null);
+        }
     }, []);
+
+    const handleLogin = (token, user) => {
+        setAuthToken(token);
+        setAuthUser(user);
+        navigate('/admin');
+    };
+
+    const handleLogout = async () => {
+        try {
+            await fetch(`${API_URL}/auth/logout`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${authToken}`
+                }
+            });
+        } catch (e) {
+            console.error('Logout error:', e);
+        }
+        logout();
+        setAuthToken(null);
+        setAuthUser(null);
+        navigate('/');
+    };
 
     const handleScanResult = (code) => {
         const product = products.find(p => p.code === code || p.id === code);
@@ -78,12 +132,29 @@ const App = () => {
             if (res.ok) {
                 setLastOrder(order);
                 setCart([]);
-                // Không hiện popup receipt nữa - xong luôn
                 fetchData();
             }
         } catch (error) {
             console.error("Checkout failed:", error);
         }
+    };
+
+    // Protected Admin Route Component
+    const ProtectedAdmin = () => {
+        if (!isAuthenticated()) {
+            return <LoginPage onLogin={handleLogin} />;
+        }
+        return (
+            <AdminPage
+                products={products}
+                history={history}
+                refreshData={fetchData}
+                onBackToPos={() => navigate('/')}
+                authToken={authToken}
+                authUser={authUser}
+                onLogout={handleLogout}
+            />
+        );
     };
 
     return (
@@ -104,14 +175,8 @@ const App = () => {
                         setCart={setCart}
                     />
                 } />
-                <Route path="/admin/*" element={
-                    <AdminPage
-                        products={products}
-                        history={history}
-                        refreshData={fetchData}
-                        onBackToPos={() => navigate('/')}
-                    />
-                } />
+                <Route path="/admin/*" element={<ProtectedAdmin />} />
+                <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
             </Routes>
 
             {showScanner && (

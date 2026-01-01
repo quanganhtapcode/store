@@ -6,12 +6,59 @@ const csv = require('csv-parser');
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const crypto = require('crypto');
 
 const app = express();
 const port = 3001;
 
+// --- Authentication Config ---
+const AUTH_CONFIG = {
+    // Default credentials (should be overridden by environment variables)
+    username: process.env.ADMIN_USERNAME || 'admin',
+    password: process.env.ADMIN_PASSWORD || 'gemini2024',
+    // Secret key for token generation
+    secretKey: process.env.SECRET_KEY || 'gemini-pos-secret-key-2024',
+    // Token expiry (24 hours in milliseconds)
+    tokenExpiry: 24 * 60 * 60 * 1000
+};
+
+// Simple token storage (in production, use Redis or database)
+const activeTokens = new Map();
+
+// --- Generate Auth Token ---
+const generateToken = (username) => {
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiry = Date.now() + AUTH_CONFIG.tokenExpiry;
+    activeTokens.set(token, { username, expiry });
+    return token;
+};
+
+// --- Verify Token Middleware ---
+const verifyToken = (req, res, next) => {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Unauthorized: No token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const tokenData = activeTokens.get(token);
+
+    if (!tokenData) {
+        return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+    }
+
+    if (Date.now() > tokenData.expiry) {
+        activeTokens.delete(token);
+        return res.status(401).json({ error: 'Unauthorized: Token expired' });
+    }
+
+    req.user = tokenData.username;
+    next();
+};
+
 // --- Middlewares ---
-app.use(cors({ origin: '*', credentials: true })); // Allow all origins explicitly to fix CORS issues on Vercel
+app.use(cors({ origin: '*', credentials: true }));
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
@@ -166,7 +213,64 @@ const getLocalImagePath = (productId) => {
     return fs.existsSync(fullPath) ? localPath : null;
 };
 
-// --- APIs ---
+// ============================================
+// --- AUTHENTICATION APIs ---
+// ============================================
+
+// Login
+app.post('/api/auth/login', (req, res) => {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+        return res.status(400).json({ error: 'Username and password required' });
+    }
+
+    if (username === AUTH_CONFIG.username && password === AUTH_CONFIG.password) {
+        const token = generateToken(username);
+        console.log(`✅ Login successful: ${username}`);
+        logActivity('LOGIN', `User ${username} logged in`);
+
+        res.json({
+            success: true,
+            token,
+            user: { username },
+            expiresIn: AUTH_CONFIG.tokenExpiry
+        });
+    } else {
+        console.log(`❌ Login failed: ${username}`);
+        logActivity('LOGIN_FAILED', `Failed login attempt for ${username}`);
+        res.status(401).json({ error: 'Invalid username or password' });
+    }
+});
+
+// Logout
+app.post('/api/auth/logout', (req, res) => {
+    const authHeader = req.headers.authorization;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.split(' ')[1];
+        if (activeTokens.has(token)) {
+            const user = activeTokens.get(token).username;
+            activeTokens.delete(token);
+            console.log(`✅ Logout: ${user}`);
+            logActivity('LOGOUT', `User ${user} logged out`);
+        }
+    }
+
+    res.json({ success: true, message: 'Logged out successfully' });
+});
+
+// Verify token (check if still valid)
+app.get('/api/auth/verify', verifyToken, (req, res) => {
+    res.json({
+        valid: true,
+        user: { username: req.user }
+    });
+});
+
+// ============================================
+// --- PUBLIC APIs (No auth required) ---
+// ============================================
 
 // PRODUCTS - Auto map local images if exist
 app.get('/api/products', (req, res) => {
@@ -273,7 +377,12 @@ const saveBase64Image = (base64Data, productId) => {
     }
 };
 
-app.post('/api/products', (req, res) => {
+// ============================================
+// --- PROTECTED APIs (Auth required) ---
+// ============================================
+
+// ADD PRODUCT (Protected)
+app.post('/api/products', verifyToken, (req, res) => {
     const p = req.body;
     const id = generateId('PRD'); // ID Chuyên nghiệp 10 ký tự
 
@@ -468,8 +577,8 @@ app.get('/api/logs', (req, res) => {
     });
 });
 
-// UPDATE PRODUCT
-app.put('/api/products/:id', (req, res) => {
+// UPDATE PRODUCT (Protected)
+app.put('/api/products/:id', verifyToken, (req, res) => {
     const { id } = req.params;
     const p = req.body;
 
@@ -490,8 +599,8 @@ app.put('/api/products/:id', (req, res) => {
     );
 });
 
-// DELETE PRODUCT
-app.delete('/api/products/:id', (req, res) => {
+// DELETE PRODUCT (Protected)
+app.delete('/api/products/:id', verifyToken, (req, res) => {
     const { id } = req.params;
     db.run("DELETE FROM products WHERE id = ?", [id], function (err) {
         if (err) return res.status(500).json({ error: err.message });
@@ -500,8 +609,8 @@ app.delete('/api/products/:id', (req, res) => {
     });
 });
 
-// IMPORT (Nhập hàng)
-app.post('/api/imports', (req, res) => {
+// IMPORT (Nhập hàng - Protected)
+app.post('/api/imports', verifyToken, (req, res) => {
     const { items, total_cost, note } = req.body;
     const id = generateId('IMP');
     const timestamp = Date.now();
