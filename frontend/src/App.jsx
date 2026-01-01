@@ -5,6 +5,7 @@ import POSView from './components/POSView';
 import AdminPage from './components/AdminPage';
 import ReceiptModal from './components/ReceiptModal';
 import LoginPage from './components/LoginPage';
+import StatsModal from './components/StatsModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
@@ -41,6 +42,7 @@ const App = () => {
     const [showReceipt, setShowReceipt] = useState(false);
     const [lastOrder, setLastOrder] = useState(null);
     const [showScanner, setShowScanner] = useState(false);
+    const [showStats, setShowStats] = useState(false);  // NEW: Stats Modal
 
     // Auth States
     const [authToken, setAuthToken] = useState(getAuthToken());
@@ -139,7 +141,7 @@ const App = () => {
         }
     };
 
-    // Protected Admin Route Component
+    // Protected Admin Route Component - Full Admin with Login
     const ProtectedAdmin = () => {
         if (!isAuthenticated()) {
             return <LoginPage onLogin={handleLogin} />;
@@ -169,6 +171,7 @@ const App = () => {
                         setSelectedCategory={setSelectedCategory}
                         addToCart={addToCart}
                         onAdminClick={() => navigate('/admin')}
+                        onStatsClick={() => setShowStats(true)}
                         setShowScanner={setShowScanner}
                         cart={cart}
                         checkout={checkout}
@@ -192,9 +195,15 @@ const App = () => {
                 setShowReceipt={setShowReceipt}
             />
 
+            {/* Stats Modal - No login required */}
+            <StatsModal
+                isOpen={showStats}
+                onClose={() => setShowStats(false)}
+            />
+
             <style dangerouslySetInnerHTML={{
                 __html: `
-                    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+                    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
                     .scrollbar-hide::-webkit-scrollbar { display: none; }
                     .animate-in { animation: fadeIn 0.3s ease-out; }
                     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }

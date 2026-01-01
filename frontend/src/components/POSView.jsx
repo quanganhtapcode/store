@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
     Search, QrCode, ShoppingCart,
-    Image as ImageIcon, Settings, Store, Package, Trash2, X, Minus, Plus
+    Image as ImageIcon, Settings, Store, Package, Trash2, X, Minus, Plus, BarChart3, Lock
 } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
@@ -22,6 +22,7 @@ const POSView = ({
     setSelectedCategory,
     addToCart,
     onAdminClick,
+    onStatsClick,
     setShowScanner,
     cart,
     checkout,
@@ -145,10 +146,18 @@ const POSView = ({
                         <QrCode size={18} />
                     </button>
                     <button
-                        onClick={onAdminClick}
-                        className="w-10 h-10 bg-white border border-[#D2D2D7] text-[#1D1D1F] rounded-full flex items-center justify-center active:bg-gray-50 transition-colors shadow-sm"
+                        onClick={onStatsClick}
+                        className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform"
+                        title="Thống kê"
                     >
-                        <Settings size={20} />
+                        <BarChart3 size={18} />
+                    </button>
+                    <button
+                        onClick={onAdminClick}
+                        className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-full flex items-center justify-center active:scale-90 transition-all shadow-lg"
+                        title="Quản trị"
+                    >
+                        <Lock size={16} />
                     </button>
                 </div>
 
