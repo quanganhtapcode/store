@@ -34,7 +34,33 @@ app.use(express.static(path.join(__dirname, 'public'), {
 
 // Structure: /images/original/..., /images/grid/..., /images/detail/...
 
-const dbPath = path.join(__dirname, '../database/pos.db');
+// --- Database Path (Flexible for local dev and VPS) ---
+const getDbPath = () => {
+    const possiblePaths = [
+        path.join(__dirname, '../database/pos.db'),  // Local: gemini-pos/backend/../database/
+        path.join(__dirname, 'database/pos.db'),     // VPS: gemini-pos-api/database/
+        path.join(__dirname, 'pos.db'),              // VPS fallback: gemini-pos-api/pos.db
+    ];
+
+    for (const p of possiblePaths) {
+        if (fs.existsSync(p)) {
+            console.log(`📂 Database found at: ${p}`);
+            return p;
+        }
+    }
+
+    // Default to first path (will create new db)
+    const defaultPath = possiblePaths[1]; // VPS path
+    console.log(`📂 Creating new database at: ${defaultPath}`);
+
+    // Ensure directory exists
+    const dir = path.dirname(defaultPath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+    return defaultPath;
+};
+
+const dbPath = getDbPath();
 const db = new sqlite3.Database(dbPath);
 
 // --- Professional Helpers ---
