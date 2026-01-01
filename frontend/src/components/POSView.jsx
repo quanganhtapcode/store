@@ -64,7 +64,12 @@ const POSView = ({
         return groups;
     }, [expandedProducts]);
 
-    const bestSellers = useMemo(() => expandedProducts.filter(p => p.isRetail).slice(0, 8), [expandedProducts]);
+    const bestSellers = useMemo(() => {
+        return [...expandedProducts]
+            .filter(p => p.isRetail)
+            .sort((a, b) => (b.total_sold || 0) - (a.total_sold || 0))
+            .slice(0, 8);
+    }, [expandedProducts]);
 
     const filtered = expandedProducts.filter(p =>
         p.displayName.toLowerCase().includes(searchTerm.toLowerCase()) &&
