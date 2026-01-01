@@ -1,29 +1,51 @@
+# ====================================
 # Dependencies
+# ====================================
 node_modules/
+package-lock.json
 
-# Build output
-dist/
+# ====================================
+# Build Output
+# ====================================
+frontend/dist/
+*.log
 
-# Environment files
+# ====================================
+# Environment Files
+# ====================================
 .env
 .env.local
 .env.production
 
-# Database
-*.db
+# ====================================
+# Database (Backup files only)
+# ====================================
+database/*_backup*.db
+database/*.db.bak
 
-# OS files
+# ====================================
+# OS Generated Files
+# ====================================
 .DS_Store
 Thumbs.db
+*.tmp
 
-# IDE
+# ====================================
+# IDE / Editor
+# ====================================
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# Logs
-*.log
-npm-debug.log*
+# ====================================
+# Product Images (Manage separately)
+# ====================================
+backend/public/images/*.jpg
+backend/public/images/*.png
+!backend/public/images/.gitkeep
 
-# Temporary files
-*.tmp
-gemini-pos-nginx.conf
+# ====================================
+# Data Files
+# ====================================
+data/*.csv
