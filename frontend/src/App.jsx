@@ -53,12 +53,12 @@ const App = () => {
         try {
             const [pRes, hRes] = await Promise.all([
                 fetch(`${API_URL}/products`),
-                fetch(`${API_URL}/orders`)
+                fetch(`${API_URL}/orders?limit=200`) // Limit 200 orders for history
             ]);
             const pData = await pRes.json();
             const hData = await hRes.json();
             setProducts(pData);
-            setHistory(hData);
+            setHistory(hData.data || hData);
         } catch (error) {
             console.error("Error fetching data:", error);
         }

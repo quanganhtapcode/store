@@ -110,6 +110,91 @@ const getDbPath = () => {
 const dbPath = getDbPath();
 const db = new sqlite3.Database(dbPath);
 
+// --- Promisify Database for async/await support ---
+const dbRun = (sql, params = []) => {
+    return new Promise((resolve, reject) => {
+        db.run(sql, params, function (err) {
+            if (err) reject(err);
+            else resolve({ lastID: this.lastID, changes: this.changes });
+        });
+    });
+};
+
+const dbGet = (sql, params = []) => {
+    return new Promise((resolve, reject) => {
+        db.get(sql, params, (err, row) => {
+            if (err) reject(err);
+            else resolve(row);
+        });
+    });
+};
+
+const dbAll = (sql, params = []) => {
+    return new Promise((resolve, reject) => {
+        db.all(sql, params, (err, rows) => {
+            if (err) reject(err);
+            else resolve(rows);
+        });
+    });
+};
+
+// --- Input Validation Helpers ---
+const validateProduct = (data) => {
+    const errors = [];
+
+    if (!data.name || typeof data.name !== 'string' || data.name.trim().length === 0) {
+        errors.push('Tên sản phẩm không được để trống');
+    }
+    if (data.price !== undefined && (isNaN(data.price) || data.price < 0)) {
+        errors.push('Giá phải là số dương');
+    }
+    if (data.stock !== undefined && (isNaN(data.stock) || data.stock < 0)) {
+        errors.push('Số lượng tồn kho không được âm');
+    }
+    if (data.case_price !== undefined && (isNaN(data.case_price) || data.case_price < 0)) {
+        errors.push('Giá thùng phải là số dương');
+    }
+    if (data.units_per_case !== undefined && (isNaN(data.units_per_case) || data.units_per_case < 1)) {
+        errors.push('Số lượng/thùng phải >= 1');
+    }
+
+    return errors;
+};
+
+const validateOrder = (data) => {
+    const errors = [];
+
+    if (!data.items || !Array.isArray(data.items) || data.items.length === 0) {
+        errors.push('Đơn hàng phải có ít nhất 1 sản phẩm');
+    }
+    if (data.total !== undefined && (isNaN(data.total) || data.total < 0)) {
+        errors.push('Tổng tiền không hợp lệ');
+    }
+
+    // Validate each item
+    if (data.items && Array.isArray(data.items)) {
+        data.items.forEach((item, idx) => {
+            if (!item.id) errors.push(`Sản phẩm ${idx + 1} thiếu ID`);
+            if (!item.quantity || item.quantity < 1) errors.push(`Sản phẩm ${idx + 1} số lượng không hợp lệ`);
+        });
+    }
+
+    return errors;
+};
+
+const validateImport = (data) => {
+    const errors = [];
+
+    if (!data.items || !Array.isArray(data.items) || data.items.length === 0) {
+        errors.push('Phiếu nhập phải có ít nhất 1 sản phẩm');
+    }
+    if (data.total_cost !== undefined && (isNaN(data.total_cost) || data.total_cost < 0)) {
+        errors.push('Tổng chi phí không hợp lệ');
+    }
+
+    return errors;
+};
+
 // --- Professional Helpers ---
 const generateId = (prefix) => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -384,6 +469,11 @@ const saveBase64Image = (base64Data, productId) => {
 // ADD PRODUCT (Protected)
 app.post('/api/products', verifyToken, (req, res) => {
     const p = req.body;
+
+    // Validation
+    const errors = validateProduct(p);
+    if (errors.length > 0) return res.status(400).json({ error: errors.join(', ') });
+
     const id = generateId('PRD'); // ID Chuyên nghiệp 10 ký tự
 
     // Auto save base64 image to file
@@ -394,43 +484,63 @@ app.post('/api/products', verifyToken, (req, res) => {
     }
 
     db.run(`INSERT INTO products (id, name, brand, category, price, case_price, units_per_case, stock, code, image, total_sold) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-        [id, p.name, p.brand, p.category, p.price, p.case_price, p.units_per_case, p.stock, p.code, imagePath],
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, p.name, p.brand, p.category, p.price, p.case_price, p.units_per_case, p.stock, p.code, imagePath, 0],
         function (err) {
             if (err) return res.status(500).json({ error: err.message });
             logActivity('ADD_PRODUCT', `Added ${p.name}`);
-            res.json({ id, success: true, image: imagePath });
+            res.json({ id, image: imagePath });
         }
     );
 });
 
-// ORDERS
-app.post('/api/orders', (req, res) => {
+// ORDERS - With Transaction & Validation
+app.post('/api/orders', async (req, res) => {
     const { total, items, timestamp, customer_name, payment_method, note } = req.body;
 
-    // Tạo mã đơn hàng chuyên nghiệp
-    db.get("SELECT COUNT(*) as count FROM orders", (err, row) => {
-        const orderCode = generateOrderCode((row?.count || 0) + 1);
+    // 1. Input Validation
+    const errors = validateOrder({ total, items });
+    if (errors.length > 0) {
+        return res.status(400).json({ error: errors.join(', ') });
+    }
+
+    try {
+        // 2. Begin Transaction
+        await dbRun('BEGIN TRANSACTION');
+
+        // 3. Generate order code
+        const countResult = await dbGet("SELECT COUNT(*) as count FROM orders");
+        const orderCode = generateOrderCode((countResult?.count || 0) + 1);
         const itemsStr = JSON.stringify(items);
 
-        db.run(`INSERT INTO orders (order_code, total, timestamp, items, customer_name, payment_method, status, note) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [orderCode, total, timestamp, itemsStr, customer_name || 'Khách lẻ', payment_method || 'cash', 'completed', note || ''],
-            function (err) {
-                if (err) return res.status(500).json({ error: err.message });
+        // 4. Insert order
+        const orderResult = await dbRun(
+            `INSERT INTO orders (order_code, total, timestamp, items, customer_name, payment_method, status, note) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [orderCode, total, timestamp || Date.now(), itemsStr, customer_name || 'Khách lẻ', payment_method || 'cash', 'completed', note || '']
+        );
 
-                // Trừ kho & Tăng lượt bán (Trending logic)
-                items.forEach(item => {
-                    const qty = item.saleType === 'case' ? (item.quantity * item.units_per_case) : item.quantity;
-                    // Logic update thông minh: Giảm tồn kho, Tăng đã bán
-                    db.run(`UPDATE products SET stock = stock - ?, total_sold = total_sold + ? WHERE id = ?`,
-                        [qty, qty, item.id]);
-                });
+        // 5. Update stock & sold count (within same transaction)
+        for (const item of items) {
+            const qty = item.saleType === 'case' ? (item.quantity * (item.units_per_case || 1)) : item.quantity;
+            await dbRun(
+                `UPDATE products SET stock = stock - ?, total_sold = total_sold + ? WHERE id = ?`,
+                [qty, qty, item.id]
+            );
+        }
 
-                logActivity('CREATE_ORDER', `New Order ${orderCode} - ${total}đ`);
-                res.json({ id: this.lastID, order_code: orderCode });
-            });
-    });
+        // 6. Commit transaction
+        await dbRun('COMMIT');
+
+        logActivity('CREATE_ORDER', `New Order ${orderCode} - ${total}đ`);
+        res.json({ id: orderResult.lastID, order_code: orderCode, success: true });
+
+    } catch (error) {
+        // Rollback on any error
+        await dbRun('ROLLBACK').catch(() => { }); // Ignore rollback error
+        console.error('Order Error:', error);
+        res.status(500).json({ error: error.message || 'Lỗi tạo đơn hàng' });
+    }
 });
 
 // STATS (Thống kê cho Admin)
@@ -460,20 +570,48 @@ app.get('/api/stats', (req, res) => {
     });
 });
 
-// GET ORDERS (Lấy danh sách đơn hàng)
+// GET ORDERS (Lấy danh sách đơn hàng - với Pagination)
 app.get('/api/orders', (req, res) => {
-    const { startDate, endDate } = req.query;
-    let query = "SELECT * FROM orders ORDER BY timestamp DESC";
+    const { startDate, endDate, limit, offset } = req.query;
+
+    // Default: 50 orders, offset 0
+    const limitNum = Math.min(parseInt(limit) || 50, 200);  // Max 200
+    const offsetNum = parseInt(offset) || 0;
+
+    let baseQuery = "SELECT * FROM orders";
+    let countQuery = "SELECT COUNT(*) as total FROM orders";
     let params = [];
+    let whereClause = "";
 
     if (startDate && endDate) {
-        query = "SELECT * FROM orders WHERE timestamp >= ? AND timestamp <= ? ORDER BY timestamp DESC";
+        whereClause = " WHERE timestamp >= ? AND timestamp <= ?";
         params = [new Date(startDate).getTime(), new Date(endDate).getTime()];
     }
 
-    db.all(query, params, (err, rows) => {
+    const orderByClause = " ORDER BY timestamp DESC";
+    const paginationClause = ` LIMIT ${limitNum} OFFSET ${offsetNum}`;
+
+    // Get total count first
+    db.get(countQuery + whereClause, params, (err, countResult) => {
         if (err) return res.status(500).json({ error: err.message });
-        res.json(rows);
+
+        const total = countResult?.total || 0;
+
+        // Then get paginated results
+        db.all(baseQuery + whereClause + orderByClause + paginationClause, params, (err, rows) => {
+            if (err) return res.status(500).json({ error: err.message });
+
+            // Return with pagination metadata
+            res.json({
+                data: rows,
+                pagination: {
+                    total,
+                    limit: limitNum,
+                    offset: offsetNum,
+                    hasMore: offsetNum + rows.length < total
+                }
+            });
+        });
     });
 });
 
@@ -582,6 +720,10 @@ app.put('/api/products/:id', verifyToken, (req, res) => {
     const { id } = req.params;
     const p = req.body;
 
+    // Validation
+    const errors = validateProduct(p);
+    if (errors.length > 0) return res.status(400).json({ error: errors.join(', ') });
+
     // Auto save base64 image to file
     let imagePath = p.image;
     if (p.image && p.image.startsWith('data:image')) {
@@ -609,26 +751,36 @@ app.delete('/api/products/:id', verifyToken, (req, res) => {
     });
 });
 
-// IMPORT (Nhập hàng - Protected)
-app.post('/api/imports', verifyToken, (req, res) => {
+// IMPORT (Nhập hàng - Protected Using Transaction)
+app.post('/api/imports', verifyToken, async (req, res) => {
     const { items, total_cost, note } = req.body;
+
+    const errors = validateImport(req.body);
+    if (errors.length > 0) return res.status(400).json({ error: errors.join(', ') });
+
     const id = generateId('IMP');
     const timestamp = Date.now();
 
-    db.run(`INSERT INTO import_notes (id, timestamp, total_cost, note, items) VALUES (?, ?, ?, ?, ?)`,
-        [id, timestamp, total_cost, note, JSON.stringify(items)],
-        function (err) {
-            if (err) return res.status(500).json({ error: err.message });
+    try {
+        await dbRun('BEGIN TRANSACTION');
 
-            // Tăng số lượng tồn kho
-            items.forEach(item => {
-                db.run(`UPDATE products SET stock = stock + ? WHERE id = ?`, [item.quantity, item.id]);
-            });
+        await dbRun(`INSERT INTO import_notes (id, timestamp, total_cost, note, items) VALUES (?, ?, ?, ?, ?)`,
+            [id, timestamp, total_cost, note, JSON.stringify(items)]);
 
-            logActivity('IMPORT_STOCK', `Imported Stock ${id} - ${total_cost}đ`);
-            res.json({ success: true, id });
+        // Tăng số lượng tồn kho
+        for (const item of items) {
+            await dbRun(`UPDATE products SET stock = stock + ? WHERE id = ?`, [item.quantity, item.id]);
         }
-    );
+
+        await dbRun('COMMIT');
+
+        logActivity('IMPORT_STOCK', `Imported Stock ${id} - ${total_cost}đ`);
+        res.json({ success: true, id });
+
+    } catch (err) {
+        await dbRun('ROLLBACK').catch(() => { });
+        res.status(500).json({ error: err.message });
+    }
 });
 
 app.listen(port, () => {

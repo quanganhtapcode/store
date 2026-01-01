@@ -139,10 +139,11 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
 
     // Fetchers
     const fetchOrders = useCallback(async () => {
-        let url = `${API_URL}/orders`;
-        if (dateFilter.start && dateFilter.end) url += `?startDate=${dateFilter.start}&endDate=${dateFilter.end}`;
+        let url = `${API_URL}/orders?limit=100`; // Load more for admin
+        if (dateFilter.start && dateFilter.end) url += `&startDate=${dateFilter.start}&endDate=${dateFilter.end}`;
         const res = await fetch(url);
-        setOrders(await res.json());
+        const data = await res.json();
+        setOrders(data.data || data); // Handle both formats format
     }, [dateFilter]);
 
     const fetchLogs = useCallback(async () => {
