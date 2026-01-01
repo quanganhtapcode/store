@@ -3,7 +3,7 @@ import {
     ChevronLeft, Package, Receipt, TrendingUp, ShoppingBag,
     Plus, Edit3, Trash2, Save, X, Upload, Image as ImageIcon,
     QrCode, Sparkles, ArrowUpRight, ScanLine, Search, Grid,
-    List as ListIcon, MoreHorizontal, Camera, Calendar, FileText, CheckCircle, XCircle, Clock, Truck, BarChart3, RefreshCw, AlertCircle
+    List as ListIcon, MoreHorizontal, Camera, Calendar, FileText, CheckCircle, XCircle, Clock, Truck, BarChart3, RefreshCw, AlertCircle, ShieldCheck
 } from 'lucide-react';
 import { Html5Qrcode } from "html5-qrcode";
 import OrderModal from './OrderModal';
@@ -134,8 +134,36 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
     const [importSearch, setImportSearch] = useState('');
     const [showImportModal, setShowImportModal] = useState(false);
 
-    // Order State
     const [editingOrder, setEditingOrder] = useState(null);
+
+
+
+    const handleSetup2FA = async () => {
+        try {
+            const res = await fetch(`${API_URL}/auth/2fa/setup`, {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+            const data = await res.json();
+            if (data.qrCode) {
+                const newWin = window.open("", "_blank", "width=400,height=500");
+                if (newWin) {
+                    newWin.document.write(`
+                        <div style="text-align:center; font-family: sans-serif; padding: 20px;">
+                            <h2 style="margin-bottom:10px">Cài đặt 2FA</h2>
+                            <p style="font-size:14px; color:#555">Mở app Authenticator và quét mã:</p>
+                            <img src="${data.qrCode}" style="width: 200px; height: 200px; margin: 10px 0;"/>
+                            <p style="font-size:12px; color:#888">Sau đó bạn có thể đăng nhập bằng mã 6 số.</p>
+                        </div>
+                     `);
+                } else {
+                    alert("Vui lòng cho phép mở cửa sổ bật lên (Popup) để xem mã QR");
+                }
+            } else {
+                if (data.error && data.error.includes('phiên')) onLogout();
+                else alert("Lỗi: " + (data.error || 'Server error'));
+            }
+        } catch (e) { console.error(e); alert("Lỗi kết nối"); }
+    };
 
     // Fetchers
     const fetchOrders = useCallback(async () => {
@@ -546,9 +574,14 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
                 <div className="flex items-center justify-between mb-3">
                     <button onClick={onBackToPos} className="w-9 h-9 bg-[#F5F5F7] rounded-full flex items-center justify-center text-[#1D1D1F]"><ChevronLeft size={20} /></button>
                     <span className="font-black text-[16px]">Quản trị Hệ thống</span>
-                    <button onClick={onLogout} className="w-9 h-9 bg-red-500/10 hover:bg-red-500/20 rounded-full flex items-center justify-center text-red-500 transition-colors" title="Đăng xuất">
-                        <LogOut size={18} />
-                    </button>
+                    <div className="flex gap-2">
+                        <button onClick={handleSetup2FA} className="w-9 h-9 bg-blue-500/10 hover:bg-blue-500/20 rounded-full flex items-center justify-center text-blue-500 transition-colors" title="Cài đặt 2FA">
+                            <ShieldCheck size={18} />
+                        </button>
+                        <button onClick={onLogout} className="w-9 h-9 bg-red-500/10 hover:bg-red-500/20 rounded-full flex items-center justify-center text-red-500 transition-colors" title="Đăng xuất">
+                            <LogOut size={18} />
+                        </button>
+                    </div>
                 </div>
                 <div className="flex bg-[#F5F5F7] p-1 rounded-2xl overflow-x-auto scrollbar-hide">
                     {[
