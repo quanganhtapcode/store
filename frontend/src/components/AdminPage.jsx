@@ -3,7 +3,7 @@ import {
     ChevronLeft, Package, Receipt, TrendingUp, ShoppingBag,
     Plus, Edit3, Trash2, Save, X, Upload, Image as ImageIcon,
     QrCode, Sparkles, ArrowUpRight, ScanLine, Search, Grid,
-    List as ListIcon, MoreHorizontal, Camera, Calendar, FileText, CheckCircle, XCircle, Clock, Truck, BarChart3, RefreshCw
+    List as ListIcon, MoreHorizontal, Camera, Calendar, FileText, CheckCircle, XCircle, Clock, Truck, BarChart3, RefreshCw, AlertCircle
 } from 'lucide-react';
 import { Html5Qrcode } from "html5-qrcode";
 import OrderModal from './OrderModal';
