@@ -134,6 +134,9 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
     const [importSearch, setImportSearch] = useState('');
     const [showImportModal, setShowImportModal] = useState(false);
 
+    const [qrCodeData, setQrCodeData] = useState(null);
+    const [showQRModal, setShowQRModal] = useState(false);
+
     const [editingOrder, setEditingOrder] = useState(null);
 
 
@@ -145,19 +148,8 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
             });
             const data = await res.json();
             if (data.qrCode) {
-                const newWin = window.open("", "_blank", "width=400,height=500");
-                if (newWin) {
-                    newWin.document.write(`
-                        <div style="text-align:center; font-family: sans-serif; padding: 20px;">
-                            <h2 style="margin-bottom:10px">Cài đặt 2FA</h2>
-                            <p style="font-size:14px; color:#555">Mở app Authenticator và quét mã:</p>
-                            <img src="${data.qrCode}" style="width: 200px; height: 200px; margin: 10px 0;"/>
-                            <p style="font-size:12px; color:#888">Sau đó bạn có thể đăng nhập bằng mã 6 số.</p>
-                        </div>
-                     `);
-                } else {
-                    alert("Vui lòng cho phép mở cửa sổ bật lên (Popup) để xem mã QR");
-                }
+                setQrCodeData(data.qrCode);
+                setShowQRModal(true);
             } else {
                 if (data.error && data.error.includes('phiên')) onLogout();
                 else alert("Lỗi: " + (data.error || 'Server error'));
@@ -570,6 +562,30 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
 
     return (
         <div className="flex flex-col h-screen bg-[#F5F5F7] font-['Inter']">
+            {/* 2FA Setup Modal */}
+            {showQRModal && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-sm text-center animate-in zoom-in-95 duration-200">
+                        <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 text-[#0071E3]">
+                            <ShieldCheck size={24} />
+                        </div>
+                        <h3 className="text-xl font-bold text-[#1D1D1F] mb-2">Cài đặt 2FA</h3>
+                        <p className="text-[#86868B] text-sm mb-6">Sử dụng Google Authenticator hoặc Authy để quét mã QR bên dưới.</p>
+
+                        <div className="bg-[#F5F5F7] p-4 rounded-2xl mb-6 inline-block">
+                            {qrCodeData && <img src={qrCodeData} alt="QR Code" className="w-48 h-48 mix-blend-multiply" />}
+                        </div>
+
+                        <button
+                            onClick={() => setShowQRModal(false)}
+                            className="w-full bg-[#1D1D1F] text-white py-3 rounded-xl font-bold active:scale-[0.98] transition-transform"
+                        >
+                            Đã quét xong
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <div className="bg-white/90 backdrop-blur-md px-4 py-3 border-b border-[#D2D2D7]/30 sticky top-0 z-20">
                 <div className="flex items-center justify-between mb-3">
                     <button onClick={onBackToPos} className="w-9 h-9 bg-[#F5F5F7] rounded-full flex items-center justify-center text-[#1D1D1F]"><ChevronLeft size={20} /></button>
