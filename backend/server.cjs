@@ -59,9 +59,24 @@ const verifyToken = (req, res, next) => {
 };
 
 // --- Middlewares ---
-// Cho phép CORS từ biến môi trường (an toàn hơn)
+const allowedOrigins = [
+    'https://store.quanganh.org',
+    'https://vps.quanganh.org',
+    'http://localhost:5173',
+    'http://localhost:3000'
+];
+
 app.use(cors({
-    origin: process.env.FRONTEND_URL || '*',
+    origin: function (origin, callback) {
+        // Cho phép request không có origin (như Postman, Mobile App)
+        if (!origin) return callback(null, true);
+
+        if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+            callback(null, true);
+        } else {
+            callback(new Error('CORS Config: Not allowed by CORS'));
+        }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization']
