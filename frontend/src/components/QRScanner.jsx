@@ -13,23 +13,44 @@ const QRScanner = ({ onResult, onClose }) => {
         scannerRef.current = html5QrCode;
 
         const config = {
-            fps: 20, // Tăng lên 20 để quét mượt hơn (mặc định là 10)
-            qrbox: { width: 250, height: 250 }, // Vùng quét
-            aspectRatio: 1.0, // Tỉ lệ khung hình vuông giúp xử lý nhanh hơn trên mobile
-            disableFlip: false, // Tự động lật nếu cần
+            fps: 30, // Tăng lên 30 FPS để mượt như Native App
+            // Responsive qrbox: 75% kích thước khung hình
+            qrbox: (viewfinderWidth, viewfinderHeight) => {
+                const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                return {
+                    width: Math.floor(minEdge * 0.75),
+                    height: Math.floor(minEdge * 0.75),
+                };
+            },
+            aspectRatio: 1.0,
+            disableFlip: false,
+            // QUAN TRỌNG: Sử dụng BarcodeDetector API của trình duyệt (quét bằng phần cứng)
+            // Nhanh hơn gấp 5-10 lần so với giải mã bằng WebAssembly thuần
+            experimentalFeatures: {
+                useBarCodeDetectorIfSupported: true
+            }
         };
 
         // Bắt đầu quét
         html5QrCode.start(
-            { facingMode: "environment" }, // Camera sau
+            {
+                facingMode: "environment", // Camera sau
+                // Ép độ phân giải cao để nét hơn
+                videoConstraints: {
+                    width: { min: 720, ideal: 1280, max: 1920 },
+                    height: { min: 720, ideal: 1280, max: 1080 },
+                    // Yêu cầu tự động lấy nét liên tục (cho Chrome Android)
+                    focusMode: "continuous",
+                }
+            },
             config,
             (decodedText) => {
                 // Khi quét thành công
-                // Dừng scanner ngay lập tức để tránh quét lặp lại
+                // Dừng scanner ngay lập tức
                 html5QrCode.stop().then(() => {
                     scannerRef.current = null;
-                    onClose(); // Đóng scanner trước
-                    onResult(decodedText); // Sau đó xử lý kết quả
+                    onClose();
+                    onResult(decodedText);
                 }).catch(err => console.error("Stop failed", err));
             },
             (errorMessage) => {
