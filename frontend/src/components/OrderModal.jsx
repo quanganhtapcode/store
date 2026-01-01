@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Trash2 } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 // --- Order Modal Component (Full Edit) ---
-const OrderModal = ({ order, onClose, onSave }) => {
+const OrderModal = ({ order, authToken, onClose, onSave }) => {
     const initialItems = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || []);
 
     const [formData, setFormData] = useState({
@@ -37,6 +37,25 @@ const OrderModal = ({ order, onClose, onSave }) => {
             return;
         }
         setEditItems(prev => prev.filter((_, i) => i !== idx));
+    };
+
+    const handleDelete = async () => {
+        if (!window.confirm('Bạn có chắc muốn xóa đơn này? Hành động này sẽ hoàn lại kho cho các sản phẩm.')) return;
+
+        try {
+            const res = await fetch(`${API_URL}/orders/${order.id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${authToken}`
+                }
+            });
+            if (res.ok) {
+                onSave();
+            } else {
+                const data = await res.json();
+                alert(data.error || 'Không thể xóa đơn hàng');
+            }
+        } catch (e) { console.error(e); alert('Lỗi kết nối khi xóa đơn'); }
     };
 
     const handleSubmit = async () => {
@@ -194,8 +213,11 @@ const OrderModal = ({ order, onClose, onSave }) => {
                     </div>
                 </div>
 
-                <div className="p-4 border-t border-[#F5F5F7]">
-                    <button onClick={handleSubmit} className="w-full bg-[#0071E3] text-white py-4 rounded-2xl font-bold text-[16px] shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-transform">
+                <div className="p-4 border-t border-[#F5F5F7] flex gap-3">
+                    <button onClick={handleDelete} className="bg-red-50 text-red-500 w-16 h-14 rounded-2xl flex items-center justify-center font-bold active:scale-95 transition-all hover:bg-red-100">
+                        <Trash2 size={22} />
+                    </button>
+                    <button onClick={handleSubmit} className="flex-1 bg-[#0071E3] text-white py-4 rounded-2xl font-bold text-[16px] shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-transform">
                         💾 Lưu thay đổi
                     </button>
                 </div>

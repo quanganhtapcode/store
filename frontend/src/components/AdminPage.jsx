@@ -601,7 +601,7 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
                 </div>
             </main>
             {(editingProduct || showAddProduct) && <ProductModal product={editingProduct} authToken={authToken} onLogout={onLogout} onClose={() => { setEditingProduct(null); setShowAddProduct(false) }} onSave={() => { refreshData(); setEditingProduct(null); setShowAddProduct(false) }} />}
-            {editingOrder && <OrderModal order={editingOrder} onClose={() => setEditingOrder(null)} onSave={() => { fetchOrders(); setEditingOrder(null); }} />}
+            {editingOrder && <OrderModal order={editingOrder} authToken={authToken} onClose={() => setEditingOrder(null)} onSave={() => { fetchOrders(); setEditingOrder(null); }} />}
             {showImportModal && <div className="fixed inset-0 bg-black/50 z-50"></div>}
         </div>
     );

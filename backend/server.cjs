@@ -543,8 +543,15 @@ app.post('/api/orders', async (req, res) => {
     }
 });
 
-// STATS (Thống kê cho Admin)
+// STATS (Thống kê - Caching 5 minutes)
+let statsCache = { data: null, expiry: 0 };
+
 app.get('/api/stats', (req, res) => {
+    // Return cached data if valid
+    if (statsCache.data && Date.now() < statsCache.expiry) {
+        return res.json(statsCache.data);
+    }
+
     const today = new Date().setHours(0, 0, 0, 0);
     const firstDayOfMonth = new Date(new Date().setDate(1)).setHours(0, 0, 0, 0);
 
@@ -553,22 +560,33 @@ app.get('/api/stats', (req, res) => {
 
         // Doanh thu hôm nay
         db.all("SELECT total FROM orders WHERE timestamp >= ?", [today], (e, r) => {
+            if (e) return res.status(500).json({ error: e.message });
             result.todayRevenue = r.reduce((ack, x) => ack + x.total, 0);
             result.todayOrders = r.length;
 
             // Doanh thu tháng
             db.all("SELECT total FROM orders WHERE timestamp >= ?", [firstDayOfMonth], (e2, r2) => {
+                if (e2) return res.status(500).json({ error: e2.message });
                 result.monthRevenue = r2.reduce((ack, x) => ack + x.total, 0);
 
                 // Top sản phẩm bán chạy
                 db.all("SELECT name, total_sold FROM products ORDER BY total_sold DESC LIMIT 5", (e3, r3) => {
+                    if (e3) return res.status(500).json({ error: e3.message });
                     result.topProducts = r3;
+
+                    // Update cache
+                    statsCache = {
+                        data: result,
+                        expiry: Date.now() + 5 * 60 * 1000 // Cache for 5 mins
+                    };
+
                     res.json(result);
                 });
             });
         });
     });
 });
+
 
 // GET ORDERS (Lấy danh sách đơn hàng - với Pagination)
 app.get('/api/orders', (req, res) => {
@@ -625,7 +643,47 @@ app.get('/api/orders/:id', (req, res) => {
     });
 });
 
-// UPDATE ORDER (Full edit: items, price, quantity, customer info)
+// DELETE ORDER (Protected - Hoàn lại kho)
+app.delete('/api/orders/:id', verifyToken, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        await dbRun('BEGIN TRANSACTION');
+
+        // 1. Get order details to restore stock
+        const order = await dbGet("SELECT items, order_code FROM orders WHERE id = ?", [id]);
+        if (!order) {
+            await dbRun('ROLLBACK');
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        const items = JSON.parse(order.items);
+
+        // 2. Restore stock for each item
+        for (const item of items) {
+            const qty = item.saleType === 'case' ? (item.quantity * (item.units_per_case || 1)) : item.quantity;
+            await dbRun(
+                `UPDATE products SET stock = stock + ?, total_sold = total_sold - ? WHERE id = ?`,
+                [qty, qty, item.id] // Cộng lại kho, Trừ đi đã bán
+            );
+        }
+
+        // 3. Delete the order
+        await dbRun("DELETE FROM orders WHERE id = ?", [id]);
+
+        await dbRun('COMMIT');
+
+        // Invalidate stats cache so it updates immediately
+        statsCache = { data: null, expiry: 0 };
+
+        logActivity('DELETE_ORDER', `Deleted Order ${order.order_code}`);
+        res.json({ success: true, changes: this.changes });
+
+    } catch (error) {
+        await dbRun('ROLLBACK').catch(() => { });
+        res.status(500).json({ error: error.message });
+    }
+});
 app.put('/api/orders/:id', (req, res) => {
     const { id } = req.params;
     const { customer_name, payment_method, status, note, items, total } = req.body;
