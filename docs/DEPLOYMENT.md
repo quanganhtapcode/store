@@ -1,10 +1,13 @@
-# 🚀 Deployment Guide - Gemini POS
+# 🚀 Deployment Guide - Gemini POS (Cát Hải Store)
 
-Hướng dẫn chi tiết cách deploy hệ thống Gemini POS lên production.
+*Cập nhật lần cuối: 2026-01-02*
+
+Tài liệu hướng dẫn deploy và cấu trúc hệ thống Gemini POS trên VPS.
 
 ---
 
-## 📋 Tổng quan Kiến trúc Deployment
+## 📋 Tổng quan Kiến trúc
+Hệ thống Backend đã được **chuẩn hóa** về thư mục `/var/www/vps.quanganh.org` (thay vì `/root/gemini-pos-api` cũ) để tăng cường bảo mật và dễ quản lý.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -16,10 +19,8 @@ Hướng dẫn chi tiết cách deploy hệ thống Gemini POS lên production.
 ┌───────────────┐   ┌───────────────┐   ┌───────────────┐
 │    VERCEL     │   │     VPS       │   │   CLOUDFLARE  │
 │   (Frontend)  │   │   (Backend)   │   │     (DNS)     │
-│               │   │               │   │               │
-│ React + Vite  │   │ Express + DB  │   │  SSL + Cache  │
-│ store.vercel  │   │ vps.quanganh  │   │               │
-│    .app       │   │    .org       │   │               │
+│ React + Vite  │   │ Node.js API   │   │  SSL + Cache  │
+│               │   │ /var/www/...  │   │               │
 └───────────────┘   └───────────────┘   └───────────────┘
 ```
 
@@ -27,307 +28,120 @@ Hướng dẫn chi tiết cách deploy hệ thống Gemini POS lên production.
 
 ## 📦 1. Deploy Frontend (Vercel)
 
-### Bước 1: Chuẩn bị
+*(Phần này giữ nguyên, không thay đổi)*
 
+### Bước 1: Chuẩn bị
 ```bash
 cd frontend
-npm run build   # Test build locally
+npm run build
 ```
 
-### Bước 2: Push lên GitHub
+### Bước 2: Push và Deploy
+Push code lên GitHub (`main` branch), Vercel sẽ tự động deploy.
 
-```bash
-git add .
-git commit -m "Deploy: Update frontend"
-git push origin main
-```
-
-### Bước 3: Setup Vercel
-
-1. Truy cập [vercel.com](https://vercel.com)
-2. Import project từ GitHub
-3. Cấu hình:
-   - **Framework Preset:** Vite
-   - **Root Directory:** `frontend`
-   - **Build Command:** `npm run build`
-   - **Output Directory:** `dist`
-
-### Bước 4: Environment Variables
-
-Thêm biến môi trường trên Vercel Dashboard:
-
-```
-VITE_API_URL=https://vps.quanganh.org/api
-```
-
-### Bước 5: Deploy
-
-Vercel tự động deploy mỗi khi push lên `main`.
-
-**URL Production:** `https://store-six-fawn.vercel.app`
+- **URL Production:** `https://store-six-fawn.vercel.app`
+- **Biến môi trường (Vercel):** `VITE_API_URL=https://vps.quanganh.org/api`
 
 ---
 
-## 🖥️ 2. Deploy Backend (VPS)
+## 🖥️ 2. Cấu Trúc Server & Backend (VPS)
 
-### Yêu cầu VPS
-- OS: Ubuntu 20.04+ / Debian 11+
-- RAM: ≥ 1GB
-- Node.js: ≥ 18
-- PM2: Process Manager
-- Nginx: Reverse Proxy
+**IP VPS:** `203.55.176.10`
 
-### Bước 1: SSH vào VPS
+### 2.1. Cấu Trúc Thư Mục Mới
+Toàn bộ hệ thống nằm tại: **`/var/www/vps.quanganh.org/`**
 
-```bash
-ssh -i ~/Desktop/key.pem root@10.66.66.1
-```
+| Đường dẫn con | Chức năng | Ghi chú |
+|--------------|-----------|---------|
+| `/api/` | **Source Code chính** | Code Node.js, Express Server (Port 3001) |
+| `/api/database/` | **Database SQLite** | File `pos.db` chứa dữ liệu |
+| `/backups/` | **Kho lưu trữ Backup** | Chứa các file `pos_YYYY-MM-DD_HH.db` |
+| `/scripts/` | **Script tự động** | Chứa `backup.sh` chạy cronjob |
 
-### Bước 2: Cài đặt dependencies (Lần đầu)
+### 2.2. Quản Lý Service (PM2)
+Bên Backend chạy dưới PM2 với tên process là `pos-api`.
 
-```bash
-# Install Node.js 18
-curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
-apt-get install -y nodejs
+- **Start/Restart:** `pm2 restart pos-api`
+- **Check Status:** `pm2 status` hoặc `pm2 logs pos-api`
+- **Port:** `3001`
 
-# Install PM2
-npm install -g pm2
+### 2.3. Quy trình Deploy Code Mới
 
-# Install Nginx
-apt-get install -y nginx
-```
+1. **SSH vào VPS:**
+   ```bash
+   ssh root@203.55.176.10
+   ```
+2. **Pull code & Update:**
+   ```bash
+   cd /var/www/vps.quanganh.org/api
+   # Nếu dùng git
+   git pull origin main
+   npm install
+   pm2 restart pos-api
+   ```
+   *(Hoặc copy thủ công file server.cjs nếu không dùng git trực tiếp trên VPS)*
 
-### Bước 3: Tạo thư mục project
-
-```bash
-mkdir -p /root/gemini-pos-api
-cd /root/gemini-pos-api
-```
-
-### Bước 4: Deploy bằng script
-
-Từ máy local:
-
-```bash
-./scripts/update-vps.sh
-```
-
-Script này sẽ:
-1. Copy `backend/server.cjs` và `backend/package.json` lên VPS
-2. Install dependencies
-3. Restart PM2
-
-### Bước 5: Cấu hình Nginx
-
-```bash
-nano /etc/nginx/sites-available/gemini-pos
-```
+### 2.4. Cấu hình Nginx (Tham khảo)
+File: `/etc/nginx/sites-available/vps.quanganh.org`
 
 ```nginx
 server {
-    listen 80;
     server_name vps.quanganh.org;
-    
+    # ... SSL config ...
     location / {
         proxy_pass http://localhost:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        # ... Headers ...
     }
 }
 ```
 
-```bash
-ln -s /etc/nginx/sites-available/gemini-pos /etc/nginx/sites-enabled/
-nginx -t
-systemctl restart nginx
-```
+---
 
-### Bước 6: SSL Certificate (Let's Encrypt)
+## 💾 3. Hệ Thống Backup Tự Động
 
+Server đã được cấu hình tự động sao lưu Database mỗi giờ.
+
+- **Script:** `/var/www/vps.quanganh.org/scripts/backup.sh`
+- **Cơ chế:**
+  - Chạy mỗi tiếng một lần (phút 00).
+  - Copy `pos.db` (kèm WAL/SHM) sang thư mục `/backups/`.
+  - Tự động xóa backup cũ hơn **7 ngày**.
+- **Kiểm tra lịch:** `crontab -l`
+
+**Lệnh Backup thủ công (nếu cần):**
 ```bash
-apt-get install -y certbot python3-certbot-nginx
-certbot --nginx -d vps.quanganh.org
+/var/www/vps.quanganh.org/scripts/backup.sh
 ```
 
 ---
 
-## 🔧 3. PM2 Commands
+## 🖼️ 4. Đồng bộ ảnh sản phẩm
 
+Ảnh sản phẩm nằm tại: `/var/www/vps.quanganh.org/api/public/images/`
+
+**Upload ảnh từ máy local lên VPS:**
 ```bash
-# Xem trạng thái
-pm2 status
-
-# Xem logs
-pm2 logs gemini-pos
-
-# Restart
-pm2 restart gemini-pos
-
-# Stop
-pm2 stop gemini-pos
-
-# Delete
-pm2 delete gemini-pos
-
-# Save cấu hình (để tự khởi động khi reboot)
-pm2 save
-pm2 startup
+scp -r backend/public/images/* root@203.55.176.10:/var/www/vps.quanganh.org/api/public/images/
 ```
+
+**URL truy cập ảnh:** `https://vps.quanganh.org/images/PRD-XXXXXX.jpg`
 
 ---
 
-## 💾 4. Database Backup
+## ⚠️ 5. Troubleshooting & Maintenance
 
-### Manual Backup
-
+### Kiểm tra Logs
 ```bash
-# Trên VPS
-cp /root/gemini-pos-api/database/pos.db /root/backups/pos_$(date +%Y%m%d).db
+pm2 logs pos-api
 ```
 
-### Auto Backup (Cron)
+### Nếu Server API không phản hồi
+1. Check PM2: `pm2 status` xem `pos-api` có online không.
+2. Restart: `pm2 restart pos-api`.
+3. Check Nginx: `systemctl status nginx`.
 
-```bash
-crontab -e
-```
-
-Thêm dòng:
-```
-0 2 * * * cp /root/gemini-pos-api/database/pos.db /root/backups/pos_$(date +\%Y\%m\%d).db
-```
-
-→ Backup lúc 2:00 AM mỗi ngày
-
-### Download Backup về Local
-
-```bash
-scp -i ~/Desktop/key.pem root@10.66.66.1:/root/backups/pos_20260101.db ./
-```
-
----
-
-## 🖼️ 5. Sync Product Images
-
-### Upload ảnh lên VPS
-
-```bash
-scp -i ~/Desktop/key.pem -r backend/public/images/* root@10.66.66.1:/root/gemini-pos-api/public/images/
-```
-
-### Cấu trúc thư mục ảnh trên VPS
-
-```
-/root/gemini-pos-api/
-└── public/
-    └── images/
-        ├── PRD-A1B2C3.jpg
-        ├── PRD-D4E5F6.jpg
-        └── ...
-```
-
----
-
-## 🔄 6. CI/CD (Optional)
-
-### GitHub Actions
-
-Tạo file `.github/workflows/deploy.yml`:
-
-```yaml
-name: Deploy to VPS
-
-on:
-  push:
-    branches: [main]
-    paths:
-      - 'backend/**'
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Deploy to VPS
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: root
-          key: ${{ secrets.VPS_KEY }}
-          script: |
-            cd /root/gemini-pos-api
-            git pull origin main
-            npm install --production
-            pm2 restart gemini-pos
-```
-
----
-
-## 🔍 7. Monitoring
-
-### Check Health
-
-```bash
-curl https://vps.quanganh.org/api/stats
-```
-
-### PM2 Monitoring
-
-```bash
-pm2 monit
-```
-
-### Logs
-
-```bash
-# Real-time logs
-pm2 logs gemini-pos --lines 100
-
-# Error logs only
-pm2 logs gemini-pos --err
-```
-
----
-
-## ⚠️ 8. Troubleshooting
-
-### Frontend không kết nối được API
-
-1. Kiểm tra biến môi trường `VITE_API_URL` trên Vercel
-2. Kiểm tra CORS trên backend
-3. Kiểm tra Nginx proxy
-
-### Backend không start
-
-```bash
-cd /root/gemini-pos-api
-node server.cjs  # Chạy manual để xem lỗi
-```
-
-### Database bị lock
-
-```bash
-pm2 restart gemini-pos
-```
-
-### Port đang bị dùng
-
-```bash
-lsof -i :3001
-kill -9 <PID>
-```
-
----
-
-## 📞 URLs Production
-
-| Service | URL |
-|---------|-----|
-| Frontend | https://store-six-fawn.vercel.app |
-| Backend API | https://vps.quanganh.org/api |
-| Images | https://vps.quanganh.org/images/PRD-XXXXXX.jpg |
+### Khôi phục dữ liệu từ Backup
+1. Stop service: `pm2 stop pos-api`
+2. Copy file backup từ `/backups/` về `/api/database/`.
+3. Đổi tên thành `pos.db`.
+4. Start service: `pm2 start pos-api`

@@ -724,6 +724,7 @@ const ProductModal = ({ product, onClose, onSave, authToken, onLogout }) => {
     const [isScanning, setIsScanning] = useState(false);
     const handleImageChange = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onloadend = () => setFormData({ ...formData, image: reader.result }); reader.readAsDataURL(file); } };
     const handleScanResult = (code) => { setFormData({ ...formData, code }); setIsScanning(false); };
+
     const handleSubmit = async () => {
         try {
             const url = isEdit ? `${API_URL}/products/${formData.id}` : `${API_URL}/products`;
@@ -743,6 +744,28 @@ const ProductModal = ({ product, onClose, onSave, authToken, onLogout }) => {
             }
             onSave();
         } catch (e) { console.error(e); }
+    };
+
+    const handleDelete = async () => {
+        if (!confirm('Bạn có chắc chắn muốn xóa sản phẩm này? Hành động không thể hoàn tác.')) return;
+        try {
+            const res = await fetch(`${API_URL}/products/${formData.id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${authToken}`
+                }
+            });
+            if (res.status === 401) {
+                alert('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+                onLogout();
+                return;
+            }
+            if (res.ok) {
+                onSave();
+            } else {
+                alert('Không thể xóa sản phẩm. Vui lòng thử lại.');
+            }
+        } catch (e) { console.error(e); alert('Lỗi kết nối'); }
     };
 
     return (
@@ -777,7 +800,16 @@ const ProductModal = ({ product, onClose, onSave, authToken, onLogout }) => {
                         </div>
                     </div>
                 </div>
-                <div className="p-4 border-t border-[#F5F5F7]"><button onClick={handleSubmit} className="w-full bg-[#0071E3] text-white py-4 rounded-2xl font-bold text-[16px] shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-transform">Lưu sản phẩm</button></div>
+                <div className="p-4 border-t border-[#F5F5F7] flex gap-3">
+                    {isEdit && (
+                        <button onClick={handleDelete} className="bg-red-50 text-red-500 p-4 rounded-2xl font-bold flex-shrink-0 active:scale-95 transition-transform hover:bg-red-100">
+                            <Trash2 size={24} />
+                        </button>
+                    )}
+                    <button onClick={handleSubmit} className="flex-1 bg-[#0071E3] text-white py-4 rounded-2xl font-bold text-[16px] shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-transform">
+                        {isEdit ? 'Lưu thay đổi' : 'Thêm mới'}
+                    </button>
+                </div>
             </div>
         </div>
     );

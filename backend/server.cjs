@@ -11,6 +11,7 @@ const multer = require('multer');
 const { initDatabase, dbRun, dbAll, logActivity } = require('./config/database');
 const { verifyToken, generateToken, AUTH_CONFIG } = require('./middleware/auth');
 const { validateImport } = require('./utils/helpers');
+const { verifyOTP, getQRCode } = require('./utils/otp');
 
 // --- Init App ---
 const app = express();
@@ -70,14 +71,46 @@ app.use('/api/orders', require('./routes/orders'));
 app.use('/api/stats', require('./routes/stats'));
 
 // --- AUTH ROUTE ---
+// --- AUTH ROUTE ---
 app.post('/api/auth/login', (req, res) => {
-    const { username, password } = req.body;
-    if (username === AUTH_CONFIG.username && password === AUTH_CONFIG.password) {
+    const { username, password, otp } = req.body;
+
+    // Check Username
+    if (username !== AUTH_CONFIG.username) {
+        return res.status(401).json({ error: 'Tài khoản không đúng' });
+    }
+
+    let isAuthenticated = false;
+
+    // Case 1: Password
+    if (password && password === AUTH_CONFIG.password) {
+        isAuthenticated = true;
+    }
+    // Case 2: OTP (2FA)
+    else if (otp) {
+        // Remove spaces if any
+        const cleanOtp = otp.toString().replace(/\s/g, '');
+        if (verifyOTP(cleanOtp)) {
+            isAuthenticated = true;
+        } else {
+            return res.status(401).json({ error: 'Mã OTP sai hoặc hết hạn' });
+        }
+    }
+
+    if (isAuthenticated) {
         const token = generateToken(username);
         res.json({ success: true, token, user: username, expiresIn: AUTH_CONFIG.tokenExpiry });
     } else {
-        res.status(401).json({ error: 'Sai tài khoản hoặc mật khẩu' });
+        res.status(401).json({ error: 'Sai mật khẩu' });
     }
+});
+
+// 2FA Setup (Get QR)
+app.get('/api/auth/2fa/setup', verifyToken, async (req, res) => {
+    try {
+        const qrData = await getQRCode(AUTH_CONFIG.username);
+        res.json({ qrCode: qrData });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // --- LOGS ROUTE ---
