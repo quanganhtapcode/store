@@ -1,11 +1,19 @@
 const crypto = require('crypto');
 
+// Validate required environment variables
+const requiredEnvVars = ['ADMIN_PASSWORD', 'SECRET_KEY'];
+const missingVars = requiredEnvVars.filter(v => !process.env[v]);
+if (missingVars.length > 0) {
+    console.error(`❌ FATAL: Missing required environment variables: ${missingVars.join(', ')}`);
+    console.error('💡 Please set these in your .env file before starting the server.');
+    process.exit(1);
+}
+
 // Auth Configuration
 const AUTH_CONFIG = {
     username: process.env.ADMIN_USERNAME || 'admin',
-    // WARNING: Default credentials should be overridden in production using .env
-    password: process.env.ADMIN_PASSWORD || 'gemini2024',
-    secretKey: process.env.SECRET_KEY || 'gemini-pos-secret-key-2024',
+    password: process.env.ADMIN_PASSWORD,
+    secretKey: process.env.SECRET_KEY,
     tokenExpiry: 24 * 60 * 60 * 1000 // 24 hours
 };
 
