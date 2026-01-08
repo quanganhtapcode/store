@@ -50,10 +50,43 @@ server {
     }
 
     # ============================================
+    # ============================================
+    # ============================================
+    # ============================================
+    # STORE IMAGES - Proxy to Backend (Debug Mode)
+    # Request: /v1/store/api/images/XXX.jpg -> Backend: /images/XXX.jpg
+    # ============================================
+    location /v1/store/images/ {
+        rewrite ^/v1/store/images/(.*)$ /images/$1 break;
+        proxy_pass http://127.0.0.1:3001;
+        
+        add_header X-Debug-Path "Proxy to Backend /images/" always;
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        
+        # CORS
+        proxy_hide_header Access-Control-Allow-Origin;
+        add_header Access-Control-Allow-Origin "*" always;
+    }
+
+    location /v1/store/api/images/ {
+        rewrite ^/v1/store/api/images/(.*)$ /images/$1 break;
+        proxy_pass http://127.0.0.1:3001;
+        
+        add_header X-Debug-Path "Proxy to Backend /images/" always;
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        
+        # CORS
+        proxy_hide_header Access-Control-Allow-Origin;
+        add_header Access-Control-Allow-Origin "*" always;
+    }
+
+    # ============================================
     # STORE/POS API - /v1/store/*
+    # Request: /v1/store/products -> Backend: /api/products
     # ============================================
     location /v1/store/ {
-        # CORS - Allow store.quanganh.org and vercel preview
+        # CORS handled by Nginx
+        proxy_hide_header Access-Control-Allow-Origin;
         add_header Access-Control-Allow-Origin "*" always;
         add_header Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS" always;
         add_header Access-Control-Allow-Headers "Content-Type, Authorization" always;
@@ -67,7 +100,9 @@ server {
             return 204;
         }
 
+        # IMPORTANT: Add /api prefix for backend routes
         rewrite ^/v1/store/(.*)$ /api/$1 break;
+        
         proxy_pass http://127.0.0.1:3001;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
