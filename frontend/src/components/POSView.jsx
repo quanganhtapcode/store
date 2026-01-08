@@ -5,13 +5,26 @@ import {
 } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-const IMAGE_BASE_URL = API_URL.replace('/api', '');
+// IMAGE_BASE_URL is deprecated in favor of dynamic calculation in getImageUrl
+// const IMAGE_BASE_URL = API_URL.replace('/api', '');
 
 // Helper to get image URL
+// Helper to get image URL - Robust implementation
 const getImageUrl = (imagePath) => {
     if (!imagePath) return null;
     if (imagePath.startsWith('http') || imagePath.startsWith('data:')) return imagePath;
-    return `${IMAGE_BASE_URL}${imagePath}`;
+
+    // Ensure API_URL is clean
+    let baseUrl = API_URL.replace(/\/api\/?$/, ''); // Remove trailing /api or /api/
+    if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1); // Remove trailing slash
+
+    // Ensure imagePath starts with /
+    const path = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
+
+    // Logic: Nếu path chưa có /images/ (ví dụ chỉ có tên file), thêm vào
+    // Nhưng hiện tại DB lưu /images/PRD... nên ok
+
+    return `${baseUrl}${path}`;
 };
 
 const POSView = ({

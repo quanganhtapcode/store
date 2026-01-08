@@ -13,10 +13,17 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 const IMAGE_BASE_URL = API_URL.replace('/api', '');
 
 // Helper to get image URL
+// Helper function to get image URL
 const getImageUrl = (imagePath) => {
     if (!imagePath) return null;
     if (imagePath.startsWith('http') || imagePath.startsWith('data:')) return imagePath;
-    return `${IMAGE_BASE_URL}${imagePath}`;
+
+    // Ensure API_URL is clean
+    let baseUrl = API_URL.replace(/\/api\/?$/, '');
+    if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+
+    const path = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
+    return `${baseUrl}${path}`;
 };
 
 // --- NEW OPTIMIZED QR Scanner Component ---
