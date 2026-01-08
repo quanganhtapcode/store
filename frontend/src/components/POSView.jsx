@@ -24,7 +24,8 @@ const getImageUrl = (imagePath) => {
     // Logic: Nếu path chưa có /images/ (ví dụ chỉ có tên file), thêm vào
     // Nhưng hiện tại DB lưu /images/PRD... nên ok
 
-    return `${baseUrl}${path}`;
+    const finalUrl = `${baseUrl}${path}`;
+    return finalUrl;
 };
 
 const POSView = ({

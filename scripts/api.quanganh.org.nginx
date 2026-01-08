@@ -60,8 +60,9 @@ server {
         rewrite ^/v1/store/images/(.*)$ /images/$1 break;
         proxy_pass http://127.0.0.1:3001;
         
-        add_header X-Debug-Path "Proxy to Backend /images/" always;
-        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        # Cache Policy: 30 Days
+        add_header Cache-Control "public, max-age=2592000, immutable";
+        expires 30d;
         
         # CORS
         proxy_hide_header Access-Control-Allow-Origin;
@@ -72,8 +73,9 @@ server {
         rewrite ^/v1/store/api/images/(.*)$ /images/$1 break;
         proxy_pass http://127.0.0.1:3001;
         
-        add_header X-Debug-Path "Proxy to Backend /images/" always;
-        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        # Cache Policy: 30 Days
+        add_header Cache-Control "public, max-age=2592000, immutable";
+        expires 30d;
         
         # CORS
         proxy_hide_header Access-Control-Allow-Origin;

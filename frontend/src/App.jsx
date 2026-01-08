@@ -8,7 +8,6 @@ import LoginPage from './components/LoginPage';
 import StatsModal from './components/StatsModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-console.log('🚀 Current API_URL:', API_URL);
 
 // Auth helper functions
 const getAuthToken = () => localStorage.getItem('auth_token');
