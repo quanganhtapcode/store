@@ -1,13 +1,13 @@
 # 🚀 Deployment Guide - Gemini POS (Cát Hải Store)
 
-*Cập nhật lần cuối: 2026-01-02*
+*Cập nhật lần cuối: 2026-01-08*
 
 Tài liệu hướng dẫn deploy và cấu trúc hệ thống Gemini POS trên VPS.
 
 ---
 
 ## 📋 Tổng quan Kiến trúc
-Hệ thống Backend đã được **chuẩn hóa** về thư mục `/var/www/vps.quanganh.org` (thay vì `/root/gemini-pos-api` cũ) để tăng cường bảo mật và dễ quản lý.
+Hệ thống Backend đã được **chuẩn hóa** về thư mục `/var/www/store` (thay vì `/root/gemini-pos-api` cũ) để tăng cường bảo mật và dễ quản lý.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -40,7 +40,7 @@ npm run build
 Push code lên GitHub (`main` branch), Vercel sẽ tự động deploy.
 
 - **URL Production:** `https://store-six-fawn.vercel.app`
-- **Biến môi trường (Vercel):** `VITE_API_URL=https://vps.quanganh.org/api`
+- **Biến môi trường (Vercel):** `VITE_API_URL=https://api.quanganh.org/v1/store`
 
 ---
 
@@ -49,7 +49,7 @@ Push code lên GitHub (`main` branch), Vercel sẽ tự động deploy.
 **IP VPS:** `203.55.176.10`
 
 ### 2.1. Cấu Trúc Thư Mục Mới
-Toàn bộ hệ thống nằm tại: **`/var/www/vps.quanganh.org/`**
+Toàn bộ hệ thống nằm tại: **`/var/www/store/`**
 
 | Đường dẫn con | Chức năng | Ghi chú |
 |--------------|-----------|---------|
@@ -73,7 +73,7 @@ Bên Backend chạy dưới PM2 với tên process là `pos-api`.
    ```
 2. **Pull code & Update:**
    ```bash
-   cd /var/www/vps.quanganh.org/api
+   cd /var/www/store/api
    # Nếu dùng git
    git pull origin main
    npm install
@@ -82,16 +82,21 @@ Bên Backend chạy dưới PM2 với tên process là `pos-api`.
    *(Hoặc copy thủ công file server.cjs nếu không dùng git trực tiếp trên VPS)*
 
 ### 2.4. Cấu hình Nginx (Tham khảo)
-File: `/etc/nginx/sites-available/vps.quanganh.org`
+File: `/etc/nginx/sites-available/api.quanganh.org`
 
 ```nginx
 server {
-    server_name vps.quanganh.org;
-    # ... SSL config ...
-    location / {
+    server_name api.quanganh.org;
+    # ... SSL config (Cloudflare Origin) ...
+    
+    # Store/POS API
+    location /v1/store/ {
+        rewrite ^/v1/store/(.*)$ /$1 break;
         proxy_pass http://localhost:3001;
         # ... Headers ...
     }
+    
+    # Other services...
 }
 ```
 
@@ -101,7 +106,7 @@ server {
 
 Server đã được cấu hình tự động sao lưu Database mỗi giờ.
 
-- **Script:** `/var/www/vps.quanganh.org/scripts/backup.sh`
+- **Script:** `/var/www/store/scripts/backup.sh`
 - **Cơ chế:**
   - Chạy mỗi tiếng một lần (phút 00).
   - Copy `pos.db` (kèm WAL/SHM) sang thư mục `/backups/`.
@@ -110,21 +115,21 @@ Server đã được cấu hình tự động sao lưu Database mỗi giờ.
 
 **Lệnh Backup thủ công (nếu cần):**
 ```bash
-/var/www/vps.quanganh.org/scripts/backup.sh
+/var/www/store/scripts/backup.sh
 ```
 
 ---
 
 ## 🖼️ 4. Đồng bộ ảnh sản phẩm
 
-Ảnh sản phẩm nằm tại: `/var/www/vps.quanganh.org/api/public/images/`
+Ảnh sản phẩm nằm tại: `/var/www/store/api/public/images/`
 
 **Upload ảnh từ máy local lên VPS:**
 ```bash
-scp -r backend/public/images/* root@203.55.176.10:/var/www/vps.quanganh.org/api/public/images/
+scp -r backend/public/images/* root@203.55.176.10:/var/www/store/api/public/images/
 ```
 
-**URL truy cập ảnh:** `https://vps.quanganh.org/images/PRD-XXXXXX.jpg`
+**URL truy cập ảnh:** `https://api.quanganh.org/v1/store/images/PRD-XXXXXX.jpg`
 
 ---
 

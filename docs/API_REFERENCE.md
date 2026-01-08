@@ -9,7 +9,7 @@ Tài liệu chi tiết về tất cả API endpoints của hệ thống Gemini P
 | Môi trường | Base URL |
 |------------|----------|
 | Development | `http://localhost:3001/api` |
-| Production | `https://vps.quanganh.org/api` |
+| Production | `https://api.quanganh.org/v1/store` |
 
 ---
 

@@ -43,7 +43,7 @@ gemini-pos/
 │   │              │         │  + Static Images         │     │
 │   └──────────────┘         └──────────────────────────┘     │
 │                                                              │
-│   URL: store-six-fawn      URL: vps.quanganh.org            │
+│   URL: store-six-fawn      URL: api.quanganh.org/v1/store  │
 │         .vercel.app                                          │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -83,7 +83,7 @@ gemini-pos/
 ## 🔌 API Endpoints (Quick Reference)
 
 ```javascript
-const API_URL = 'https://vps.quanganh.org/api';
+const API_URL = 'https://api.quanganh.org/v1/store';
 
 // Products
 GET    /api/products           // Lấy tất cả sản phẩm
@@ -133,7 +133,7 @@ import_notes(id TEXT PK, timestamp INT, total_cost INT,
 ### Local Image Storage
 - **Location:** `backend/public/images/`
 - **Format:** `{product_id}.jpg` (e.g., `PRD-A1B2C3.jpg`)
-- **URL:** `https://vps.quanganh.org/images/PRD-A1B2C3.jpg`
+- **URL:** `https://api.quanganh.org/v1/store/images/PRD-A1B2C3.jpg`
 
 ### Image Upload Flow
 1. Frontend gửi base64 image trong request body
@@ -186,7 +186,7 @@ ssh -i ~/Desktop/key.pem root@203.55.176.10
 ### 1. Environment Variables
 ```bash
 # Frontend (Vercel)
-VITE_API_URL=https://vps.quanganh.org/api
+VITE_API_URL=https://api.quanganh.org/v1/store
 
 # Backend (.env không cần, hardcoded port 3001)
 ```
@@ -236,16 +236,16 @@ const dbPath = path.join(__dirname, '../database/pos.db');
 
 ```bash
 # Check VPS server status
-ssh -i ~/Desktop/key.pem root@203.55.176.10 "pm2 status"
+ssh root@203.55.176.10 "pm2 status"
 
 # View VPS logs
-ssh -i ~/Desktop/key.pem root@203.55.176.10 "pm2 logs gemini-pos --lines 50"
+ssh root@203.55.176.10 "pm2 logs pos-api --lines 50"
 
 # Restart VPS server
-ssh -i ~/Desktop/key.pem root@203.55.176.10 "pm2 restart gemini-pos"
+ssh root@203.55.176.10 "pm2 restart pos-api"
 
 # Test API
-curl https://vps.quanganh.org/api/products
+curl https://api.quanganh.org/v1/store/products
 ```
 
 ---
@@ -262,4 +262,4 @@ User → POSView.jsx → App.jsx → API → server.cjs → pos.db
 
 ---
 
-*Cập nhật lần cuối: 2026-01-01*
+*Cập nhật lần cuối: 2026-01-08*

@@ -17,7 +17,7 @@ set -e
 VPS_IP="203.55.176.10"
 VPS_USER="root"
 KEY_PATH="$HOME/Desktop/key.pem"
-REMOTE_PATH="/root/gemini-pos-api"
+REMOTE_PATH="/var/www/store/api"
 
 # Colors
 RED='\033[0;31m'
@@ -85,7 +85,7 @@ deploy_vps() {
     echo -e "${BLUE}Restarting server...${NC}"
     
     ssh -i "$KEY_PATH" "$VPS_USER@$VPS_IP" << 'ENDSSH'
-cd /root/gemini-pos-api
+cd /var/www/store/api
 
 # Create directories if needed
 mkdir -p database
@@ -95,12 +95,12 @@ mkdir -p public/images
 npm install --production 2>/dev/null || true
 
 # Restart PM2
-pm2 restart gemini-pos 2>/dev/null || pm2 start server.cjs --name gemini-pos
+pm2 restart pos-api 2>/dev/null || pm2 start server.cjs --name pos-api
 pm2 save
 
 echo ""
 echo "✅ Server restarted!"
-pm2 status gemini-pos
+pm2 status pos-api
 ENDSSH
 
     echo ""
@@ -144,8 +144,8 @@ show_status() {
     echo ""
     echo -e "${BLUE}━━━━━━━━━━━━━ Deployment URLs ━━━━━━━━━━━━━${NC}"
     echo -e "  🌐 Frontend: ${GREEN}https://store-six-fawn.vercel.app${NC}"
-    echo -e "  🔌 API:      ${GREEN}https://vps.quanganh.org/api${NC}"
-    echo -e "  🖼️  Images:   ${GREEN}https://vps.quanganh.org/images/PRD-XXXXXX.jpg${NC}"
+    echo -e "  🔌 API:      ${GREEN}https://api.quanganh.org/v1/store${NC}"
+    echo -e "  🖼️  Images:   ${GREEN}https://api.quanganh.org/v1/store/images/PRD-XXXXXX.jpg${NC}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
 }

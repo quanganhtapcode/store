@@ -12,7 +12,7 @@ set -e
 VPS_IP="203.55.176.10"
 VPS_USER="root"
 KEY_PATH="$HOME/Desktop/key.pem"
-REMOTE_PATH="/root/gemini-pos-api"
+REMOTE_PATH="/var/www/store/api"
 
 echo ""
 echo "🚀 Gemini POS - VPS Quick Update"
@@ -33,18 +33,18 @@ echo "   ✅ Files uploaded"
 echo ""
 echo "🔧 Restarting server..."
 ssh -i "$KEY_PATH" "$VPS_USER@$VPS_IP" << 'ENDSSH'
-cd /root/gemini-pos-api
+cd /var/www/store/api
 npm install --production 2>/dev/null || true
-pm2 restart gemini-pos || pm2 start server.cjs --name gemini-pos
+pm2 restart pos-api || pm2 start server.cjs --name pos-api
 pm2 save
 echo ""
 echo "✅ Server running!"
-pm2 status gemini-pos --no-color | head -5
+pm2 status pos-api --no-color | head -5
 ENDSSH
 
 echo ""
 echo "🎉 Deployment Complete!"
 echo ""
 echo "   🌐 Frontend: https://store-six-fawn.vercel.app"
-echo "   🔌 API:      https://vps.quanganh.org/api"
+echo "   🔌 API:      https://api.quanganh.org/v1/store"
 echo ""
