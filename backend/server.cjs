@@ -70,6 +70,11 @@ app.use('/api/products', require('./routes/products'));
 app.use('/api/orders', require('./routes/orders'));
 app.use('/api/stats', require('./routes/stats'));
 
+// Reports route (with DB init)
+const reportsRoute = require('./routes/reports');
+reportsRoute.initDB(dbAll, dbRun);
+app.use('/api/reports', reportsRoute.router);
+
 // --- AUTH ROUTE ---
 // --- AUTH ROUTE ---
 app.post('/api/auth/login', (req, res) => {

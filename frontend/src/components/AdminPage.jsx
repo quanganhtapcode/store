@@ -221,6 +221,53 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
             start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
             end: new Date().toISOString().split('T')[0]
         });
+        const [exporting, setExporting] = React.useState(false);
+
+        // Server-side Excel export function
+        const exportExcel = async (type) => {
+            setExporting(true);
+            try {
+                const response = await fetch(`${API_URL}/reports/export`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        type,
+                        startDate: exportDateRange.start,
+                        endDate: exportDateRange.end
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Export failed');
+                }
+
+                // Get filename from header
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = `report_${type}.xlsx`;
+                if (contentDisposition) {
+                    const match = contentDisposition.match(/filename="?([^"]+)"?/);
+                    if (match) filename = decodeURIComponent(match[1]);
+                }
+
+                // Download
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+                setShowExportModal(false);
+            } catch (error) {
+                console.error('Export error:', error);
+                alert('Lỗi xuất báo cáo: ' + error.message);
+            } finally {
+                setExporting(false);
+            }
+        };
 
         // Helper: Format date for report
         const formatDateVN = (date) => {
@@ -524,11 +571,33 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
                                     {loadingImports ? 'Đang tải dữ liệu...' : 'Phiếu nhập kho theo ngày, giá nhập'}
                                 </div>
                             </button>
+
+                            {/* Divider and Excel Export */}
+                            <div className="border-t border-[#E8E8ED] pt-3 mt-3">
+                                <label className="text-[11px] font-bold text-[#86868B] uppercase mb-2 block">📁 Xuất file Excel (.xlsx)</label>
+                                <button
+                                    onClick={() => exportExcel('full_report')}
+                                    disabled={exporting}
+                                    className="w-full p-4 bg-gradient-to-r from-[#1D1D1F] to-[#3D3D3F] text-white rounded-xl text-left hover:shadow-lg transition-all active:scale-[0.98] disabled:opacity-50"
+                                >
+                                    <div className="font-bold text-[14px]">📑 Báo Cáo Tổng Hợp (Excel)</div>
+                                    <div className="text-[11px] opacity-80 mt-0.5">
+                                        {exporting ? 'Đang tạo báo cáo...' : 'Bán hàng + Xuất nhập tồn + Nhập hàng (nhiều sheet)'}
+                                    </div>
+                                </button>
+                            </div>
                         </div>
+
+                        {exporting && (
+                            <div className="flex items-center justify-center gap-2 py-3 bg-[#F5F5F7] rounded-xl">
+                                <div className="w-5 h-5 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin"></div>
+                                <span className="text-[13px] text-[#0071E3] font-medium">Đang tạo file Excel...</span>
+                            </div>
+                        )}
                     </div>
 
                     <div className="p-5 border-t border-[#F5F5F7] text-center">
-                        <p className="text-[11px] text-[#86868B]">File xuất ra định dạng CSV, mở được bằng Excel</p>
+                        <p className="text-[11px] text-[#86868B]">CSV: mở nhanh bằng Excel | XLSX: file Excel chuẩn với format đẹp</p>
                     </div>
                 </div>
             </div>
