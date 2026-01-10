@@ -246,7 +246,7 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
 
             let csv = '\uFEFF'; // BOM for UTF-8
             csv += `SỔ CHI TIẾT BÁN HÀNG (Mẫu S1-HKD)\n`;
-            csv += `Đơn vị: CÁT HẢI POS\n`;
+            csv += `Đơn vị: Cát Hải\n`;
             csv += `Kỳ báo cáo: Từ ${formatDateVN(exportDateRange.start)} đến ${formatDateVN(exportDateRange.end)}\n\n`;
             csv += `Ngày,Mã đơn,Tên sản phẩm,ĐVT,Số lượng,Đơn giá,Thành tiền,Phương thức TT,Ghi chú\n`;
 
@@ -300,7 +300,7 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
 
             let csv = '\uFEFF';
             csv += `BÁO CÁO XUẤT NHẬP TỒN KHO (Mẫu S2-HKD)\n`;
-            csv += `Đơn vị: CÁT HẢI POS\n`;
+            csv += `Đơn vị: Cát Hải\n`;
             csv += `Kỳ báo cáo: Từ ${formatDateVN(exportDateRange.start)} đến ${formatDateVN(exportDateRange.end)}\n\n`;
             csv += `STT,Mã SP,Tên sản phẩm,ĐVT,Tồn đầu kỳ (SL),Giá vốn,Nhập trong kỳ (SL),Xuất trong kỳ (SL),Doanh thu xuất,Tồn cuối kỳ (SL)\n`;
 
@@ -344,7 +344,7 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
 
             let csv = '\uFEFF';
             csv += `BÁO CÁO TỔNG HỢP DOANH THU THEO SẢN PHẨM\n`;
-            csv += `Đơn vị: CÁT HẢI POS\n`;
+            csv += `Đơn vị: Cát Hải\n`;
             csv += `Kỳ báo cáo: ${monthYear.toUpperCase()}\n\n`;
             csv += `STT,Mã sản phẩm,Tên sản phẩm,Thương hiệu,Danh mục,Số lượng bán,Doanh thu (VNĐ),Tỷ lệ (%)\n`;
 

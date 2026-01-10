@@ -173,5 +173,5 @@ app.post('/api/products/import-csv', verifyToken, upload.single('file'), (req, r
 
 // --- START SERVER ---
 app.listen(port, '0.0.0.0', () => {
-    console.log(`🚀 CÁT HẢI POS Server running at port ${port}`);
+    console.log(`🚀 Cát Hải Server running at port ${port}`);
 });
