@@ -1,7 +1,17 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { X, TrendingUp, Package, DollarSign, Calendar, ShoppingBag, History, ChevronRight, ArrowLeft } from 'lucide-react';
+import { X, TrendingUp, Package, DollarSign, Calendar, ShoppingBag, History, ChevronRight, ArrowLeft, Image as ImageIcon } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
+// Helper to get image URL
+const getImageUrl = (imagePath) => {
+    if (!imagePath) return null;
+    if (imagePath.startsWith('http') || imagePath.startsWith('data:')) return imagePath;
+    let baseUrl = API_URL.replace(/\/api\/?$/, '');
+    if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+    const path = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
+    return `${baseUrl}${path}`;
+};
 
 // Skeleton component cho loading mượt hơn
 const Skeleton = ({ className }) => (
@@ -137,14 +147,31 @@ const StatsModal = ({ isOpen, onClose }) => {
                 <h4 className="font-bold text-[#1D1D1F] text-sm mb-3">Chi tiết sản phẩm ({items?.length || 0})</h4>
                 <div className="space-y-2">
                     {items?.map((item, idx) => (
-                        <div key={idx} className="bg-white p-3 rounded-xl flex justify-between items-center border border-[#F5F5F7]">
-                            <div>
-                                <p className="font-bold text-[#1D1D1F] text-[13px]">{item.displayName || item.name}</p>
+                        <div key={idx} className="bg-white p-3 rounded-xl flex items-center gap-3 border border-[#F5F5F7]">
+                            {/* Ảnh sản phẩm */}
+                            <div className="w-14 h-14 bg-[#F5F5F7] rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center">
+                                {item.image ? (
+                                    <img
+                                        src={getImageUrl(item.image)}
+                                        alt={item.displayName || item.name}
+                                        className="w-full h-full object-cover"
+                                        loading="lazy"
+                                    />
+                                ) : (
+                                    <ImageIcon size={20} className="text-[#D2D2D7]" />
+                                )}
+                            </div>
+
+                            {/* Thông tin */}
+                            <div className="flex-1 min-w-0">
+                                <p className="font-bold text-[#1D1D1F] text-[13px] line-clamp-1">{item.displayName || item.name}</p>
                                 <p className="text-[#86868B] text-[11px]">
                                     {item.finalPrice?.toLocaleString() || item.price?.toLocaleString()}đ x {item.quantity}
                                 </p>
                             </div>
-                            <span className="font-bold text-[#0071E3] text-[14px]">
+
+                            {/* Tổng tiền item */}
+                            <span className="font-bold text-[#0071E3] text-[14px] flex-shrink-0">
                                 {((item.finalPrice || item.price) * item.quantity).toLocaleString()}đ
                             </span>
                         </div>
