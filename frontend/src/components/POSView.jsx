@@ -106,6 +106,20 @@ const POSView = ({
         }).filter(item => item.quantity > 0));
     };
 
+    // Cập nhật giá sản phẩm trong giỏ (chiết khấu)
+    const updateItemPrice = (itemId, saleType, newPrice) => {
+        setCart(prev => prev.map(item => {
+            if (item.id === itemId && item.saleType === saleType) {
+                return { ...item, finalPrice: newPrice, hasDiscount: newPrice < item.originalPrice };
+            }
+            return item;
+        }));
+    };
+
+    // State để quản lý editing giá
+    const [editingPriceId, setEditingPriceId] = useState(null);
+    const [tempPrice, setTempPrice] = useState('');
+
     const handlePayment = (method) => {
         checkout(method); // Pass payment method to checkout
         setShowPaymentChoice(false);
@@ -266,9 +280,51 @@ const POSView = ({
                                     {/* Info */}
                                     <div className="flex-1 min-w-0">
                                         <h4 className="font-bold text-[#1D1D1F] text-[14px] leading-tight mb-1.5 line-clamp-2">{item.displayName}</h4>
-                                        <p className={`font-bold text-[16px] ${item.isCase ? 'text-emerald-600' : 'text-[#0071E3]'}`}>
-                                            {item.finalPrice.toLocaleString()}đ
-                                        </p>
+
+                                        {/* Giá có thể chỉnh sửa */}
+                                        {editingPriceId === `${item.id}-${item.saleType}` ? (
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    value={tempPrice}
+                                                    onChange={e => setTempPrice(e.target.value.replace(/[^0-9]/g, ''))}
+                                                    onBlur={() => {
+                                                        const newPrice = parseInt(tempPrice, 10) || item.originalPrice || item.finalPrice;
+                                                        updateItemPrice(item.id, item.saleType, newPrice);
+                                                        setEditingPriceId(null);
+                                                    }}
+                                                    onKeyDown={e => {
+                                                        if (e.key === 'Enter') {
+                                                            const newPrice = parseInt(tempPrice, 10) || item.originalPrice || item.finalPrice;
+                                                            updateItemPrice(item.id, item.saleType, newPrice);
+                                                            setEditingPriceId(null);
+                                                        }
+                                                    }}
+                                                    autoFocus
+                                                    className="w-24 bg-white border-2 border-[#0071E3] rounded-lg px-2 py-1 font-bold text-[#0071E3] text-[14px] outline-none"
+                                                />
+                                                <span className="text-[#86868B] text-[12px]">đ</span>
+                                            </div>
+                                        ) : (
+                                            <div
+                                                className="flex items-center gap-2 cursor-pointer group"
+                                                onClick={() => {
+                                                    setEditingPriceId(`${item.id}-${item.saleType}`);
+                                                    setTempPrice(String(item.finalPrice));
+                                                }}
+                                            >
+                                                <p className={`font-bold text-[16px] ${item.isCase ? 'text-emerald-600' : 'text-[#0071E3]'} group-hover:underline`}>
+                                                    {item.finalPrice.toLocaleString()}đ
+                                                </p>
+                                                {item.hasDiscount && item.originalPrice && (
+                                                    <span className="text-[12px] text-[#86868B] line-through">
+                                                        {item.originalPrice.toLocaleString()}đ
+                                                    </span>
+                                                )}
+                                                <span className="text-[10px] text-[#86868B] opacity-0 group-hover:opacity-100 transition-opacity">✏️ Sửa</span>
+                                            </div>
+                                        )}
 
                                         {/* Quantity controls */}
                                         <div className="flex items-center justify-between mt-2">

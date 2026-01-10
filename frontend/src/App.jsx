@@ -110,7 +110,8 @@ const App = () => {
         setCart(prev => {
             const exist = prev.find(i => i.id === p.id && i.saleType === p.saleType);
             if (exist) return prev.map(i => (i.id === p.id && i.saleType === p.saleType) ? { ...i, quantity: i.quantity + 1 } : i);
-            return [...prev, { ...p, quantity: 1 }];
+            // Thêm originalPrice để tracking chiết khấu
+            return [...prev, { ...p, quantity: 1, originalPrice: p.finalPrice }];
         });
     };
 
@@ -207,6 +208,7 @@ const App = () => {
                     .scrollbar-hide::-webkit-scrollbar { display: none; }
                     .animate-in { animation: fadeIn 0.3s ease-out; }
                     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+                    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
                 `}}
             />
         </>

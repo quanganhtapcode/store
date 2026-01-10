@@ -725,14 +725,101 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
     );
 };
 
+// Helper format số với dấu phân cách (1,000,000)
+const formatNumber = (num) => {
+    if (num === '' || num === null || num === undefined) return '';
+    return Number(num).toLocaleString('vi-VN');
+};
+
+// Parse số từ chuỗi có dấu phân cách
+const parseNumber = (str) => {
+    if (!str) return 0;
+    return parseInt(String(str).replace(/[.,\s]/g, ''), 10) || 0;
+};
+
 const ProductModal = ({ product, onClose, onSave, authToken, onLogout }) => {
     const isEdit = !!product;
     const [formData, setFormData] = useState(product || { name: '', brand: '', category: '', price: 0, case_price: 0, units_per_case: 1, stock: 0, code: '', image: '' });
     const [isScanning, setIsScanning] = useState(false);
-    const handleImageChange = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onloadend = () => setFormData({ ...formData, image: reader.result }); reader.readAsDataURL(file); } };
+
+    // State để lưu giá trị hiển thị (có format)
+    const [displayValues, setDisplayValues] = useState({
+        price: formatNumber(product?.price || 0),
+        case_price: formatNumber(product?.case_price || 0),
+        units_per_case: String(product?.units_per_case || 1),
+        stock: formatNumber(product?.stock || 0)
+    });
+
+    // Handler cho input số có format
+    const handleNumberInput = (field, value) => {
+        // Chỉ cho phép số
+        const numericValue = value.replace(/[^0-9]/g, '');
+        setDisplayValues(prev => ({ ...prev, [field]: numericValue }));
+        setFormData(prev => ({ ...prev, [field]: parseInt(numericValue, 10) || (field === 'units_per_case' ? 1 : 0) }));
+    };
+
+    // Khi blur, format lại số
+    const handleNumberBlur = (field) => {
+        const value = formData[field] || (field === 'units_per_case' ? 1 : 0);
+        setDisplayValues(prev => ({
+            ...prev,
+            [field]: field === 'units_per_case' ? String(value) : formatNumber(value)
+        }));
+    };
+
+    // Khi focus, hiện số thuần (không format)
+    const handleNumberFocus = (field) => {
+        const value = formData[field] || '';
+        setDisplayValues(prev => ({ ...prev, [field]: value ? String(value) : '' }));
+    };
+
+    // Nén ảnh trước khi upload để tăng tốc
+    const compressImage = (file, maxWidth = 800, quality = 0.7) => {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    // Resize nếu quá lớn
+                    if (width > maxWidth) {
+                        height = Math.round((height * maxWidth) / width);
+                        width = maxWidth;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // Compress và trả về base64
+                    resolve(canvas.toDataURL('image/jpeg', quality));
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+    };
+
+    const handleImageChange = async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            // Nén ảnh trước khi lưu vào state
+            const compressedImage = await compressImage(file);
+            setFormData({ ...formData, image: compressedImage });
+        }
+    };
     const handleScanResult = (code) => { setFormData({ ...formData, code }); setIsScanning(false); };
 
+    const [isSaving, setIsSaving] = useState(false);
+
     const handleSubmit = async () => {
+        if (isSaving) return;
+        setIsSaving(true);
         try {
             const url = isEdit ? `${API_URL}/products/${formData.id}` : `${API_URL}/products`;
             const method = isEdit ? 'PUT' : 'POST';
@@ -751,6 +838,7 @@ const ProductModal = ({ product, onClose, onSave, authToken, onLogout }) => {
             }
             onSave();
         } catch (e) { console.error(e); }
+        finally { setIsSaving(false); }
     };
 
     const handleDelete = async () => {
@@ -785,12 +873,60 @@ const ProductModal = ({ product, onClose, onSave, authToken, onLogout }) => {
                     <div className="space-y-4">
                         <input value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Tên sản phẩm" className="w-full bg-[#F9F9FA] p-4 rounded-xl font-bold outline-none ring-1 ring-transparent focus:ring-[#0071E3]" />
                         <div className="grid grid-cols-2 gap-3">
-                            <div><label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Giá lẻ (VND)</label><input type="number" value={formData.price} onChange={e => setFormData({ ...formData, price: parseInt(e.target.value) || 0 })} className="w-full bg-[#F9F9FA] p-3 rounded-xl font-bold text-[#0071E3] outline-none" /></div>
-                            <div><label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Giá thùng (VND)</label><input type="number" value={formData.case_price || 0} onChange={e => setFormData({ ...formData, case_price: parseInt(e.target.value) || 0 })} className="w-full bg-[#F9F9FA] p-3 rounded-xl font-bold text-[#FF9500] outline-none" /></div>
+                            <div>
+                                <label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Giá lẻ (VND)</label>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={displayValues.price}
+                                    onChange={e => handleNumberInput('price', e.target.value)}
+                                    onFocus={() => handleNumberFocus('price')}
+                                    onBlur={() => handleNumberBlur('price')}
+                                    placeholder="0"
+                                    className="w-full bg-[#F9F9FA] p-3 rounded-xl font-bold text-[#0071E3] outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Giá thùng (VND)</label>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={displayValues.case_price}
+                                    onChange={e => handleNumberInput('case_price', e.target.value)}
+                                    onFocus={() => handleNumberFocus('case_price')}
+                                    onBlur={() => handleNumberBlur('case_price')}
+                                    placeholder="0"
+                                    className="w-full bg-[#F9F9FA] p-3 rounded-xl font-bold text-[#FF9500] outline-none"
+                                />
+                            </div>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
-                            <div><label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">SL/Thùng</label><input type="number" value={formData.units_per_case || 1} onChange={e => setFormData({ ...formData, units_per_case: parseInt(e.target.value) || 1 })} className="w-full bg-[#F9F9FA] p-3 rounded-xl font-medium outline-none" /></div>
-                            <div><label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Tồn kho</label><input type="number" value={formData.stock} onChange={e => setFormData({ ...formData, stock: parseInt(e.target.value) || 0 })} className="w-full bg-[#F9F9FA] p-3 rounded-xl font-medium outline-none" /></div>
+                            <div>
+                                <label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">SL/Thùng</label>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={displayValues.units_per_case}
+                                    onChange={e => handleNumberInput('units_per_case', e.target.value)}
+                                    onFocus={() => handleNumberFocus('units_per_case')}
+                                    onBlur={() => handleNumberBlur('units_per_case')}
+                                    placeholder="1"
+                                    className="w-full bg-[#F9F9FA] p-3 rounded-xl font-medium outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Tồn kho</label>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={displayValues.stock}
+                                    onChange={e => handleNumberInput('stock', e.target.value)}
+                                    onFocus={() => handleNumberFocus('stock')}
+                                    onBlur={() => handleNumberBlur('stock')}
+                                    placeholder="0"
+                                    className="w-full bg-[#F9F9FA] p-3 rounded-xl font-medium outline-none"
+                                />
+                            </div>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <div><label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Thương hiệu</label><input value={formData.brand || ''} onChange={e => setFormData({ ...formData, brand: e.target.value })} placeholder="VD: Castrol..." className="w-full bg-[#F9F9FA] p-3 rounded-xl font-medium outline-none" /></div>
@@ -813,8 +949,19 @@ const ProductModal = ({ product, onClose, onSave, authToken, onLogout }) => {
                             <Trash2 size={24} />
                         </button>
                     )}
-                    <button onClick={handleSubmit} className="flex-1 bg-[#0071E3] text-white py-4 rounded-2xl font-bold text-[16px] shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-transform">
-                        {isEdit ? 'Lưu thay đổi' : 'Thêm mới'}
+                    <button
+                        onClick={handleSubmit}
+                        disabled={isSaving}
+                        className={`flex-1 bg-[#0071E3] text-white py-4 rounded-2xl font-bold text-[16px] shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 ${isSaving ? 'opacity-70 cursor-not-allowed' : 'active:scale-[0.98]'}`}
+                    >
+                        {isSaving ? (
+                            <>
+                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                Đang lưu...
+                            </>
+                        ) : (
+                            isEdit ? 'Lưu thay đổi' : 'Thêm mới'
+                        )}
                     </button>
                 </div>
             </div>
