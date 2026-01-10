@@ -3,7 +3,7 @@ import {
     ChevronLeft, Package, Receipt, TrendingUp, ShoppingBag,
     Plus, Edit3, Trash2, Save, X, Upload, Image as ImageIcon,
     QrCode, Sparkles, ArrowUpRight, ScanLine, Search, Grid,
-    List as ListIcon, MoreHorizontal, Camera, Calendar, FileText, CheckCircle, XCircle, Clock, Truck, BarChart3, RefreshCw, AlertCircle, ShieldCheck
+    List as ListIcon, MoreHorizontal, Camera, Calendar, FileText, CheckCircle, XCircle, Clock, Truck, BarChart3, RefreshCw, AlertCircle, ShieldCheck, Download
 } from 'lucide-react';
 import { Html5Qrcode } from "html5-qrcode";
 import OrderModal from './OrderModal';
@@ -217,6 +217,43 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
     const DashboardTab = () => {
         const lowStockProducts = useMemo(() => products.filter(p => p.stock <= 5), [products]);
 
+        // Export to Excel function
+        const exportToExcel = () => {
+            if (!stats.productsMonthly || stats.productsMonthly.length === 0) {
+                alert('Chưa có dữ liệu để xuất!');
+                return;
+            }
+
+            // Tạo dữ liệu CSV (tương thích Excel)
+            const now = new Date();
+            const monthYear = now.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' });
+
+            // Header
+            let csvContent = '\uFEFF'; // BOM for UTF-8
+            csvContent += `BÁO CÁO BÁN HÀNG - ${monthYear.toUpperCase()}\n`;
+            csvContent += `Ngày xuất: ${now.toLocaleDateString('vi-VN')}\n\n`;
+            csvContent += `STT,Tên sản phẩm,Số lượng bán,Doanh thu (VND)\n`;
+
+            // Data rows
+            stats.productsMonthly.forEach((p, i) => {
+                const name = p.name.replace(/,/g, ' '); // Remove commas
+                csvContent += `${i + 1},"${name}",${p.total_sold},${p.revenue}\n`;
+            });
+
+            // Summary
+            const totalQty = stats.productsMonthly.reduce((s, p) => s + p.total_sold, 0);
+            const totalRevenue = stats.productsMonthly.reduce((s, p) => s + p.revenue, 0);
+            csvContent += `\n,TỔNG CỘNG,${totalQty},${totalRevenue}\n`;
+
+            // Download
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `BaoCaoBanHang_Thang${now.getMonth() + 1}_${now.getFullYear()}.csv`;
+            link.click();
+            URL.revokeObjectURL(link.href);
+        };
+
         return (
             <div className="space-y-4 pb-20">
                 {/* Low Stock Alert */}
@@ -271,7 +308,16 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
 
                 {/* Monthly Detailed Stats */}
                 <div className="bg-white p-5 rounded-[2rem] border border-[#F5F5F7] shadow-sm">
-                    <h3 className="font-bold text-[#1D1D1F] mb-4 flex items-center gap-2">📊 Chi tiết doanh thu tháng này</h3>
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-bold text-[#1D1D1F] flex items-center gap-2">📊 Chi tiết doanh thu tháng này</h3>
+                        <button
+                            onClick={exportToExcel}
+                            className="flex items-center gap-1.5 px-3 py-2 bg-[#34C759] text-white text-[12px] font-bold rounded-xl active:scale-95 transition-all shadow-sm hover:bg-[#2DB84D]"
+                        >
+                            <Download size={14} />
+                            Xuất Excel
+                        </button>
+                    </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-[13px]">
                             <thead>

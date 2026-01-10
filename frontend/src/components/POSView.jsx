@@ -75,7 +75,20 @@ const POSView = ({
             if (!groups[p.brand]) groups[p.brand] = [];
             groups[p.brand].push(p);
         });
-        return groups;
+
+        // Sắp xếp sản phẩm trong mỗi brand theo total_sold (giảm dần)
+        Object.keys(groups).forEach(brand => {
+            groups[brand].sort((a, b) => (b.total_sold || 0) - (a.total_sold || 0));
+        });
+
+        // Sắp xếp các brand theo tổng lượng bán
+        const sortedEntries = Object.entries(groups).sort((a, b) => {
+            const totalA = a[1].reduce((sum, p) => sum + (p.total_sold || 0), 0);
+            const totalB = b[1].reduce((sum, p) => sum + (p.total_sold || 0), 0);
+            return totalB - totalA;
+        });
+
+        return Object.fromEntries(sortedEntries);
     }, [expandedProducts]);
 
     const bestSellers = useMemo(() => {
