@@ -720,41 +720,154 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
                     {activeTab === 'products' && <ProductsTab />}
                     {activeTab === 'import' && <ImportTab />}
 
-                    {/* Orders tab */}
+                    {/* Orders tab with Date Filter */}
                     {activeTab === 'orders' && (
                         <div className="space-y-3 pb-20">
-                            {orders.map(o => {
-                                const items = typeof o.items === 'string' ? JSON.parse(o.items) : o.items;
-                                return (
-                                    <div key={o.id} onClick={() => setEditingOrder(o)} className="bg-white p-4 rounded-2xl shadow-sm border border-[#F5F5F7] active:scale-[0.98] transition-all cursor-pointer">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div>
-                                                <p className="font-bold text-[14px] text-[#1D1D1F] flex items-center gap-2 flex-wrap">
-                                                    {o.order_code || `#${o.id}`}
-                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${o.status === 'completed' ? 'bg-green-100 text-green-700' : o.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-[#E8E8ED] text-[#1D1D1F]'}`}>
-                                                        {o.status || 'completed'}
-                                                    </span>
-                                                    <span className="text-[10px] bg-[#E8E8ED] px-1.5 py-0.5 rounded">{o.payment_method || 'cash'}</span>
-                                                </p>
-                                                <p className="text-[12px] text-[#86868B] mt-0.5">{new Date(o.timestamp).toLocaleString()}</p>
-                                                {o.customer_name && o.customer_name !== 'Khách lẻ' && (
-                                                    <p className="text-[12px] text-[#1D1D1F] font-medium mt-1">👤 {o.customer_name}</p>
-                                                )}
-                                            </div>
-                                            <span className="font-black text-[#0071E3] text-[16px]">{o.total?.toLocaleString()}đ</span>
-                                        </div>
-                                        <div className="text-[11px] text-[#86868B] border-t border-[#F5F5F7] pt-2 mt-2">
-                                            {items?.slice(0, 3).map((item, idx) => (
-                                                <span key={idx} className="inline-block bg-[#F5F5F7] px-2 py-0.5 rounded mr-1 mb-1">
-                                                    {item.displayName || item.name} x{item.quantity}
-                                                </span>
-                                            ))}
-                                            {items?.length > 3 && <span className="text-[#0071E3]">+{items.length - 3} khác</span>}
-                                        </div>
-                                        {o.note && <p className="text-[11px] text-[#86868B] mt-2 italic">📝 {o.note}</p>}
+                            {/* Date Filter Controls */}
+                            <div className="bg-white p-4 rounded-2xl border border-[#F5F5F7] shadow-sm sticky top-0 z-10">
+                                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                                    <button
+                                        onClick={() => {
+                                            const today = new Date();
+                                            today.setHours(0, 0, 0, 0);
+                                            setDateFilter({ start: today.toISOString().split('T')[0], end: '' });
+                                        }}
+                                        className={`px-3 py-1.5 rounded-lg text-[12px] font-bold flex-shrink-0 transition-all ${dateFilter.start === new Date().toISOString().split('T')[0] && !dateFilter.end
+                                                ? 'bg-[#0071E3] text-white'
+                                                : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E8E8ED]'
+                                            }`}
+                                    >
+                                        📅 Hôm nay
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            const d = new Date();
+                                            d.setDate(d.getDate() - 7);
+                                            setDateFilter({ start: d.toISOString().split('T')[0], end: '' });
+                                        }}
+                                        className="px-3 py-1.5 rounded-lg text-[12px] font-bold flex-shrink-0 bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E8E8ED] transition-all"
+                                    >
+                                        7 ngày
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            const d = new Date();
+                                            d.setDate(1);
+                                            setDateFilter({ start: d.toISOString().split('T')[0], end: '' });
+                                        }}
+                                        className="px-3 py-1.5 rounded-lg text-[12px] font-bold flex-shrink-0 bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E8E8ED] transition-all"
+                                    >
+                                        Tháng này
+                                    </button>
+                                    <button
+                                        onClick={() => setDateFilter({ start: '', end: '' })}
+                                        className={`px-3 py-1.5 rounded-lg text-[12px] font-bold flex-shrink-0 transition-all ${!dateFilter.start && !dateFilter.end
+                                                ? 'bg-[#1D1D1F] text-white'
+                                                : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E8E8ED]'
+                                            }`}
+                                    >
+                                        Tất cả
+                                    </button>
+                                </div>
+
+                                {/* Custom Date Range */}
+                                <div className="flex gap-2 mt-2">
+                                    <div className="flex-1">
+                                        <label className="text-[10px] text-[#86868B] font-bold">Từ ngày</label>
+                                        <input
+                                            type="date"
+                                            value={dateFilter.start}
+                                            onChange={(e) => setDateFilter({ ...dateFilter, start: e.target.value })}
+                                            className="w-full bg-[#F5F5F7] px-3 py-2 rounded-lg text-[12px] font-medium outline-none"
+                                        />
                                     </div>
+                                    <div className="flex-1">
+                                        <label className="text-[10px] text-[#86868B] font-bold">Đến ngày</label>
+                                        <input
+                                            type="date"
+                                            value={dateFilter.end}
+                                            onChange={(e) => setDateFilter({ ...dateFilter, end: e.target.value })}
+                                            className="w-full bg-[#F5F5F7] px-3 py-2 rounded-lg text-[12px] font-medium outline-none"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Filtered Orders List */}
+                            {(() => {
+                                const filteredOrders = orders.filter(o => {
+                                    if (!dateFilter.start && !dateFilter.end) return true;
+                                    const orderDate = new Date(o.timestamp);
+                                    if (dateFilter.start) {
+                                        const startDate = new Date(dateFilter.start);
+                                        startDate.setHours(0, 0, 0, 0);
+                                        if (orderDate < startDate) return false;
+                                    }
+                                    if (dateFilter.end) {
+                                        const endDate = new Date(dateFilter.end);
+                                        endDate.setHours(23, 59, 59, 999);
+                                        if (orderDate > endDate) return false;
+                                    }
+                                    return true;
+                                });
+
+                                const totalFiltered = filteredOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+
+                                return (
+                                    <>
+                                        {/* Summary */}
+                                        <div className="bg-[#0071E3]/10 p-3 rounded-xl flex justify-between items-center">
+                                            <span className="text-[12px] text-[#0071E3] font-bold">
+                                                {filteredOrders.length} đơn hàng
+                                            </span>
+                                            <span className="text-[14px] text-[#0071E3] font-black">
+                                                Tổng: {totalFiltered.toLocaleString()}đ
+                                            </span>
+                                        </div>
+
+                                        {/* Orders */}
+                                        {filteredOrders.map(o => {
+                                            const items = typeof o.items === 'string' ? JSON.parse(o.items) : o.items;
+                                            return (
+                                                <div key={o.id} onClick={() => setEditingOrder(o)} className="bg-white p-4 rounded-2xl shadow-sm border border-[#F5F5F7] active:scale-[0.98] transition-all cursor-pointer">
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <div>
+                                                            <p className="font-bold text-[14px] text-[#1D1D1F] flex items-center gap-2 flex-wrap">
+                                                                {o.order_code || `#${o.id}`}
+                                                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${o.status === 'completed' ? 'bg-green-100 text-green-700' : o.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-[#E8E8ED] text-[#1D1D1F]'}`}>
+                                                                    {o.status || 'completed'}
+                                                                </span>
+                                                                <span className="text-[10px] bg-[#E8E8ED] px-1.5 py-0.5 rounded">{o.payment_method || 'cash'}</span>
+                                                            </p>
+                                                            <p className="text-[12px] text-[#86868B] mt-0.5">{new Date(o.timestamp).toLocaleString()}</p>
+                                                            {o.customer_name && o.customer_name !== 'Khách lẻ' && (
+                                                                <p className="text-[12px] text-[#1D1D1F] font-medium mt-1">👤 {o.customer_name}</p>
+                                                            )}
+                                                        </div>
+                                                        <span className="font-black text-[#0071E3] text-[16px]">{o.total?.toLocaleString()}đ</span>
+                                                    </div>
+                                                    <div className="text-[11px] text-[#86868B] border-t border-[#F5F5F7] pt-2 mt-2">
+                                                        {items?.slice(0, 3).map((item, idx) => (
+                                                            <span key={idx} className="inline-block bg-[#F5F5F7] px-2 py-0.5 rounded mr-1 mb-1">
+                                                                {item.displayName || item.name} x{item.quantity}
+                                                            </span>
+                                                        ))}
+                                                        {items?.length > 3 && <span className="text-[#0071E3]">+{items.length - 3} khác</span>}
+                                                    </div>
+                                                    {o.note && <p className="text-[11px] text-[#86868B] mt-2 italic">📝 {o.note}</p>}
+                                                </div>
+                                            );
+                                        })}
+
+                                        {filteredOrders.length === 0 && (
+                                            <div className="text-center py-12 text-[#86868B]">
+                                                <p className="text-4xl mb-2">📦</p>
+                                                <p className="font-medium">Không có đơn hàng trong khoảng thời gian này</p>
+                                            </div>
+                                        )}
+                                    </>
                                 );
-                            })}
+                            })()}
                         </div>
                     )}
                     {activeTab === 'logs' && (

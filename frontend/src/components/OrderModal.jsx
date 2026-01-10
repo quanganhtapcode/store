@@ -1,7 +1,17 @@
 import React, { useState } from 'react';
-import { X, Trash2 } from 'lucide-react';
+import { X, Trash2, Image as ImageIcon } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
+// Helper to get image URL
+const getImageUrl = (imagePath) => {
+    if (!imagePath) return null;
+    if (imagePath.startsWith('http') || imagePath.startsWith('data:')) return imagePath;
+    let baseUrl = API_URL.replace(/\/api\/?$/, '');
+    if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+    const path = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
+    return `${baseUrl}${path}`;
+};
 
 // --- Order Modal Component (Full Edit) ---
 const OrderModal = ({ order, authToken, onClose, onSave }) => {
@@ -95,7 +105,7 @@ const OrderModal = ({ order, authToken, onClose, onSave }) => {
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-5 space-y-5">
-                    {/* Order Items - Editable */}
+                    {/* Order Items - Editable with Images */}
                     <div className="bg-[#F9F9FA] p-4 rounded-2xl">
                         <h4 className="font-bold text-[13px] text-[#86868B] uppercase mb-3 flex justify-between">
                             <span>Sản phẩm ({editItems.length})</span>
@@ -104,10 +114,28 @@ const OrderModal = ({ order, authToken, onClose, onSave }) => {
                         <div className="space-y-3">
                             {editItems.map((item, idx) => (
                                 <div key={idx} className={`p-3 rounded-xl border ${isEditing ? 'bg-white border-[#FF9500]/30' : 'bg-transparent border-[#E8E8ED]'}`}>
-                                    <div className="flex justify-between items-start mb-2">
-                                        <p className="font-medium text-[13px] text-[#1D1D1F] flex-1 pr-2">{item.displayName || item.name}</p>
+                                    <div className="flex gap-3 mb-2">
+                                        {/* Ảnh sản phẩm */}
+                                        <div className="w-12 h-12 bg-[#F5F5F7] rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center">
+                                            {item.image ? (
+                                                <img
+                                                    src={getImageUrl(item.image)}
+                                                    alt={item.displayName || item.name}
+                                                    className="w-full h-full object-cover"
+                                                    loading="lazy"
+                                                />
+                                            ) : (
+                                                <ImageIcon size={18} className="text-[#D2D2D7]" />
+                                            )}
+                                        </div>
+
+                                        {/* Tên và nút xóa */}
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-medium text-[13px] text-[#1D1D1F] line-clamp-2">{item.displayName || item.name}</p>
+                                        </div>
+
                                         {isEditing && (
-                                            <button onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700 text-[11px] font-bold">
+                                            <button onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700 text-[11px] font-bold flex-shrink-0">
                                                 ✕ Xóa
                                             </button>
                                         )}
