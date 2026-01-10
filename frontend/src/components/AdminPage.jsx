@@ -841,8 +841,11 @@ const ProductModal = ({ product, onClose, onSave, authToken, onLogout }) => {
         finally { setIsSaving(false); }
     };
 
+    const [isDeleting, setIsDeleting] = useState(false);
+
     const handleDelete = async () => {
         if (!confirm('Bạn có chắc chắn muốn xóa sản phẩm này? Hành động không thể hoàn tác.')) return;
+        setIsDeleting(true);
         try {
             const res = await fetch(`${API_URL}/products/${formData.id}`, {
                 method: 'DELETE',
@@ -858,9 +861,15 @@ const ProductModal = ({ product, onClose, onSave, authToken, onLogout }) => {
             if (res.ok) {
                 onSave();
             } else {
-                alert('Không thể xóa sản phẩm. Vui lòng thử lại.');
+                const data = await res.json().catch(() => ({}));
+                alert('Không thể xóa sản phẩm: ' + (data.error || 'Lỗi không xác định'));
             }
-        } catch (e) { console.error(e); alert('Lỗi kết nối'); }
+        } catch (e) {
+            console.error('Delete error:', e);
+            alert('Lỗi kết nối: ' + e.message);
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
     return (
@@ -945,8 +954,17 @@ const ProductModal = ({ product, onClose, onSave, authToken, onLogout }) => {
                 </div>
                 <div className="p-4 border-t border-[#F5F5F7] flex gap-3">
                     {isEdit && (
-                        <button onClick={handleDelete} className="bg-red-50 text-red-500 p-4 rounded-2xl font-bold flex-shrink-0 active:scale-95 transition-transform hover:bg-red-100">
-                            <Trash2 size={24} />
+                        <button
+                            type="button"
+                            onClick={handleDelete}
+                            disabled={isDeleting}
+                            className={`bg-red-50 text-red-500 p-4 rounded-2xl font-bold flex-shrink-0 transition-all hover:bg-red-100 flex items-center justify-center ${isDeleting ? 'opacity-70 cursor-not-allowed' : 'active:scale-95'}`}
+                        >
+                            {isDeleting ? (
+                                <div className="w-6 h-6 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                                <Trash2 size={24} />
+                            )}
                         </button>
                     )}
                     <button
