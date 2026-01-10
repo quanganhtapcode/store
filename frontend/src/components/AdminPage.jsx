@@ -215,48 +215,251 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
 
     // --- TABS ---
     const DashboardTab = () => {
-        const lowStockProducts = useMemo(() => products.filter(p => p.stock <= 5), [products]);
+        // State for export modal
+        const [showExportModal, setShowExportModal] = React.useState(false);
+        const [exportDateRange, setExportDateRange] = React.useState({
+            start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+            end: new Date().toISOString().split('T')[0]
+        });
 
-        // Export to Excel function
-        const exportToExcel = () => {
+        // Helper: Format date for report
+        const formatDateVN = (date) => {
+            return new Date(date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        };
+
+        // 1. SỔ CHI TIẾT BÁN HÀNG (Mẫu S1-HKD) - Chi tiết từng giao dịch theo ngày
+        const exportSalesDetail = () => {
+            const startDate = new Date(exportDateRange.start);
+            const endDate = new Date(exportDateRange.end);
+            endDate.setHours(23, 59, 59, 999);
+
+            // Filter orders in date range
+            const filteredOrders = orders.filter(o => {
+                const orderDate = new Date(o.timestamp);
+                return orderDate >= startDate && orderDate <= endDate;
+            });
+
+            if (filteredOrders.length === 0) {
+                alert('Không có đơn hàng trong khoảng thời gian này!');
+                return;
+            }
+
+            let csv = '\uFEFF'; // BOM for UTF-8
+            csv += `SỔ CHI TIẾT BÁN HÀNG (Mẫu S1-HKD)\n`;
+            csv += `Đơn vị: CÁT HẢI POS\n`;
+            csv += `Kỳ báo cáo: Từ ${formatDateVN(exportDateRange.start)} đến ${formatDateVN(exportDateRange.end)}\n\n`;
+            csv += `Ngày,Mã đơn,Tên sản phẩm,ĐVT,Số lượng,Đơn giá,Thành tiền,Phương thức TT,Ghi chú\n`;
+
+            let totalRevenue = 0;
+            filteredOrders.forEach(order => {
+                const items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
+                const orderDate = formatDateVN(order.timestamp);
+                const orderCode = order.order_code || `#${order.id}`;
+                const paymentMethod = order.payment_method === 'transfer' ? 'Chuyển khoản' : order.payment_method === 'cash' ? 'Tiền mặt' : order.payment_method;
+
+                items.forEach(item => {
+                    const itemTotal = (item.finalPrice || item.price) * item.quantity;
+                    totalRevenue += itemTotal;
+                    const name = (item.displayName || item.name).replace(/,/g, ' ');
+                    const unit = item.isCase ? 'Thùng' : 'Cái';
+                    csv += `${orderDate},${orderCode},"${name}",${unit},${item.quantity},${item.finalPrice || item.price},${itemTotal},${paymentMethod},"${order.note || ''}"\n`;
+                });
+            });
+
+            csv += `\n,,,TỔNG CỘNG,,,${totalRevenue},,\n`;
+            csv += `\nTổng số đơn hàng: ${filteredOrders.length}\n`;
+            csv += `Ngày xuất báo cáo: ${formatDateVN(new Date())}\n`;
+
+            downloadCSV(csv, `SoChiTietBanHang_${exportDateRange.start}_${exportDateRange.end}.csv`);
+            setShowExportModal(false);
+        };
+
+        // 2. BÁO CÁO XUẤT NHẬP TỒN KHO (Mẫu S2-HKD)
+        const exportInventoryReport = () => {
+            const startDate = new Date(exportDateRange.start);
+            const endDate = new Date(exportDateRange.end);
+            endDate.setHours(23, 59, 59, 999);
+
+            // Lọc đơn hàng trong kỳ
+            const ordersInPeriod = orders.filter(o => {
+                const d = new Date(o.timestamp);
+                return d >= startDate && d <= endDate;
+            });
+
+            // Tính toán xuất kho trong kỳ
+            const soldMap = {};
+            ordersInPeriod.forEach(order => {
+                const items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
+                items.forEach(item => {
+                    const key = item.id;
+                    if (!soldMap[key]) soldMap[key] = { quantity: 0, value: 0 };
+                    soldMap[key].quantity += item.quantity;
+                    soldMap[key].value += (item.finalPrice || item.price) * item.quantity;
+                });
+            });
+
+            let csv = '\uFEFF';
+            csv += `BÁO CÁO XUẤT NHẬP TỒN KHO (Mẫu S2-HKD)\n`;
+            csv += `Đơn vị: CÁT HẢI POS\n`;
+            csv += `Kỳ báo cáo: Từ ${formatDateVN(exportDateRange.start)} đến ${formatDateVN(exportDateRange.end)}\n\n`;
+            csv += `STT,Mã SP,Tên sản phẩm,ĐVT,Tồn đầu kỳ (SL),Giá vốn,Nhập trong kỳ (SL),Xuất trong kỳ (SL),Doanh thu xuất,Tồn cuối kỳ (SL)\n`;
+
+            let totalBeginning = 0;
+            let totalExport = 0;
+            let totalExportValue = 0;
+            let totalEnding = 0;
+
+            products.forEach((p, idx) => {
+                const sold = soldMap[p.id] || { quantity: 0, value: 0 };
+                // Tồn đầu kỳ = Tồn hiện tại + Đã bán trong kỳ (giả định không có nhập trong kỳ từ DB)
+                const beginningStock = p.stock + sold.quantity;
+                const endingStock = p.stock;
+
+                totalBeginning += beginningStock;
+                totalExport += sold.quantity;
+                totalExportValue += sold.value;
+                totalEnding += endingStock;
+
+                const name = p.name.replace(/,/g, ' ');
+                csv += `${idx + 1},${p.id},"${name}",Cái,${beginningStock},${p.price},0,${sold.quantity},${sold.value},${endingStock}\n`;
+            });
+
+            csv += `\n,,TỔNG CỘNG,,${totalBeginning},,0,${totalExport},${totalExportValue},${totalEnding}\n`;
+            csv += `\nGhi chú: Tồn đầu kỳ được tính từ tồn kho hiện tại + số lượng đã bán trong kỳ\n`;
+            csv += `Ngày xuất báo cáo: ${formatDateVN(new Date())}\n`;
+
+            downloadCSV(csv, `BaoCaoXuatNhapTon_${exportDateRange.start}_${exportDateRange.end}.csv`);
+            setShowExportModal(false);
+        };
+
+        // 3. BÁO CÁO TỔNG HỢP DOANH THU THEO SẢN PHẨM
+        const exportProductSummary = () => {
             if (!stats.productsMonthly || stats.productsMonthly.length === 0) {
                 alert('Chưa có dữ liệu để xuất!');
                 return;
             }
 
-            // Tạo dữ liệu CSV (tương thích Excel)
             const now = new Date();
             const monthYear = now.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' });
 
-            // Header
-            let csvContent = '\uFEFF'; // BOM for UTF-8
-            csvContent += `BÁO CÁO BÁN HÀNG - ${monthYear.toUpperCase()}\n`;
-            csvContent += `Ngày xuất: ${now.toLocaleDateString('vi-VN')}\n\n`;
-            csvContent += `STT,Tên sản phẩm,Số lượng bán,Doanh thu (VND)\n`;
+            let csv = '\uFEFF';
+            csv += `BÁO CÁO TỔNG HỢP DOANH THU THEO SẢN PHẨM\n`;
+            csv += `Đơn vị: CÁT HẢI POS\n`;
+            csv += `Kỳ báo cáo: ${monthYear.toUpperCase()}\n\n`;
+            csv += `STT,Mã sản phẩm,Tên sản phẩm,Thương hiệu,Danh mục,Số lượng bán,Doanh thu (VNĐ),Tỷ lệ (%)\n`;
 
-            // Data rows
+            const totalRevenue = stats.productsMonthly.reduce((s, p) => s + p.revenue, 0);
+
             stats.productsMonthly.forEach((p, i) => {
-                const name = p.name.replace(/,/g, ' '); // Remove commas
-                csvContent += `${i + 1},"${name}",${p.total_sold},${p.revenue}\n`;
+                const product = products.find(pr => pr.name === p.name) || {};
+                const name = p.name.replace(/,/g, ' ');
+                const percentage = totalRevenue > 0 ? ((p.revenue / totalRevenue) * 100).toFixed(2) : 0;
+                csv += `${i + 1},${product.id || ''},"${name}",${product.brand || ''},${product.category || ''},${p.total_sold},${p.revenue},${percentage}%\n`;
             });
 
-            // Summary
             const totalQty = stats.productsMonthly.reduce((s, p) => s + p.total_sold, 0);
-            const totalRevenue = stats.productsMonthly.reduce((s, p) => s + p.revenue, 0);
-            csvContent += `\n,TỔNG CỘNG,${totalQty},${totalRevenue}\n`;
+            csv += `\n,,TỔNG CỘNG,,,,${totalQty},${totalRevenue},100%\n`;
+            csv += `\nTổng số mặt hàng: ${stats.productsMonthly.length}\n`;
+            csv += `Ngày xuất báo cáo: ${formatDateVN(now)}\n`;
 
-            // Download
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            downloadCSV(csv, `BaoCaoDoanhThu_Thang${now.getMonth() + 1}_${now.getFullYear()}.csv`);
+            setShowExportModal(false);
+        };
+
+        // Helper: Download CSV
+        const downloadCSV = (content, filename) => {
+            const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = `BaoCaoBanHang_Thang${now.getMonth() + 1}_${now.getFullYear()}.csv`;
+            link.download = filename;
             link.click();
             URL.revokeObjectURL(link.href);
         };
 
+        // Export Modal Component
+        const ExportModal = () => (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in">
+                <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl animate-in slide-in-from-bottom-10">
+                    <div className="p-5 border-b border-[#F5F5F7]">
+                        <div className="flex justify-between items-center">
+                            <h3 className="font-bold text-[18px] text-[#1D1D1F]">📊 Xuất Báo Cáo</h3>
+                            <button onClick={() => setShowExportModal(false)} className="p-2 bg-[#F5F5F7] rounded-full hover:bg-[#E8E8ED]">
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <p className="text-[12px] text-[#86868B] mt-1">Theo chuẩn Thông tư 152/2025/TT-BTC</p>
+                    </div>
+
+                    <div className="p-5 space-y-4">
+                        {/* Date Range */}
+                        <div className="bg-[#F5F5F7] p-4 rounded-xl">
+                            <label className="text-[11px] font-bold text-[#86868B] uppercase">Khoảng thời gian</label>
+                            <div className="flex gap-3 mt-2">
+                                <div className="flex-1">
+                                    <label className="text-[10px] text-[#86868B]">Từ ngày</label>
+                                    <input
+                                        type="date"
+                                        value={exportDateRange.start}
+                                        onChange={e => setExportDateRange({ ...exportDateRange, start: e.target.value })}
+                                        className="w-full bg-white p-2 rounded-lg text-[13px] font-medium outline-none border border-[#E8E8ED]"
+                                    />
+                                </div>
+                                <div className="flex-1">
+                                    <label className="text-[10px] text-[#86868B]">Đến ngày</label>
+                                    <input
+                                        type="date"
+                                        value={exportDateRange.end}
+                                        onChange={e => setExportDateRange({ ...exportDateRange, end: e.target.value })}
+                                        className="w-full bg-white p-2 rounded-lg text-[13px] font-medium outline-none border border-[#E8E8ED]"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Report Types */}
+                        <div className="space-y-2">
+                            <label className="text-[11px] font-bold text-[#86868B] uppercase">Chọn loại báo cáo</label>
+
+                            <button
+                                onClick={exportSalesDetail}
+                                className="w-full p-4 bg-gradient-to-r from-[#0071E3] to-[#0077ED] text-white rounded-xl text-left hover:shadow-lg transition-all active:scale-[0.98]"
+                            >
+                                <div className="font-bold text-[14px]">📋 Sổ Chi Tiết Bán Hàng</div>
+                                <div className="text-[11px] opacity-80 mt-0.5">Mẫu S1-HKD: Chi tiết từng giao dịch theo ngày</div>
+                            </button>
+
+                            <button
+                                onClick={exportInventoryReport}
+                                className="w-full p-4 bg-gradient-to-r from-[#34C759] to-[#30D158] text-white rounded-xl text-left hover:shadow-lg transition-all active:scale-[0.98]"
+                            >
+                                <div className="font-bold text-[14px]">📦 Báo Cáo Xuất Nhập Tồn</div>
+                                <div className="text-[11px] opacity-80 mt-0.5">Mẫu S2-HKD: Tồn đầu kỳ, nhập, xuất, tồn cuối kỳ</div>
+                            </button>
+
+                            <button
+                                onClick={exportProductSummary}
+                                className="w-full p-4 bg-gradient-to-r from-[#FF9500] to-[#FF9F0A] text-white rounded-xl text-left hover:shadow-lg transition-all active:scale-[0.98]"
+                            >
+                                <div className="font-bold text-[14px]">💰 Tổng Hợp Doanh Thu</div>
+                                <div className="text-[11px] opacity-80 mt-0.5">Doanh thu theo sản phẩm, tỷ lệ % đóng góp</div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="p-5 border-t border-[#F5F5F7] text-center">
+                        <p className="text-[11px] text-[#86868B]">File xuất ra định dạng CSV, mở được bằng Excel</p>
+                    </div>
+                </div>
+            </div>
+        );
+
+        // Compute low stock products
+        const lowStockProducts = products.filter(p => p.stock <= 5);
+
         return (
             <div className="space-y-4 pb-20">
-                {/* Low Stock Alert */}
+                {/* Export Modal */}
+                {showExportModal && <ExportModal />}
                 {lowStockProducts.length > 0 && (
                     <div className="bg-red-50 p-5 rounded-[2rem] border border-red-100 shadow-sm animate-in fade-in slide-in-from-top-4">
                         <h3 className="font-bold text-red-600 mb-3 flex items-center gap-2">
@@ -311,11 +514,11 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="font-bold text-[#1D1D1F] flex items-center gap-2">📊 Chi tiết doanh thu tháng này</h3>
                         <button
-                            onClick={exportToExcel}
+                            onClick={() => setShowExportModal(true)}
                             className="flex items-center gap-1.5 px-3 py-2 bg-[#34C759] text-white text-[12px] font-bold rounded-xl active:scale-95 transition-all shadow-sm hover:bg-[#2DB84D]"
                         >
                             <Download size={14} />
-                            Xuất Excel
+                            Xuất Báo Cáo
                         </button>
                     </div>
                     <div className="overflow-x-auto">
@@ -733,8 +936,8 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
                                             setDateFilter({ start: today.toISOString().split('T')[0], end: '' });
                                         }}
                                         className={`px-3 py-1.5 rounded-lg text-[12px] font-bold flex-shrink-0 transition-all ${dateFilter.start === new Date().toISOString().split('T')[0] && !dateFilter.end
-                                                ? 'bg-[#0071E3] text-white'
-                                                : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E8E8ED]'
+                                            ? 'bg-[#0071E3] text-white'
+                                            : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E8E8ED]'
                                             }`}
                                     >
                                         📅 Hôm nay
@@ -762,8 +965,8 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
                                     <button
                                         onClick={() => setDateFilter({ start: '', end: '' })}
                                         className={`px-3 py-1.5 rounded-lg text-[12px] font-bold flex-shrink-0 transition-all ${!dateFilter.start && !dateFilter.end
-                                                ? 'bg-[#1D1D1F] text-white'
-                                                : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E8E8ED]'
+                                            ? 'bg-[#1D1D1F] text-white'
+                                            : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E8E8ED]'
                                             }`}
                                     >
                                         Tất cả
