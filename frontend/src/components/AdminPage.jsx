@@ -366,6 +366,76 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
             setShowExportModal(false);
         };
 
+        // 4. BÁO CÁO NHẬP HÀNG (Phiếu nhập kho)
+        const [imports, setImports] = React.useState([]);
+        const [loadingImports, setLoadingImports] = React.useState(false);
+
+        const fetchImports = async () => {
+            setLoadingImports(true);
+            try {
+                const res = await fetch(`${API_URL}/imports`);
+                const data = await res.json();
+                setImports(data);
+            } catch (e) {
+                console.error('Error fetching imports:', e);
+            }
+            setLoadingImports(false);
+        };
+
+        // Fetch imports when modal opens
+        React.useEffect(() => {
+            if (showExportModal) {
+                fetchImports();
+            }
+        }, [showExportModal]);
+
+        const exportImportReport = () => {
+            const startDate = new Date(exportDateRange.start);
+            const endDate = new Date(exportDateRange.end);
+            endDate.setHours(23, 59, 59, 999);
+
+            // Filter imports in date range
+            const filteredImports = imports.filter(imp => {
+                const impDate = new Date(imp.timestamp);
+                return impDate >= startDate && impDate <= endDate;
+            });
+
+            if (filteredImports.length === 0) {
+                alert('Không có phiếu nhập trong khoảng thời gian này!');
+                return;
+            }
+
+            let csv = '\uFEFF';
+            csv += `SỔ CHI TIẾT NHẬP HÀNG\n`;
+            csv += `Đơn vị: Cát Hải\n`;
+            csv += `Kỳ báo cáo: Từ ${formatDateVN(exportDateRange.start)} đến ${formatDateVN(exportDateRange.end)}\n\n`;
+            csv += `Ngày,Mã phiếu,Tên sản phẩm,Số lượng nhập,Giá nhập,Thành tiền,Ghi chú\n`;
+
+            let totalValue = 0;
+            let totalQty = 0;
+
+            filteredImports.forEach(imp => {
+                const items = typeof imp.items === 'string' ? JSON.parse(imp.items) : imp.items;
+                const impDate = formatDateVN(imp.timestamp);
+                const impCode = imp.id;
+
+                items.forEach(item => {
+                    const itemTotal = (item.importPrice || item.price) * item.quantity;
+                    totalValue += itemTotal;
+                    totalQty += item.quantity;
+                    const name = (item.name || '').replace(/,/g, ' ');
+                    csv += `${impDate},${impCode},"${name}",${item.quantity},${item.importPrice || item.price},${itemTotal},"${imp.note || ''}"\n`;
+                });
+            });
+
+            csv += `\n,,TỔNG CỘNG,${totalQty},,${totalValue},\n`;
+            csv += `\nTổng số phiếu nhập: ${filteredImports.length}\n`;
+            csv += `Ngày xuất báo cáo: ${formatDateVN(new Date())}\n`;
+
+            downloadCSV(csv, `SoChiTietNhapHang_${exportDateRange.start}_${exportDateRange.end}.csv`);
+            setShowExportModal(false);
+        };
+
         // Helper: Download CSV
         const downloadCSV = (content, filename) => {
             const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
@@ -442,6 +512,17 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
                             >
                                 <div className="font-bold text-[14px]">💰 Tổng Hợp Doanh Thu</div>
                                 <div className="text-[11px] opacity-80 mt-0.5">Doanh thu theo sản phẩm, tỷ lệ % đóng góp</div>
+                            </button>
+
+                            <button
+                                onClick={exportImportReport}
+                                disabled={loadingImports}
+                                className="w-full p-4 bg-gradient-to-r from-[#AF52DE] to-[#BF5AF2] text-white rounded-xl text-left hover:shadow-lg transition-all active:scale-[0.98] disabled:opacity-50"
+                            >
+                                <div className="font-bold text-[14px]">📥 Sổ Chi Tiết Nhập Hàng</div>
+                                <div className="text-[11px] opacity-80 mt-0.5">
+                                    {loadingImports ? 'Đang tải dữ liệu...' : 'Phiếu nhập kho theo ngày, giá nhập'}
+                                </div>
                             </button>
                         </div>
                     </div>

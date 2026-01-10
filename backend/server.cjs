@@ -147,6 +147,36 @@ app.post('/api/imports', verifyToken, async (req, res) => {
     }
 });
 
+// GET ALL IMPORTS
+app.get('/api/imports', async (req, res) => {
+    try {
+        const imports = await dbAll("SELECT * FROM import_notes ORDER BY timestamp DESC LIMIT 200");
+        res.json(imports);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// UPDATE IMPORT (add invoice PDF link, note, etc.)
+app.put('/api/imports/:id', verifyToken, async (req, res) => {
+    const { id } = req.params;
+    const { note, invoice_url } = req.body;
+
+    try {
+        // Check if invoice_url column exists, if not add it
+        await dbRun("UPDATE import_notes SET note = ?, invoice_url = ? WHERE id = ?", [note || '', invoice_url || '', id]);
+        res.json({ success: true });
+    } catch (e) {
+        // If invoice_url column doesn't exist, try without it
+        try {
+            await dbRun("UPDATE import_notes SET note = ? WHERE id = ?", [note || '', id]);
+            res.json({ success: true, warning: 'invoice_url not saved' });
+        } catch (e2) {
+            res.status(500).json({ error: e2.message });
+        }
+    }
+});
+
 // CSV Import
 const upload = multer({ dest: 'uploads/' });
 app.post('/api/products/import-csv', verifyToken, upload.single('file'), (req, res) => {
