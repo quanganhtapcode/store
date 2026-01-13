@@ -11,7 +11,7 @@ set -e
 # Configuration
 VPS_IP="203.55.176.10"
 VPS_USER="root"
-KEY_PATH="$HOME/Desktop/key.pem"
+KEY_PATH="/tmp/key.pem"
 REMOTE_PATH="/var/www/store/api"
 
 echo ""
