@@ -99,6 +99,92 @@ router.post('/', async (req, res) => {
     }
 });
 
+// UPDATE ORDER (Full edit: items, total, payment_method, customer_name, note)
+router.put('/:id', verifyToken, async (req, res) => {
+    const { id } = req.params;
+    const { items, total, payment_method, customer_name, note } = req.body;
+
+    try {
+        const order = await dbGet("SELECT * FROM orders WHERE id = ?", [id]);
+        if (!order) return res.status(404).json({ error: 'Đơn hàng không tồn tại' });
+
+        // Build update query dynamically
+        const updates = [];
+        const params = [];
+        const changes = []; // Track changes for logging
+
+        // Validate and update payment_method (only cash or transfer allowed)
+        if (payment_method !== undefined) {
+            const validPayments = ['cash', 'transfer'];
+            if (!validPayments.includes(payment_method)) {
+                return res.status(400).json({ error: 'Phương thức thanh toán không hợp lệ (chỉ tiền mặt hoặc chuyển khoản)' });
+            }
+            if (payment_method !== order.payment_method) {
+                updates.push('payment_method = ?');
+                params.push(payment_method);
+                changes.push(`Thanh toán: ${order.payment_method} → ${payment_method}`);
+            }
+        }
+
+        // Update items and total
+        if (items !== undefined && Array.isArray(items)) {
+            const itemsStr = JSON.stringify(items);
+            updates.push('items = ?');
+            params.push(itemsStr);
+
+            // Calculate new total from items
+            const newTotal = total || items.reduce((sum, item) => sum + ((item.finalPrice || 0) * item.quantity), 0);
+            if (newTotal !== order.total) {
+                updates.push('total = ?');
+                params.push(newTotal);
+                changes.push(`Tổng tiền: ${order.total?.toLocaleString()}đ → ${newTotal?.toLocaleString()}đ`);
+            }
+
+            // Compare items count
+            const oldItems = JSON.parse(order.items || '[]');
+            if (oldItems.length !== items.length) {
+                changes.push(`Số SP: ${oldItems.length} → ${items.length}`);
+            }
+        } else if (total !== undefined && total !== order.total) {
+            updates.push('total = ?');
+            params.push(total);
+            changes.push(`Tổng tiền: ${order.total?.toLocaleString()}đ → ${total?.toLocaleString()}đ`);
+        }
+
+        if (customer_name !== undefined && customer_name !== order.customer_name) {
+            updates.push('customer_name = ?');
+            params.push(customer_name);
+            changes.push(`Khách: ${order.customer_name} → ${customer_name}`);
+        }
+
+        if (note !== undefined && note !== order.note) {
+            updates.push('note = ?');
+            params.push(note);
+            changes.push(`Ghi chú: cập nhật`);
+        }
+
+        if (updates.length === 0) {
+            return res.status(400).json({ error: 'Không có dữ liệu thay đổi' });
+        }
+
+        params.push(id);
+        await dbRun(`UPDATE orders SET ${updates.join(', ')} WHERE id = ?`, params);
+
+        // Log activity with details
+        const orderCode = order.order_code || `#${id}`;
+        const logMessage = changes.length > 0
+            ? `Sửa đơn ${orderCode}: ${changes.join(', ')}`
+            : `Sửa đơn ${orderCode}`;
+        logActivity('UPDATE_ORDER', logMessage);
+
+        res.json({ success: true, message: 'Cập nhật đơn hàng thành công' });
+
+    } catch (error) {
+        console.error('Update Order Error:', error);
+        res.status(500).json({ error: error.message || 'Lỗi cập nhật đơn hàng' });
+    }
+});
+
 // DELETE ORDER (Restore Stock)
 router.delete('/:id', verifyToken, async (req, res) => {
     const { id } = req.params;

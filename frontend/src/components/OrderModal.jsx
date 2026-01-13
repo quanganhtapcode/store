@@ -20,14 +20,24 @@ const OrderModal = ({ order, authToken, onClose, onSave }) => {
     const [formData, setFormData] = useState({
         customer_name: order.customer_name || 'Khách lẻ',
         payment_method: order.payment_method || 'cash',
-        status: order.status || 'completed',
         note: order.note || ''
     });
     const [editItems, setEditItems] = useState(initialItems);
     const [isEditing, setIsEditing] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
     // Calculate total from items
     const calculatedTotal = editItems.reduce((sum, item) => sum + ((item.finalPrice || 0) * item.quantity), 0);
+
+    // Check if there are changes
+    const hasChanges = () => {
+        const originalItems = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || []);
+        const itemsChanged = JSON.stringify(editItems) !== JSON.stringify(originalItems);
+        const customerChanged = formData.customer_name !== (order.customer_name || 'Khách lẻ');
+        const paymentChanged = formData.payment_method !== (order.payment_method || 'cash');
+        const noteChanged = formData.note !== (order.note || '');
+        return itemsChanged || customerChanged || paymentChanged || noteChanged;
+    };
 
     // Update item quantity
     const updateItemQuantity = (idx, newQty) => {
@@ -65,24 +75,49 @@ const OrderModal = ({ order, authToken, onClose, onSave }) => {
                 const data = await res.json();
                 alert(data.error || 'Không thể xóa đơn hàng');
             }
-        } catch (e) { console.error(e); alert('Lỗi kết nối khi xóa đơn'); }
+        } catch (e) {
+            console.error(e);
+            alert('Lỗi kết nối khi xóa đơn');
+        }
     };
 
     const handleSubmit = async () => {
+        if (!hasChanges()) {
+            onClose();
+            return;
+        }
+
+        setIsSaving(true);
         try {
             const payload = {
-                ...formData,
                 items: editItems,
-                total: calculatedTotal
+                total: calculatedTotal,
+                customer_name: formData.customer_name,
+                payment_method: formData.payment_method,
+                note: formData.note
             };
 
-            await fetch(`${API_URL}/orders/${order.id}`, {
+            const res = await fetch(`${API_URL}/orders/${order.id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
                 body: JSON.stringify(payload)
             });
-            onSave();
-        } catch (e) { console.error(e); }
+
+            if (res.ok) {
+                onSave();
+            } else {
+                const data = await res.json();
+                alert(data.error || 'Không thể cập nhật đơn hàng');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Lỗi kết nối khi cập nhật đơn');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     return (
@@ -197,35 +232,34 @@ const OrderModal = ({ order, authToken, onClose, onSave }) => {
                             <input
                                 value={formData.customer_name}
                                 onChange={e => setFormData({ ...formData, customer_name: e.target.value })}
-                                className="w-full bg-[#F9F9FA] p-3 rounded-xl font-medium outline-none mt-1"
+                                className="w-full bg-[#F9F9FA] p-3 rounded-xl font-medium outline-none mt-1 focus:ring-2 focus:ring-[#0071E3]/20"
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Thanh toán</label>
-                                <select
-                                    value={formData.payment_method}
-                                    onChange={e => setFormData({ ...formData, payment_method: e.target.value })}
-                                    className="w-full bg-[#F9F9FA] p-3 rounded-xl font-medium outline-none mt-1"
+                        {/* Payment Method - Only Cash and Transfer */}
+                        <div>
+                            <label className="text-[11px] font-bold uppercase text-[#86868B] ml-1 mb-2 block">Thanh toán</label>
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    onClick={() => setFormData({ ...formData, payment_method: 'cash' })}
+                                    className={`p-3 rounded-xl border-2 transition-all flex items-center justify-center gap-2 ${formData.payment_method === 'cash'
+                                            ? 'bg-green-50 border-green-300 text-green-700'
+                                            : 'bg-[#F9F9FA] border-transparent text-[#86868B] hover:bg-[#F5F5F7]'
+                                        }`}
                                 >
-                                    <option value="cash">Tiền mặt</option>
-                                    <option value="transfer">Chuyển khoản</option>
-                                    <option value="momo">MoMo</option>
-                                    <option value="card">Thẻ</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-[11px] font-bold uppercase text-[#86868B] ml-1">Trạng thái</label>
-                                <select
-                                    value={formData.status}
-                                    onChange={e => setFormData({ ...formData, status: e.target.value })}
-                                    className="w-full bg-[#F9F9FA] p-3 rounded-xl font-medium outline-none mt-1"
+                                    <span className="text-lg">💵</span>
+                                    <span className="font-bold text-[13px]">Tiền mặt</span>
+                                </button>
+                                <button
+                                    onClick={() => setFormData({ ...formData, payment_method: 'transfer' })}
+                                    className={`p-3 rounded-xl border-2 transition-all flex items-center justify-center gap-2 ${formData.payment_method === 'transfer'
+                                            ? 'bg-blue-50 border-blue-300 text-blue-700'
+                                            : 'bg-[#F9F9FA] border-transparent text-[#86868B] hover:bg-[#F5F5F7]'
+                                        }`}
                                 >
-                                    <option value="completed">Hoàn thành</option>
-                                    <option value="pending">Đang xử lý</option>
-                                    <option value="cancelled">Đã huỷ</option>
-                                </select>
+                                    <span className="text-lg">🏦</span>
+                                    <span className="font-bold text-[13px]">Chuyển khoản</span>
+                                </button>
                             </div>
                         </div>
 
@@ -235,18 +269,28 @@ const OrderModal = ({ order, authToken, onClose, onSave }) => {
                                 value={formData.note}
                                 onChange={e => setFormData({ ...formData, note: e.target.value })}
                                 placeholder="Thêm ghi chú..."
-                                className="w-full bg-[#F9F9FA] p-3 rounded-xl font-medium outline-none mt-1 min-h-[60px] resize-none"
+                                className="w-full bg-[#F9F9FA] p-3 rounded-xl font-medium outline-none mt-1 min-h-[60px] resize-none focus:ring-2 focus:ring-[#0071E3]/20"
                             />
                         </div>
                     </div>
                 </div>
 
                 <div className="p-4 border-t border-[#F5F5F7] flex gap-3">
-                    <button onClick={handleDelete} className="bg-red-50 text-red-500 w-16 h-14 rounded-2xl flex items-center justify-center font-bold active:scale-95 transition-all hover:bg-red-100">
+                    <button
+                        onClick={handleDelete}
+                        className="bg-red-50 text-red-500 w-16 h-14 rounded-2xl flex items-center justify-center font-bold active:scale-95 transition-all hover:bg-red-100"
+                    >
                         <Trash2 size={22} />
                     </button>
-                    <button onClick={handleSubmit} className="flex-1 bg-[#0071E3] text-white py-4 rounded-2xl font-bold text-[16px] shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-transform">
-                        💾 Lưu thay đổi
+                    <button
+                        onClick={handleSubmit}
+                        disabled={isSaving}
+                        className={`flex-1 py-4 rounded-2xl font-bold text-[16px] transition-all active:scale-[0.98] ${hasChanges()
+                                ? 'bg-[#0071E3] text-white shadow-lg shadow-blue-500/20'
+                                : 'bg-[#E8E8ED] text-[#86868B]'
+                            }`}
+                    >
+                        {isSaving ? '⏳ Đang lưu...' : hasChanges() ? '💾 Lưu thay đổi' : '✓ Đóng'}
                     </button>
                 </div>
             </div>
