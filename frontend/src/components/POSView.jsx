@@ -133,10 +133,22 @@ const POSView = ({
     const [editingPriceId, setEditingPriceId] = useState(null);
     const [tempPrice, setTempPrice] = useState('');
 
+    // State cho sửa tổng tiền (sẽ tính ra chiết khấu)
+    const [customTotal, setCustomTotal] = useState(null); // null = không sửa
+    const [editingTotal, setEditingTotal] = useState(false);
+    const [tempTotal, setTempTotal] = useState('');
+
+    // Tính tổng gốc và chiết khấu
+    const originalTotal = cart.reduce((s, i) => s + (i.finalPrice * i.quantity), 0);
+    const finalTotal = customTotal !== null ? customTotal : originalTotal;
+    const discountAmount = originalTotal - finalTotal;
+
+
     const handlePayment = (method) => {
-        checkout(method); // Pass payment method to checkout
+        checkout(method, finalTotal, discountAmount); // Pass payment method, finalTotal, and discount to checkout
         setShowPaymentChoice(false);
         setShowCartDetail(false);
+        setCustomTotal(null); // Reset chiết khấu sau khi thanh toán
     };
 
     const ProductCard = ({ p, size = "md" }) => (
@@ -324,7 +336,7 @@ const POSView = ({
                                                 className="flex items-center gap-2 cursor-pointer group"
                                                 onClick={() => {
                                                     setEditingPriceId(`${item.id}-${item.saleType}`);
-                                                    setTempPrice(String(item.finalPrice));
+                                                    setTempPrice(''); // Xóa sạch để nhập mới từ đầu
                                                 }}
                                             >
                                                 <p className={`font-bold text-[16px] ${item.isCase ? 'text-emerald-600' : 'text-[#0071E3]'} group-hover:underline`}>
@@ -370,9 +382,66 @@ const POSView = ({
 
                         {/* Footer - Fixed */}
                         <div className="flex-shrink-0 space-y-3 pt-3 border-t border-[#F5F5F7]">
-                            <div className="flex justify-between items-center p-4 bg-gradient-to-r from-[#F5F5F7] to-[#E8E8ED] rounded-2xl">
-                                <span className="font-bold text-[#86868B] text-[14px] uppercase tracking-wide">Tổng cộng</span>
-                                <span className="font-black text-[#1D1D1F] text-[28px]">{cart.reduce((s, i) => s + (i.finalPrice * i.quantity), 0).toLocaleString()}đ</span>
+                            {/* Tổng cộng có thể sửa */}
+                            <div
+                                className="flex justify-between items-center p-4 bg-gradient-to-r from-[#F5F5F7] to-[#E8E8ED] rounded-2xl cursor-pointer group"
+                                onClick={() => {
+                                    if (!editingTotal) {
+                                        setEditingTotal(true);
+                                        setTempTotal(''); // Xóa sạch để nhập mới
+                                    }
+                                }}
+                            >
+                                <div className="flex flex-col">
+                                    <span className="font-bold text-[#86868B] text-[14px] uppercase tracking-wide">Tổng cộng</span>
+                                    {discountAmount > 0 && (
+                                        <span className="text-[12px] text-emerald-600 font-medium">Chiết khấu: -{discountAmount.toLocaleString()}đ</span>
+                                    )}
+                                </div>
+                                {editingTotal ? (
+                                    <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                                        <input
+                                            type="text"
+                                            inputMode="numeric"
+                                            placeholder={originalTotal.toLocaleString()}
+                                            value={tempTotal}
+                                            onChange={e => setTempTotal(e.target.value.replace(/[^0-9]/g, ''))}
+                                            onBlur={() => {
+                                                const newTotal = parseInt(tempTotal, 10);
+                                                if (newTotal && newTotal > 0 && newTotal <= originalTotal) {
+                                                    setCustomTotal(newTotal);
+                                                } else if (tempTotal === '') {
+                                                    setCustomTotal(null); // Reset về tổng gốc
+                                                }
+                                                setEditingTotal(false);
+                                            }}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter') {
+                                                    const newTotal = parseInt(tempTotal, 10);
+                                                    if (newTotal && newTotal > 0 && newTotal <= originalTotal) {
+                                                        setCustomTotal(newTotal);
+                                                    } else if (tempTotal === '') {
+                                                        setCustomTotal(null);
+                                                    }
+                                                    setEditingTotal(false);
+                                                }
+                                            }}
+                                            autoFocus
+                                            className="w-32 bg-white border-2 border-[#0071E3] rounded-xl px-3 py-2 font-black text-[#0071E3] text-[20px] outline-none text-right"
+                                        />
+                                        <span className="text-[#1D1D1F] font-bold text-[20px]">đ</span>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-2">
+                                        {discountAmount > 0 && (
+                                            <span className="text-[18px] text-[#86868B] line-through">{originalTotal.toLocaleString()}đ</span>
+                                        )}
+                                        <span className="font-black text-[#1D1D1F] text-[28px] group-hover:text-[#0071E3] transition-colors">
+                                            {finalTotal.toLocaleString()}đ
+                                        </span>
+                                        <span className="text-[10px] text-[#86868B] opacity-0 group-hover:opacity-100 transition-opacity">✏️</span>
+                                    </div>
+                                )}
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <button

@@ -115,12 +115,15 @@ const App = () => {
         });
     };
 
-    const checkout = async (paymentMethod = 'cash') => {
+    const checkout = async (paymentMethod = 'cash', finalTotal = null, discount = 0) => {
         if (cart.length === 0) return;
-        const total = cart.reduce((s, i) => s + (i.finalPrice * i.quantity), 0);
+        const originalTotal = cart.reduce((s, i) => s + (i.finalPrice * i.quantity), 0);
+        const total = finalTotal !== null ? finalTotal : originalTotal;
         const order = {
             items: cart,
             total,
+            original_total: originalTotal,
+            discount: discount,
             payment_method: paymentMethod,
             timestamp: Date.now()
         };

@@ -151,6 +151,18 @@ const initDatabase = () => {
             items TEXT
         )`);
 
+        // Add discount and original_total columns if not exist
+        db.run(`ALTER TABLE orders ADD COLUMN discount INTEGER DEFAULT 0`, (err) => {
+            if (err && !err.message.includes('duplicate column')) {
+                console.log('Note: Column discount already exists or error:', err.message);
+            }
+        });
+        db.run(`ALTER TABLE orders ADD COLUMN original_total INTEGER`, (err) => {
+            if (err && !err.message.includes('duplicate column')) {
+                console.log('Note: Column original_total already exists or error:', err.message);
+            }
+        });
+
         // Trigger migration check
         setTimeout(migrateOrderItems, 2000);
     });

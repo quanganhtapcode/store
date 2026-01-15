@@ -140,6 +140,8 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
     const [importCart, setImportCart] = useState([]);
     const [importSearch, setImportSearch] = useState('');
     const [showImportModal, setShowImportModal] = useState(false);
+    const [editingImportQty, setEditingImportQty] = useState(null); // { idx: number, value: string }
+
 
     const [qrCodeData, setQrCodeData] = useState(null);
     const [showQRModal, setShowQRModal] = useState(false);
@@ -924,7 +926,33 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
                                     <div className="flex flex-col gap-1 items-end">
                                         <div className="flex items-center gap-2 bg-white/20 rounded-lg px-2 py-1">
                                             <button onClick={() => setImportCart(prev => prev.map((pi, pii) => pii === idx ? { ...pi, quantity: Math.max(1, pi.quantity - 1) } : pi))} className="text-white/70 hover:text-white px-1">-</button>
-                                            <span className="w-8 text-center text-[13px] font-bold">{i.quantity}</span>
+                                            {editingImportQty?.idx === idx ? (
+                                                <input
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    value={editingImportQty.value}
+                                                    onChange={e => setEditingImportQty({ idx, value: e.target.value.replace(/[^0-9]/g, '') })}
+                                                    onBlur={() => {
+                                                        const newQty = parseInt(editingImportQty.value, 10) || 1;
+                                                        setImportCart(prev => prev.map((pi, pii) => pii === idx ? { ...pi, quantity: Math.max(1, newQty) } : pi));
+                                                        setEditingImportQty(null);
+                                                    }}
+                                                    onKeyDown={e => {
+                                                        if (e.key === 'Enter') {
+                                                            const newQty = parseInt(editingImportQty.value, 10) || 1;
+                                                            setImportCart(prev => prev.map((pi, pii) => pii === idx ? { ...pi, quantity: Math.max(1, newQty) } : pi));
+                                                            setEditingImportQty(null);
+                                                        }
+                                                    }}
+                                                    autoFocus
+                                                    className="w-12 text-center text-[13px] font-bold bg-white text-[#1D1D1F] rounded px-1 py-0.5 outline-none"
+                                                />
+                                            ) : (
+                                                <span
+                                                    onClick={() => setEditingImportQty({ idx, value: '' })}
+                                                    className="w-8 text-center text-[13px] font-bold cursor-pointer hover:bg-white/20 rounded px-1"
+                                                >{i.quantity}</span>
+                                            )}
                                             <button onClick={() => setImportCart(prev => prev.map((pi, pii) => pii === idx ? { ...pi, quantity: pi.quantity + 1 } : pi))} className="text-white/70 hover:text-white px-1">+</button>
                                         </div>
                                         <button onClick={() => setImportCart(prev => prev.filter((_, pii) => pii !== idx))} className="text-red-400 text-[11px] hover:text-red-300">Xóa</button>

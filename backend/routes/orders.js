@@ -50,7 +50,7 @@ router.get('/', async (req, res) => {
 
 // CREATE ORDER (Transaction + Normalized Data)
 router.post('/', async (req, res) => {
-    const { items, total, customer_name, payment_method, note, timestamp } = req.body;
+    const { items, total, original_total, discount, customer_name, payment_method, note, timestamp } = req.body;
 
     const errors = validateOrder({ total, items });
     if (errors.length > 0) return res.status(400).json({ error: errors.join(', ') });
@@ -62,11 +62,11 @@ router.post('/', async (req, res) => {
         const orderCode = generateOrderCode((countResult?.count || 0) + 1);
         const itemsStr = JSON.stringify(items);
 
-        // 1. Insert Order
+        // 1. Insert Order (with discount)
         const orderResult = await dbRun(
-            `INSERT INTO orders (order_code, total, timestamp, items, customer_name, payment_method, status, note) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [orderCode, total, timestamp || Date.now(), itemsStr, customer_name || 'Khách lẻ', payment_method || 'cash', 'completed', note || '']
+            `INSERT INTO orders (order_code, total, original_total, discount, timestamp, items, customer_name, payment_method, status, note) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [orderCode, total, original_total || total, discount || 0, timestamp || Date.now(), itemsStr, customer_name || 'Khách lẻ', payment_method || 'cash', 'completed', note || '']
         );
         const orderId = orderResult.lastID;
 
@@ -89,7 +89,8 @@ router.post('/', async (req, res) => {
 
         await dbRun('COMMIT');
 
-        logActivity('CREATE_ORDER', `New Order ${orderCode} - ${total}đ`);
+        const discountLog = discount > 0 ? ` (Chiết khấu: ${discount}đ)` : '';
+        logActivity('CREATE_ORDER', `New Order ${orderCode} - ${total}đ${discountLog}`);
         res.json({ id: orderId, order_code: orderCode, success: true });
 
     } catch (error) {
