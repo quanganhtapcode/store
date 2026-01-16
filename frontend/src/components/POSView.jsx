@@ -56,7 +56,8 @@ const POSView = ({
                 isRetail: true
             });
 
-            if (p.case_price > 0) {
+            // Chỉ hiển thị card "Thùng" nếu units_per_case > 1
+            if (p.case_price > 0 && p.units_per_case > 1) {
                 result.push({
                     ...p,
                     saleType: 'case',
@@ -76,9 +77,15 @@ const POSView = ({
             groups[p.brand].push(p);
         });
 
-        // Sắp xếp sản phẩm trong mỗi brand theo total_sold (giảm dần)
+        // Sắp xếp sản phẩm trong mỗi brand: theo category trước, rồi theo total_sold
         Object.keys(groups).forEach(brand => {
-            groups[brand].sort((a, b) => (b.total_sold || 0) - (a.total_sold || 0));
+            groups[brand].sort((a, b) => {
+                // Ưu tiên sắp xếp theo category (A-Z)
+                const categoryCompare = (a.category || '').localeCompare(b.category || '', 'vi');
+                if (categoryCompare !== 0) return categoryCompare;
+                // Trong cùng category, sắp xếp theo total_sold (giảm dần)
+                return (b.total_sold || 0) - (a.total_sold || 0);
+            });
         });
 
         // Sắp xếp các brand theo tổng lượng bán
