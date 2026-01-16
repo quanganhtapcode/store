@@ -36,7 +36,15 @@ const db = new sqlite3.Database(dbPath, (err) => {
     if (err) console.error('❌ Database opening error:', err);
     else {
         console.log('✅ Connected to SQLite database.');
-        db.run("PRAGMA journal_mode = WAL;");
+
+        // === SQLite Performance Optimizations ===
+        db.run("PRAGMA journal_mode = WAL;");           // Write-Ahead Logging - tăng tốc write
+        db.run("PRAGMA synchronous = NORMAL;");         // Cân bằng giữa tốc độ và an toàn (FULL quá chậm)
+        db.run("PRAGMA cache_size = -64000;");          // 64MB cache (mặc định chỉ 2MB)
+        db.run("PRAGMA temp_store = MEMORY;");          // Temp tables trong RAM
+        db.run("PRAGMA mmap_size = 268435456;");        // 256MB memory-mapped I/O
+        db.run("PRAGMA busy_timeout = 5000;");          // Đợi 5s nếu DB bị lock
+        console.log('⚡ SQLite optimizations applied.');
     }
 });
 
@@ -165,6 +173,14 @@ const initDatabase = () => {
 
         // Trigger migration check
         setTimeout(migrateOrderItems, 2000);
+
+        // === CREATE INDEXES for faster queries ===
+        db.run(`CREATE INDEX IF NOT EXISTS idx_orders_timestamp ON orders(timestamp)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_products_brand ON products(brand)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_products_category ON products(category)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_order_items_product_id ON order_items(product_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_import_notes_timestamp ON import_notes(timestamp)`);
     });
 };
 
