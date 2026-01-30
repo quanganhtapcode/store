@@ -79,7 +79,15 @@ const MobileButton = ({ onClick, disabled, children, position }) => {
     );
 };
 
-export default function OrdersTable({ data, totalOrders, pageIndex, pageSize, onPageChange, onOrderClick }) {
+export const OrdersTable = ({
+    data,
+    totalOrders,
+    totalRevenue,
+    pageIndex,
+    pageSize,
+    onPageChange,
+    onOrderClick,
+}) => {
     const paginationCount = Math.ceil(totalOrders / pageSize);
     const actualPage = pageIndex + 1;
 
@@ -128,8 +136,14 @@ export default function OrdersTable({ data, totalOrders, pageIndex, pageSize, on
 
     return (
         <div className="space-y-3">
+            {/* Summary Bar */}
+            <div className="bg-[#EBF5FF] px-4 py-3 rounded-xl flex justify-between items-center border border-[#D1E9FF]">
+                <span className="text-[#0071E3] font-bold text-[14px]">{totalOrders} đơn hàng</span>
+                <span className="text-[#0071E3] font-black text-[16px]">Tổng: {totalRevenue?.toLocaleString()}đ</span>
+            </div>
+
             {/* Order Cards List */}
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {data.map((o) => {
                     const items = Array.isArray(o.items) ? o.items : JSON.parse(o.items || '[]');
                     return (
@@ -225,4 +239,6 @@ export default function OrdersTable({ data, totalOrders, pageIndex, pageSize, on
             )}
         </div>
     );
-}
+};
+
+export default OrdersTable;

@@ -151,6 +151,7 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
     const [pageIndex, setPageIndex] = useState(0);
     const [pageSize] = useState(20);
     const [totalOrders, setTotalOrders] = useState(0);
+    const [totalOrdersRevenue, setTotalOrdersRevenue] = useState(0);
 
     // Import State
     const [importCart, setImportCart] = useState([]);
@@ -198,6 +199,7 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
             const data = await res.json();
             setOrders(data.data || []);
             setTotalOrders(data.pagination?.total || 0);
+            setTotalOrdersRevenue(data.pagination?.totalRevenue || 0);
             setPageIndex(page);
         } catch (e) {
             console.error('Fetch orders error:', e);
@@ -1216,6 +1218,7 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
                             <OrdersTable
                                 data={orders}
                                 totalOrders={totalOrders}
+                                totalRevenue={totalOrdersRevenue}
                                 pageIndex={pageIndex}
                                 pageSize={pageSize}
                                 onPageChange={(idx) => fetchOrders(idx)}

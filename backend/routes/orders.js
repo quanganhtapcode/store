@@ -12,7 +12,7 @@ router.get('/', async (req, res) => {
     const offsetNum = parseInt(offset) || 0;
 
     let baseQuery = "SELECT * FROM orders";
-    let countQuery = "SELECT COUNT(*) as total FROM orders";
+    let countQuery = "SELECT COUNT(*) as total, SUM(total) as totalRevenue FROM orders";
     let params = [];
     let whereClause = "";
 
@@ -27,6 +27,7 @@ router.get('/', async (req, res) => {
     try {
         const totalResult = await dbGet(countQuery + whereClause, params);
         const total = totalResult.total;
+        const totalRevenue = totalResult.totalRevenue || 0;
 
         const query = `${baseQuery}${whereClause} ORDER BY timestamp DESC LIMIT ? OFFSET ?`;
         const orders = await dbAll(query, [...params, limitNum, offsetNum]);
@@ -41,6 +42,7 @@ router.get('/', async (req, res) => {
             data: parsedOrders,
             pagination: {
                 total,
+                totalRevenue,
                 limit: limitNum,
                 offset: offsetNum,
                 hasMore: offsetNum + limitNum < total
