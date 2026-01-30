@@ -9,6 +9,7 @@ import { Html5Qrcode } from "html5-qrcode";
 import OrderModal from './OrderModal';
 import { LogOut, PieChart } from 'lucide-react';
 import AnalyticsComponents from './AnalyticsComponents';
+import OrdersTable from './OrdersTable';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 const IMAGE_BASE_URL = API_URL.replace('/api', '');
@@ -137,6 +138,11 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
     const [stats, setStats] = useState({ todayRevenue: 0, todayOrders: 0, monthRevenue: 0, topProducts: [], productsMonthly: [] });
     const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
 
+    // Orders Pagination state
+    const [pageIndex, setPageIndex] = useState(0);
+    const [pageSize] = useState(20);
+    const [totalOrders, setTotalOrders] = useState(0);
+
     // Import State
     const [importCart, setImportCart] = useState([]);
     const [importSearch, setImportSearch] = useState('');
@@ -168,13 +174,21 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
     };
 
     // Fetchers
-    const fetchOrders = useCallback(async () => {
-        let url = `${API_URL}/orders?limit=100`; // Load more for admin
+    const fetchOrders = useCallback(async (page = 0) => {
+        const offset = page * pageSize;
+        let url = `${API_URL}/orders?limit=${pageSize}&offset=${offset}`; // Use pagination
         if (dateFilter.start && dateFilter.end) url += `&startDate=${dateFilter.start}&endDate=${dateFilter.end}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        setOrders(data.data || data); // Handle both formats format
-    }, [dateFilter]);
+
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            setOrders(data.data || []);
+            setTotalOrders(data.pagination?.total || 0);
+            setPageIndex(page);
+        } catch (e) {
+            console.error('Fetch orders error:', e);
+        }
+    }, [dateFilter, pageSize]);
 
     const fetchLogs = useCallback(async () => {
         const res = await fetch(`${API_URL}/logs`);
@@ -204,7 +218,7 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
     };
 
     useEffect(() => {
-        if (activeTab === 'orders') fetchOrders();
+        if (activeTab === 'orders') fetchOrders(0);
         if (activeTab === 'logs') fetchLogs();
         if (activeTab === 'dashboard') fetchStats();
     }, [activeTab, fetchOrders, fetchLogs, fetchStats]);
@@ -1178,80 +1192,14 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
                             </div>
 
                             {/* Filtered Orders List */}
-                            {(() => {
-                                const filteredOrders = orders.filter(o => {
-                                    if (!dateFilter.start && !dateFilter.end) return true;
-                                    const orderDate = new Date(o.timestamp);
-                                    if (dateFilter.start) {
-                                        const startDate = new Date(dateFilter.start);
-                                        startDate.setHours(0, 0, 0, 0);
-                                        if (orderDate < startDate) return false;
-                                    }
-                                    if (dateFilter.end) {
-                                        const endDate = new Date(dateFilter.end);
-                                        endDate.setHours(23, 59, 59, 999);
-                                        if (orderDate > endDate) return false;
-                                    }
-                                    return true;
-                                });
-
-                                const totalFiltered = filteredOrders.reduce((sum, o) => sum + (o.total || 0), 0);
-
-                                return (
-                                    <>
-                                        {/* Summary */}
-                                        <div className="bg-[#0071E3]/10 p-3 rounded-xl flex justify-between items-center">
-                                            <span className="text-[12px] text-[#0071E3] font-bold">
-                                                {filteredOrders.length} đơn hàng
-                                            </span>
-                                            <span className="text-[14px] text-[#0071E3] font-black">
-                                                Tổng: {totalFiltered.toLocaleString()}đ
-                                            </span>
-                                        </div>
-
-                                        {/* Orders */}
-                                        {filteredOrders.map(o => {
-                                            const items = typeof o.items === 'string' ? JSON.parse(o.items) : o.items;
-                                            return (
-                                                <div key={o.id} onClick={() => setEditingOrder(o)} className="bg-white p-4 rounded-2xl shadow-sm border border-[#F5F5F7] active:scale-[0.98] transition-all cursor-pointer">
-                                                    <div className="flex justify-between items-start mb-2">
-                                                        <div>
-                                                            <p className="font-bold text-[14px] text-[#1D1D1F] flex items-center gap-2 flex-wrap">
-                                                                {o.order_code || `#${o.id}`}
-                                                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${o.status === 'completed' ? 'bg-green-100 text-green-700' : o.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-[#E8E8ED] text-[#1D1D1F]'}`}>
-                                                                    {o.status || 'completed'}
-                                                                </span>
-                                                                <span className="text-[10px] bg-[#E8E8ED] px-1.5 py-0.5 rounded">{o.payment_method || 'cash'}</span>
-                                                            </p>
-                                                            <p className="text-[12px] text-[#86868B] mt-0.5">{new Date(o.timestamp).toLocaleString()}</p>
-                                                            {o.customer_name && o.customer_name !== 'Khách lẻ' && (
-                                                                <p className="text-[12px] text-[#1D1D1F] font-medium mt-1">👤 {o.customer_name}</p>
-                                                            )}
-                                                        </div>
-                                                        <span className="font-black text-[#0071E3] text-[16px]">{o.total?.toLocaleString()}đ</span>
-                                                    </div>
-                                                    <div className="text-[11px] text-[#86868B] border-t border-[#F5F5F7] pt-2 mt-2">
-                                                        {items?.slice(0, 3).map((item, idx) => (
-                                                            <span key={idx} className="inline-block bg-[#F5F5F7] px-2 py-0.5 rounded mr-1 mb-1">
-                                                                {item.displayName || item.name} x{item.quantity}
-                                                            </span>
-                                                        ))}
-                                                        {items?.length > 3 && <span className="text-[#0071E3]">+{items.length - 3} khác</span>}
-                                                    </div>
-                                                    {o.note && <p className="text-[11px] text-[#86868B] mt-2 italic">📝 {o.note}</p>}
-                                                </div>
-                                            );
-                                        })}
-
-                                        {filteredOrders.length === 0 && (
-                                            <div className="text-center py-12 text-[#86868B]">
-                                                <p className="text-4xl mb-2">📦</p>
-                                                <p className="font-medium">Không có đơn hàng trong khoảng thời gian này</p>
-                                            </div>
-                                        )}
-                                    </>
-                                );
-                            })()}
+                            <OrdersTable
+                                data={orders}
+                                totalOrders={totalOrders}
+                                pageIndex={pageIndex}
+                                pageSize={pageSize}
+                                onPageChange={(idx) => fetchOrders(idx)}
+                                onOrderClick={(o) => setEditingOrder(o)}
+                            />
                         </div>
                     )}
                     {activeTab === 'logs' && (
