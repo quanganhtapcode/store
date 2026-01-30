@@ -7,7 +7,8 @@ import {
 } from 'lucide-react';
 import { Html5Qrcode } from "html5-qrcode";
 import OrderModal from './OrderModal';
-import { LogOut } from 'lucide-react';
+import { LogOut, PieChart } from 'lucide-react';
+import AnalyticsComponents from './AnalyticsComponents';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 const IMAGE_BASE_URL = API_URL.replace('/api', '');
@@ -1036,6 +1037,7 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
                 <div className="flex bg-[#F5F5F7] p-1 rounded-2xl overflow-x-auto scrollbar-hide">
                     {[
                         { id: 'dashboard', l: 'Tổng quan', i: BarChart3 },
+                        { id: 'analytics', l: 'Phân tích', i: PieChart },
                         { id: 'products', l: 'Sản phẩm', i: Package },
                         { id: 'import', l: 'Nhập hàng', i: Truck },
                         { id: 'orders', l: 'Đơn hàng', i: Receipt },
@@ -1098,6 +1100,7 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
                 <div className="max-w-4xl mx-auto">
                     {/* Tabs - conditional render with lazy loading images */}
                     {activeTab === 'dashboard' && <DashboardTab />}
+                    {activeTab === 'analytics' && <AnalyticsComponents authToken={authToken} />}
                     {activeTab === 'products' && <ProductsTab />}
                     {activeTab === 'import' && <ImportTab />}
 

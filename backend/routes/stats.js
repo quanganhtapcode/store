@@ -71,4 +71,128 @@ router.get('/monthly-products', async (req, res) => {
     }
 });
 
+// GET DETAILED ANALYTICS (Payment methods, Day of week, Time of day)
+router.get('/detailed', async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+        let whereClause = "";
+        let params = [];
+
+        if (startDate && endDate) {
+            whereClause = "WHERE timestamp >= ? AND timestamp <= ?";
+            params = [Number(startDate), Number(endDate)];
+        }
+
+        // Payment Methods
+        const paymentData = await dbAll(`
+            SELECT payment_method, COUNT(*) as count, SUM(total) as total
+            FROM orders
+            ${whereClause}
+            GROUP BY payment_method
+        `, params);
+
+        // Day of Week (0=Sunday, 1=Monday, ..., 6=Saturday)
+        const dayOfWeekData = await dbAll(`
+            SELECT CAST(strftime('%w', timestamp / 1000, 'unixepoch') AS INTEGER) as day, COUNT(*) as count, SUM(total) as total
+            FROM orders
+            ${whereClause}
+            GROUP BY day
+            ORDER BY day
+        `, params);
+
+        // Hour of Day (Fixed with 'localtime')
+        const hourData = await dbAll(`
+            SELECT CAST(strftime('%H', timestamp / 1000, 'unixepoch', 'localtime') AS INTEGER) as hour, COUNT(*) as count, SUM(total) as total
+            FROM orders
+            ${whereClause}
+            GROUP BY hour
+            ORDER BY hour
+        `, params);
+
+        // Top Products by Revenue
+        const topProductsData = await dbAll(`
+            SELECT p.name, SUM(oi.quantity) as sold, SUM(oi.price * oi.quantity) as revenue
+            FROM order_items oi
+            JOIN orders o ON oi.order_id = o.id
+            JOIN products p ON oi.product_id = p.id
+            ${whereClause}
+            GROUP BY p.id
+            ORDER BY revenue DESC
+            LIMIT 5
+        `, params);
+
+        // Category Distribution
+        const categoryData = await dbAll(`
+            SELECT p.category, SUM(oi.price * oi.quantity) as revenue
+            FROM order_items oi
+            JOIN orders o ON oi.order_id = o.id
+            JOIN products p ON oi.product_id = p.id
+            ${whereClause}
+            GROUP BY p.category
+            ORDER BY revenue DESC
+        `, params);
+
+        // KPI Comparisons - Optimized for SQLite
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const yesterdayStart = todayStart - 86400000;
+        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+        const firstDayOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+
+        const kpiComparisons = await dbAll(`
+            SELECT 
+                IFNULL(SUM(CASE WHEN timestamp >= ? THEN total ELSE 0 END), 0) as todayRevenue,
+                COUNT(CASE WHEN timestamp >= ? THEN 1 END) as todayOrders,
+                IFNULL(SUM(CASE WHEN timestamp >= ? AND timestamp < ? THEN total ELSE 0 END), 0) as yesterdayRevenue,
+                COUNT(CASE WHEN timestamp >= ? AND timestamp < ? THEN 1 END) as yesterdayOrders,
+                IFNULL(SUM(CASE WHEN timestamp >= ? THEN total ELSE 0 END), 0) as monthRevenue,
+                IFNULL(SUM(CASE WHEN timestamp >= ? AND timestamp < ? THEN total ELSE 0 END), 0) as lastMonthRevenue
+            FROM orders
+            WHERE timestamp >= ?
+        `, [
+            todayStart, todayStart,
+            yesterdayStart, todayStart, yesterdayStart, todayStart,
+            firstDayOfMonth,
+            firstDayOfLastMonth, firstDayOfMonth,
+            firstDayOfLastMonth
+        ]);
+
+        // Daily Trend for Current Month
+        const currentMonthTrend = await dbAll(`
+            SELECT CAST(strftime('%d', timestamp / 1000, 'unixepoch', 'localtime') AS INTEGER) as day, SUM(total) as total
+            FROM orders
+            WHERE timestamp >= ?
+            GROUP BY day
+            ORDER BY day
+        `, [firstDayOfMonth]);
+
+        // Daily Trend for Last Month
+        const lastMonthTrend = await dbAll(`
+            SELECT CAST(strftime('%d', timestamp / 1000, 'unixepoch', 'localtime') AS INTEGER) as day, SUM(total) as total
+            FROM orders
+            WHERE timestamp >= ? AND timestamp < ?
+            GROUP BY day
+            ORDER BY day
+        `, [firstDayOfLastMonth, firstDayOfMonth]);
+
+        res.json({
+            paymentMethods: paymentData,
+            dayOfWeek: dayOfWeekData,
+            timeOfDay: hourData,
+            topProducts: topProductsData,
+            categories: categoryData,
+            dailyTrend: {
+                current: currentMonthTrend,
+                previous: lastMonthTrend
+            },
+            kpis: kpiComparisons[0] || {
+                todayRevenue: 0, todayOrders: 0, yesterdayRevenue: 0,
+                yesterdayOrders: 0, monthRevenue: 0, lastMonthRevenue: 0
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;
