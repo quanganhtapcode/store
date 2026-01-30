@@ -138,8 +138,10 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
     const [stats, setStats] = useState({ todayRevenue: 0, todayOrders: 0, monthRevenue: 0, topProducts: [], productsMonthly: [] });
 
     // Helper to get YYYY-MM-DD in Vietnam timezone
+    // Helper to get YYYY-MM-DD in Vietnam timezone (Bulletproof)
     const getVNDateStr = (date = new Date()) => {
-        return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(date);
+        // Use sv-SE as it's the only locale that consistently returns YYYY-MM-DD
+        return date.toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
     };
 
     // Initialize dateFilter with today's range in VN

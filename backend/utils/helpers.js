@@ -41,22 +41,40 @@ const generateId = (prefix) => {
     return `${prefix}-${result}`;
 };
 
-const getVietnamTime = (date = new Date()) => {
-    const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
-    return new Date(utc + (3600000 * 7));
+const getVNTodayStr = () => {
+    return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
 };
 
 const getDayRangeVI = (dateStr) => {
     if (!dateStr) return null;
-    return {
-        start: new Date(`${dateStr}T00:00:00+07:00`).getTime(),
-        end: new Date(`${dateStr}T23:59:59.999+07:00`).getTime()
-    };
+    // Input is YYYY-MM-DD
+    // Create direct date object with explicit VN offset
+    const start = new Date(`${dateStr}T00:00:00+07:00`).getTime();
+    const end = new Date(`${dateStr}T23:59:59.999+07:00`).getTime();
+
+    // Fallback if the above fails to parse correctly (returns NaN)
+    if (isNaN(start)) {
+        const parts = dateStr.split('-');
+        const y = parseInt(parts[0]);
+        const m = parseInt(parts[1]) - 1;
+        const d = parseInt(parts[2]);
+
+        // UTC Jan 30 00:00:00 is VN Jan 30 07:00:00
+        const utcMidnight = Date.UTC(y, m, d, 0, 0, 0);
+
+        // Start: VN 00:00:00 = UTC -7 hours
+        const vnStart = utcMidnight - (7 * 3600000);
+        // End: VN 23:59:59.999 = (VN Start + 24h - 1ms)
+        const vnEnd = vnStart + 86400000 - 1;
+
+        return { start: vnStart, end: vnEnd };
+    }
+
+    return { start, end };
 };
 
 const generateOrderCode = (index) => {
-    const vnDate = getVietnamTime();
-    const dateStr = vnDate.toISOString().slice(0, 10).replace(/-/g, '');
+    const dateStr = getVNTodayStr().replace(/-/g, '');
     const seq = String(index).padStart(4, '0');
     return `ORD-${dateStr}-${seq}`;
 };
@@ -67,6 +85,6 @@ module.exports = {
     validateImport,
     generateId,
     generateOrderCode,
-    getVietnamTime,
+    getVNTodayStr,
     getDayRangeVI
 };

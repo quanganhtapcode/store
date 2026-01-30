@@ -1,12 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const { db, dbAll } = require('../config/database');
-const { getVietnamTime, getDayRangeVI } = require('../utils/helpers');
+const { getVNTodayStr, getDayRangeVI } = require('../utils/helpers');
 
 // GET GENERAL STATS
 router.get('/', (req, res) => {
-    const vnNow = getVietnamTime();
-    const todayStr = vnNow.toISOString().slice(0, 10);
+    const todayStr = getVNTodayStr();
     const todayStart = getDayRangeVI(todayStr).start;
 
     // First day of current month in VN
@@ -138,17 +137,14 @@ router.get('/detailed', async (req, res) => {
         `, params);
 
         // KPI Comparisons - Vietnam Time Aware
-        const vnNow = getVietnamTime();
-        const todayStr = vnNow.toISOString().slice(0, 10);
+        const todayStr = getVNTodayStr();
         const todayStart = getDayRangeVI(todayStr).start;
         const yesterdayStart = todayStart - 86400000;
 
         const firstDayOfMonthStr = todayStr.slice(0, 8) + '01';
-        const firstDayOfMonth = getDayRangeVI(firstDayOfMonthStr).start;
+        const firstDayOfLastMonthStr = new Date(new Date(firstDayOfMonthStr).getTime() - 86400000).toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }).slice(0, 8) + '01';
 
-        // Calculate first day of last month
-        const lastMonthDate = new Date(firstDayOfMonth - 86400000);
-        const firstDayOfLastMonthStr = lastMonthDate.toISOString().slice(0, 8) + '01';
+        const firstDayOfMonth = getDayRangeVI(firstDayOfMonthStr).start;
         const firstDayOfLastMonth = getDayRangeVI(firstDayOfLastMonthStr).start;
 
         const kpiComparisons = await dbAll(`
