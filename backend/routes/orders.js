@@ -12,7 +12,7 @@ router.get('/', async (req, res) => {
     const offsetNum = parseInt(offset) || 0;
 
     let baseQuery = "SELECT * FROM orders";
-    let countQuery = "SELECT COUNT(*) as total, SUM(total) as totalRevenue FROM orders";
+    let countQuery = "SELECT COUNT(*) as total, IFNULL(SUM(total), 0) as totalRevenue FROM orders";
     let params = [];
     let whereClause = "";
 

@@ -183,6 +183,38 @@ router.get('/detailed', async (req, res) => {
             ORDER BY day
         `, [firstDayOfLastMonth, firstDayOfMonth]);
 
+        // MEDIAN SALES BY DAY OF WEEK
+        // 1. Get total revenue for every single day in history
+        const allDailyTotals = await dbAll(`
+            SELECT 
+                strftime('%w', timestamp / 1000, 'unixepoch', '+7 hours') as day_w,
+                strftime('%Y-%m-%d', timestamp / 1000, 'unixepoch', '+7 hours') as date,
+                SUM(total) as total
+            FROM orders
+            WHERE status = 'completed'
+            GROUP BY date
+        `);
+
+        // 2. Group these totals by day of week (0-6)
+        const groupedByDayW = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
+        allDailyTotals.forEach(row => {
+            groupedByDayW[row.day_w].push(row.total);
+        });
+
+        // 3. Helper to calculate median
+        const calculateMedian = (arr) => {
+            if (arr.length === 0) return 0;
+            const sorted = [...arr].sort((a, b) => a - b);
+            const mid = Math.floor(sorted.length / 2);
+            return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+        };
+
+        const medianByDayW = Object.keys(groupedByDayW).map(day => ({
+            day: parseInt(day),
+            median: calculateMedian(groupedByDayW[day]),
+            count: groupedByDayW[day].length
+        }));
+
         res.json({
             paymentMethods: paymentData,
             dayOfWeek: dayOfWeekData,
@@ -193,6 +225,7 @@ router.get('/detailed', async (req, res) => {
                 current: currentMonthTrend,
                 previous: lastMonthTrend
             },
+            medianDayOfWeek: medianByDayW,
             kpis: kpiComparisons[0] || {
                 todayRevenue: 0, todayOrders: 0, yesterdayRevenue: 0,
                 yesterdayOrders: 0, monthRevenue: 0, lastMonthRevenue: 0

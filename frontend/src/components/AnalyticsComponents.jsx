@@ -103,6 +103,7 @@ const AnalyticsComponents = ({ authToken }) => {
         topProducts: [],
         categories: [],
         dailyTrend: { current: [], previous: [] },
+        medianDayOfWeek: [],
         kpis: {}
     });
     const [loading, setLoading] = useState(true);
@@ -149,8 +150,8 @@ const AnalyticsComponents = ({ authToken }) => {
     const daysInMonth = 31;
     const fullDailyData = Array.from({ length: daysInMonth }, (_, i) => {
         const day = i + 1;
-        const currentMonthDayVal = data.dailyTrend.current.find(d => d.day === day)?.total || 0;
-        const previousMonthDayVal = data.dailyTrend.previous.find(d => d.day === day)?.total || 0;
+        const currentMonthDayVal = (data.dailyTrend.current || []).find(d => d.day === day)?.total || 0;
+        const previousMonthDayVal = (data.dailyTrend.previous || []).find(d => d.day === day)?.total || 0;
         const res = { date: `${monthStr} ${day < 10 ? '0' + day : day}`, 'Tháng trước': previousMonthDayVal };
         if (day <= currentDay) res['Tháng này'] = currentMonthDayVal;
         return res;
@@ -164,14 +165,14 @@ const AnalyticsComponents = ({ authToken }) => {
 
     // --- HOURLY TREND DATA ---
     const hourlyData = Array.from({ length: 24 }, (_, i) => {
-        const found = data.timeOfDay.find(d => d.hour === i);
+        const found = (data.timeOfDay || []).find(d => d.hour === i);
         return {
             hour: `${i}h:00`,
             'Doanh thu': found ? found.total : 0,
         };
     });
 
-    const peakHour = [...data.timeOfDay].sort((a, b) => b.total - a.total)[0]?.hour || 0;
+    const peakHour = [...(data.timeOfDay || [])].sort((a, b) => b.total - a.total)[0]?.hour || 0;
 
     const summary = [
         { name: 'Trung bình ngày', value: formatWithSuffix(Math.round(kpis.monthRevenue / (currentDay || 1))) + 'đ' },
@@ -183,6 +184,18 @@ const AnalyticsComponents = ({ authToken }) => {
     ];
 
     const totalRevenueAllTime = data.paymentMethods.reduce((a, b) => a + b.total, 0) || 1;
+
+    // MEDIAN SALES BY DAY OF WEEK mapping
+    const dayNames = ["Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
+    const medianChartData = (data.medianDayOfWeek || []).sort((a, b) => {
+        const valA = a.day === 0 ? 7 : a.day;
+        const valB = b.day === 0 ? 7 : b.day;
+        return valA - valB;
+    }).map(item => ({
+        name: dayNames[item.day],
+        'Doanh thu (Trung vị)': item.median,
+        'Số ngày dữ liệu': item.count
+    }));
 
     return (
         <div className="bg-[#F9FAFB] min-h-screen p-3 sm:p-6 lg:p-8 space-y-8 rounded-[2rem]">
@@ -286,45 +299,66 @@ const AnalyticsComponents = ({ authToken }) => {
                 </div>
             </Card>
 
-            {/* NEW HOURLY PERFORMANCE CHART */}
-            <Card className="bg-white border-none ring-1 ring-gray-200 shadow-sm rounded-2xl overflow-hidden p-6 sm:p-10">
-                <div className="flex justify-between items-start mb-10">
-                    <div>
-                        <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                            <Clock size={20} className="text-blue-500" /> Hoạt động theo giờ
-                        </h3>
-                        <p className="text-sm text-gray-500 mt-1">Phân bố doanh thu chi tiết trong ngày (Giờ địa phương)</p>
+            {/* HOURLY & WEEKLY ANALYTICS */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* HOURLY PERFORMANCE */}
+                <Card className="bg-white border-none ring-1 ring-gray-200 shadow-sm rounded-2xl overflow-hidden p-6 sm:p-10">
+                    <div className="flex justify-between items-start mb-6">
+                        <div>
+                            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                                <Clock size={20} className="text-blue-500" /> Hoạt động theo giờ
+                            </h3>
+                            <p className="text-sm text-gray-500 mt-1">Phân bố doanh thu chi tiết trong ngày</p>
+                        </div>
                     </div>
-                </div>
-                <BarChart
-                    data={hourlyData}
-                    index="hour"
-                    categories={['Doanh thu']}
-                    colors={['blue']}
-                    valueFormatter={valueFormatter}
-                    yAxisWidth={60}
-                    className="h-72 mt-6 hidden sm:block"
-                    showLegend={false}
-                    customTooltip={CustomTooltip}
-                />
-                <BarChart
-                    data={hourlyData}
-                    index="hour"
-                    categories={['Doanh thu']}
-                    colors={['blue']}
-                    valueFormatter={valueFormatter}
-                    className="h-64 mt-6 block sm:hidden"
-                    showYAxis={false}
-                    showLegend={false}
-                    customTooltip={CustomTooltip}
-                />
-                <div className="mt-8 p-4 bg-blue-50 border border-blue-100 rounded-xl">
-                    <p className="text-sm text-blue-800 font-medium flex items-center gap-2">
-                        <AlertCircle size={16} />
-                        Giờ vàng kinh doanh tập trung tại khung: <span className="font-bold underline text-blue-900">{peakHour}h:00 - {peakHour + 1}h:00</span>
-                    </p>
-                </div>
-            </Card>
+                    <BarChart
+                        data={hourlyData}
+                        index="hour"
+                        categories={['Doanh thu']}
+                        colors={['blue']}
+                        valueFormatter={valueFormatter}
+                        yAxisWidth={60}
+                        className="h-72 mt-6"
+                        showLegend={false}
+                        customTooltip={CustomTooltip}
+                    />
+                    <div className="mt-8 p-4 bg-blue-50 border border-blue-100 rounded-xl">
+                        <p className="text-sm text-blue-800 font-medium flex items-center gap-2">
+                            <AlertCircle size={16} />
+                            Giờ vàng kinh doanh khung: <span className="font-bold underline text-blue-900">{peakHour}h:00</span>
+                        </p>
+                    </div>
+                </Card>
+
+                {/* MEDIAN SALES BY DAY OF WEEK */}
+                <Card className="bg-white border-none ring-1 ring-gray-200 shadow-sm rounded-2xl overflow-hidden p-6 sm:p-10">
+                    <div className="flex justify-between items-start mb-6">
+                        <div>
+                            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                                <Calendar size={20} className="text-emerald-500" /> Phân tích theo thứ (Median)
+                            </h3>
+                            <p className="text-sm text-gray-500 mt-1">Doanh thu trung vị của từng thứ hàng tuần</p>
+                        </div>
+                    </div>
+                    <BarChart
+                        data={medianChartData}
+                        index="name"
+                        categories={['Doanh thu (Trung vị)']}
+                        colors={['emerald']}
+                        valueFormatter={valueFormatter}
+                        yAxisWidth={60}
+                        className="h-72 mt-6"
+                        showLegend={false}
+                        customTooltip={CustomTooltip}
+                    />
+                    <div className="mt-8 p-4 bg-emerald-50 border border-emerald-100 rounded-xl">
+                        <p className="text-sm text-emerald-800 font-medium flex items-center gap-2">
+                            <TrendingUp size={16} />
+                            Ngày bán chạy ổn định nhất: <span className="font-bold underline text-emerald-900">{[...medianChartData].sort((a, b) => b['Doanh thu (Trung vị)'] - a['Doanh thu (Trung vị)'])[0]?.name || '...'}</span>
+                        </p>
+                    </div>
+                </Card>
+            </div>
 
             {/* Bottom Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pb-10">
