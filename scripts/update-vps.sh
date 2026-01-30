@@ -11,7 +11,8 @@ set -e
 # Configuration
 VPS_IP="203.55.176.10"
 VPS_USER="root"
-KEY_PATH="/tmp/key.pem"
+# Path to your key (update this if needed on other machines)
+KEY_PATH="$HOME/Desktop/key.pem"
 REMOTE_PATH="/var/www/store/api"
 
 echo ""
@@ -25,8 +26,14 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Sync backend files
 echo "📤 Uploading backend files..."
+# Root server files
 scp -i "$KEY_PATH" "$PROJECT_DIR/backend/server.cjs" "$VPS_USER@$VPS_IP:$REMOTE_PATH/"
 scp -i "$KEY_PATH" "$PROJECT_DIR/backend/package.json" "$VPS_USER@$VPS_IP:$REMOTE_PATH/"
+
+# Sync routes directory
+ssh -i "$KEY_PATH" "$VPS_USER@$VPS_IP" "mkdir -p $REMOTE_PATH/routes"
+scp -i "$KEY_PATH" "$PROJECT_DIR/backend/routes/"*.js "$VPS_USER@$VPS_IP:$REMOTE_PATH/routes/"
+
 echo "   ✅ Files uploaded"
 
 # Restart server
