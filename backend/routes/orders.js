@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { db, dbRun, dbGet, dbAll, logActivity } = require('../config/database');
 const { verifyToken } = require('../middleware/auth');
-const { validateOrder, generateOrderCode } = require('../utils/helpers');
+const { validateOrder, generateOrderCode, getDayRangeVI } = require('../utils/helpers');
 
 // GET ORDERS (Pagination + Filtering)
 router.get('/', async (req, res) => {
@@ -16,9 +16,12 @@ router.get('/', async (req, res) => {
     let params = [];
     let whereClause = "";
 
-    if (startDate && endDate) {
+    if (startDate) {
+        const rangeStart = getDayRangeVI(startDate);
+        const rangeEnd = getDayRangeVI(endDate || startDate);
+
         whereClause = " WHERE timestamp >= ? AND timestamp <= ?";
-        params = [new Date(startDate).getTime(), new Date(endDate).getTime()];
+        params = [rangeStart.start, rangeEnd.end];
     }
 
     try {

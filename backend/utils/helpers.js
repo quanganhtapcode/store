@@ -41,10 +41,24 @@ const generateId = (prefix) => {
     return `${prefix}-${result}`;
 };
 
+const getVietnamTime = (date = new Date()) => {
+    const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
+    return new Date(utc + (3600000 * 7));
+};
+
+const getDayRangeVI = (dateStr) => {
+    if (!dateStr) return null;
+    return {
+        start: new Date(`${dateStr}T00:00:00+07:00`).getTime(),
+        end: new Date(`${dateStr}T23:59:59.999+07:00`).getTime()
+    };
+};
+
 const generateOrderCode = (index) => {
-    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const vnDate = getVietnamTime();
+    const dateStr = vnDate.toISOString().slice(0, 10).replace(/-/g, '');
     const seq = String(index).padStart(4, '0');
-    return `ORD-${date}-${seq}`;
+    return `ORD-${dateStr}-${seq}`;
 };
 
 module.exports = {
@@ -52,5 +66,7 @@ module.exports = {
     validateOrder,
     validateImport,
     generateId,
-    generateOrderCode
+    generateOrderCode,
+    getVietnamTime,
+    getDayRangeVI
 };

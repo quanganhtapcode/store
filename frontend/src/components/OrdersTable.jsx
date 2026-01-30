@@ -84,53 +84,46 @@ export default function OrdersTable({ data, totalOrders, pageIndex, pageSize, on
     const actualPage = pageIndex + 1;
 
     const renderPageNumbers = () => {
-        const pages = [];
-
-        // Always show first page
-        pages.push(
-            <NumberButton key={0} onClick={() => onPageChange(0)} active={pageIndex === 0}>
-                1
-            </NumberButton>
-        );
-
-        if (paginationCount <= 1) return pages;
+        if (paginationCount <= 1) return null;
 
         if (actualPage > 4) {
-            pages.push(<span key="dots-1" className="px-2 self-center text-gray-400">...</span>);
-        }
-
-        // Dynamic pages around current
-        let start = Math.max(1, pageIndex - 1);
-        let end = Math.min(paginationCount - 2, pageIndex + 1);
-
-        // Adjust if near start or end
-        if (pageIndex <= 2) end = Math.min(paginationCount - 2, 4);
-        if (pageIndex >= paginationCount - 3) start = Math.max(1, paginationCount - 5);
-
-        for (let i = start; i <= end; i++) {
-            if (i > 0 && i < paginationCount - 1) {
-                pages.push(
-                    <NumberButton key={i} onClick={() => onPageChange(i)} active={pageIndex === i}>
-                        {i + 1}
-                    </NumberButton>
+            if (actualPage < paginationCount - 2) {
+                return (
+                    <>
+                        <NumberButton onClick={() => onPageChange(0)} active={actualPage === 1}>1</NumberButton>
+                        <NumberButton onClick={() => onPageChange(actualPage - 5)} active={false}>...</NumberButton>
+                        <NumberButton onClick={() => onPageChange(actualPage - 2)} active={false}>{actualPage - 1}</NumberButton>
+                        <NumberButton onClick={() => onPageChange(actualPage - 1)} active={true}>{actualPage}</NumberButton>
+                        <NumberButton onClick={() => onPageChange(actualPage)} active={false}>{actualPage + 1}</NumberButton>
+                        <NumberButton onClick={() => onPageChange(actualPage + 1)} active={false}>...</NumberButton>
+                        <NumberButton onClick={() => onPageChange(paginationCount - 1)} active={actualPage === paginationCount}>{paginationCount}</NumberButton>
+                    </>
+                );
+            } else {
+                return (
+                    <>
+                        <NumberButton onClick={() => onPageChange(0)} active={actualPage === 1}>1</NumberButton>
+                        <NumberButton onClick={() => onPageChange(1)} active={false}>2</NumberButton>
+                        <NumberButton onClick={() => onPageChange(paginationCount - 5)} active={false}>...</NumberButton>
+                        <NumberButton onClick={() => onPageChange(paginationCount - 4)} active={actualPage === paginationCount - 3}>{paginationCount - 3}</NumberButton>
+                        <NumberButton onClick={() => onPageChange(paginationCount - 3)} active={actualPage === paginationCount - 2}>{paginationCount - 2}</NumberButton>
+                        <NumberButton onClick={() => onPageChange(paginationCount - 2)} active={actualPage === paginationCount - 1}>{paginationCount - 1}</NumberButton>
+                        <NumberButton onClick={() => onPageChange(paginationCount - 1)} active={actualPage === paginationCount}>{paginationCount}</NumberButton>
+                    </>
                 );
             }
-        }
-
-        if (actualPage < paginationCount - 3) {
-            pages.push(<span key="dots-2" className="px-2 self-center text-gray-400">...</span>);
-        }
-
-        // Always show last page
-        if (paginationCount > 1) {
-            pages.push(
-                <NumberButton key={paginationCount - 1} onClick={() => onPageChange(paginationCount - 1)} active={pageIndex === paginationCount - 1}>
-                    {paginationCount}
-                </NumberButton>
+        } else {
+            return (
+                <>
+                    <NumberButton onClick={() => onPageChange(0)} active={actualPage === 1}>1</NumberButton>
+                    {paginationCount > 1 && <NumberButton onClick={() => onPageChange(1)} active={actualPage === 2}>2</NumberButton>}
+                    {paginationCount > 2 && <NumberButton onClick={() => onPageChange(2)} active={actualPage === 3}>3</NumberButton>}
+                    {paginationCount > 3 && <NumberButton onClick={() => onPageChange(3)} active={actualPage === 4}>4</NumberButton>}
+                    {paginationCount > 5 && <NumberButton onClick={() => onPageChange(4)} active={false}>...</NumberButton>}
+                    {paginationCount > 4 && <NumberButton onClick={() => onPageChange(paginationCount - 1)} active={actualPage === paginationCount}>{paginationCount}</NumberButton>}
+                </>
             );
         }
-
-        return pages;
     };
 
     return (

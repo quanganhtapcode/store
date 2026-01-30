@@ -136,7 +136,14 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
     const [orders, setOrders] = useState([]);
     const [logs, setLogs] = useState([]);
     const [stats, setStats] = useState({ todayRevenue: 0, todayOrders: 0, monthRevenue: 0, topProducts: [], productsMonthly: [] });
-    const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
+
+    // Helper to get YYYY-MM-DD in Vietnam timezone
+    const getVNDateStr = (date = new Date()) => {
+        return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(date);
+    };
+
+    // Initialize dateFilter with today's range in VN
+    const [dateFilter, setDateFilter] = useState({ start: getVNDateStr(), end: getVNDateStr() });
 
     // Orders Pagination state
     const [pageIndex, setPageIndex] = useState(0);
@@ -177,7 +184,12 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
     const fetchOrders = useCallback(async (page = 0) => {
         const offset = page * pageSize;
         let url = `${API_URL}/orders?limit=${pageSize}&offset=${offset}`; // Use pagination
-        if (dateFilter.start && dateFilter.end) url += `&startDate=${dateFilter.start}&endDate=${dateFilter.end}`;
+
+        if (dateFilter.start) {
+            url += `&startDate=${dateFilter.start}`;
+            // If end is missing, use start date as end too
+            url += `&endDate=${dateFilter.end || dateFilter.start}`;
+        }
 
         try {
             const res = await fetch(url);
@@ -1126,11 +1138,10 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
                                 <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                                     <button
                                         onClick={() => {
-                                            const today = new Date();
-                                            today.setHours(0, 0, 0, 0);
-                                            setDateFilter({ start: today.toISOString().split('T')[0], end: '' });
+                                            const todayStr = getVNDateStr();
+                                            setDateFilter({ start: todayStr, end: todayStr });
                                         }}
-                                        className={`px-3 py-1.5 rounded-lg text-[12px] font-bold flex-shrink-0 transition-all ${dateFilter.start === new Date().toISOString().split('T')[0] && !dateFilter.end
+                                        className={`px-3 py-1.5 rounded-lg text-[12px] font-bold flex-shrink-0 transition-all ${dateFilter.start === getVNDateStr() && dateFilter.end === dateFilter.start
                                             ? 'bg-[#0071E3] text-white'
                                             : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E8E8ED]'
                                             }`}
@@ -1139,9 +1150,13 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
                                     </button>
                                     <button
                                         onClick={() => {
-                                            const d = new Date();
-                                            d.setDate(d.getDate() - 7);
-                                            setDateFilter({ start: d.toISOString().split('T')[0], end: '' });
+                                            const end = new Date();
+                                            const start = new Date();
+                                            start.setDate(start.getDate() - 7);
+                                            setDateFilter({
+                                                start: getVNDateStr(start),
+                                                end: getVNDateStr(end)
+                                            });
                                         }}
                                         className="px-3 py-1.5 rounded-lg text-[12px] font-bold flex-shrink-0 bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E8E8ED] transition-all"
                                     >
@@ -1149,9 +1164,13 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
                                     </button>
                                     <button
                                         onClick={() => {
-                                            const d = new Date();
-                                            d.setDate(1);
-                                            setDateFilter({ start: d.toISOString().split('T')[0], end: '' });
+                                            const end = new Date();
+                                            const start = new Date();
+                                            start.setDate(1);
+                                            setDateFilter({
+                                                start: getVNDateStr(start),
+                                                end: getVNDateStr(end)
+                                            });
                                         }}
                                         className="px-3 py-1.5 rounded-lg text-[12px] font-bold flex-shrink-0 bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E8E8ED] transition-all"
                                     >

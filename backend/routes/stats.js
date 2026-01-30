@@ -1,18 +1,23 @@
 const express = require('express');
 const router = express.Router();
 const { db, dbAll } = require('../config/database');
+const { getVietnamTime, getDayRangeVI } = require('../utils/helpers');
 
 // GET GENERAL STATS
 router.get('/', (req, res) => {
-    // Realtime Stats (No Cache)
-    const today = new Date().setHours(0, 0, 0, 0);
-    const firstDayOfMonth = new Date(new Date().setDate(1)).setHours(0, 0, 0, 0);
+    const vnNow = getVietnamTime();
+    const todayStr = vnNow.toISOString().slice(0, 10);
+    const todayStart = getDayRangeVI(todayStr).start;
+
+    // First day of current month in VN
+    const firstDayOfMonthStr = todayStr.slice(0, 8) + '01';
+    const firstDayOfMonth = getDayRangeVI(firstDayOfMonthStr).start;
 
     db.serialize(() => {
         const result = {};
 
         // 1. Today Revenue
-        db.all("SELECT total FROM orders WHERE timestamp >= ?", [today], (e, r) => {
+        db.all("SELECT total FROM orders WHERE timestamp >= ?", [todayStart], (e, r) => {
             if (e) return res.status(500).json({ error: e.message });
             result.todayRevenue = r.reduce((ack, x) => ack + x.total, 0);
             result.todayOrders = r.length;
@@ -93,16 +98,16 @@ router.get('/detailed', async (req, res) => {
 
         // Day of Week (0=Sunday, 1=Monday, ..., 6=Saturday)
         const dayOfWeekData = await dbAll(`
-            SELECT CAST(strftime('%w', timestamp / 1000, 'unixepoch') AS INTEGER) as day, COUNT(*) as count, SUM(total) as total
+            SELECT CAST(strftime('%w', timestamp / 1000, 'unixepoch', '+7 hours') AS INTEGER) as day, COUNT(*) as count, SUM(total) as total
             FROM orders
             ${whereClause}
             GROUP BY day
             ORDER BY day
         `, params);
 
-        // Hour of Day (Fixed with 'localtime')
+        // Hour of Day (Fixed with '+7 hours')
         const hourData = await dbAll(`
-            SELECT CAST(strftime('%H', timestamp / 1000, 'unixepoch', 'localtime') AS INTEGER) as hour, COUNT(*) as count, SUM(total) as total
+            SELECT CAST(strftime('%H', timestamp / 1000, 'unixepoch', '+7 hours') AS INTEGER) as hour, COUNT(*) as count, SUM(total) as total
             FROM orders
             ${whereClause}
             GROUP BY hour
@@ -132,12 +137,19 @@ router.get('/detailed', async (req, res) => {
             ORDER BY revenue DESC
         `, params);
 
-        // KPI Comparisons - Optimized for SQLite
-        const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        // KPI Comparisons - Vietnam Time Aware
+        const vnNow = getVietnamTime();
+        const todayStr = vnNow.toISOString().slice(0, 10);
+        const todayStart = getDayRangeVI(todayStr).start;
         const yesterdayStart = todayStart - 86400000;
-        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-        const firstDayOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+
+        const firstDayOfMonthStr = todayStr.slice(0, 8) + '01';
+        const firstDayOfMonth = getDayRangeVI(firstDayOfMonthStr).start;
+
+        // Calculate first day of last month
+        const lastMonthDate = new Date(firstDayOfMonth - 86400000);
+        const firstDayOfLastMonthStr = lastMonthDate.toISOString().slice(0, 8) + '01';
+        const firstDayOfLastMonth = getDayRangeVI(firstDayOfLastMonthStr).start;
 
         const kpiComparisons = await dbAll(`
             SELECT 
@@ -159,7 +171,7 @@ router.get('/detailed', async (req, res) => {
 
         // Daily Trend for Current Month
         const currentMonthTrend = await dbAll(`
-            SELECT CAST(strftime('%d', timestamp / 1000, 'unixepoch', 'localtime') AS INTEGER) as day, SUM(total) as total
+            SELECT CAST(strftime('%d', timestamp / 1000, 'unixepoch', '+7 hours') AS INTEGER) as day, SUM(total) as total
             FROM orders
             WHERE timestamp >= ?
             GROUP BY day
@@ -168,7 +180,7 @@ router.get('/detailed', async (req, res) => {
 
         // Daily Trend for Last Month
         const lastMonthTrend = await dbAll(`
-            SELECT CAST(strftime('%d', timestamp / 1000, 'unixepoch', 'localtime') AS INTEGER) as day, SUM(total) as total
+            SELECT CAST(strftime('%d', timestamp / 1000, 'unixepoch', '+7 hours') AS INTEGER) as day, SUM(total) as total
             FROM orders
             WHERE timestamp >= ? AND timestamp < ?
             GROUP BY day
