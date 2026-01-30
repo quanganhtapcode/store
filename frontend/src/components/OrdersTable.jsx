@@ -80,88 +80,7 @@ const MobileButton = ({ onClick, disabled, children, position }) => {
 };
 
 export default function OrdersTable({ data, totalOrders, pageIndex, pageSize, onPageChange, onOrderClick }) {
-
-    const columns = useMemo(() => [
-        {
-            header: 'Mã đơn',
-            accessorKey: 'order_code',
-            cell: ({ row }) => (
-                <span className="font-bold text-[#1D1D1F]">
-                    {row.original.order_code || `#${row.original.id}`}
-                </span>
-            ),
-        },
-        {
-            header: 'Ngày giờ',
-            accessorKey: 'timestamp',
-            cell: ({ getValue }) => (
-                <span className="text-[12px] text-[#86868B]">
-                    {new Date(getValue()).toLocaleString('vi-VN')}
-                </span>
-            ),
-        },
-        {
-            header: 'Khách hàng',
-            accessorKey: 'customer_name',
-            cell: ({ getValue }) => (
-                <span className="text-[13px] font-medium">
-                    {getValue() || 'Khách lẻ'}
-                </span>
-            ),
-        },
-        {
-            header: 'Thanh toán',
-            accessorKey: 'payment_method',
-            cell: ({ getValue }) => (
-                <Badge color={getValue() === 'transfer' ? 'blue' : 'slate'} size="xs" className="uppercase font-bold">
-                    {getValue() === 'transfer' ? 'CK' : 'TM'}
-                </Badge>
-            ),
-        },
-        {
-            header: 'Sản phẩm',
-            accessorKey: 'items',
-            cell: ({ getValue }) => {
-                const items = getValue();
-                return (
-                    <div className="flex flex-wrap gap-1 max-w-[200px]">
-                        {items?.slice(0, 2).map((item, idx) => (
-                            <span key={idx} className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 whitespace-nowrap">
-                                {item.displayName || item.name} x{item.quantity}
-                            </span>
-                        ))}
-                        {items?.length > 2 && <span className="text-[10px] text-blue-500">+{items.length - 2}</span>}
-                    </div>
-                );
-            }
-        },
-        {
-            header: 'Tổng tiền',
-            accessorKey: 'total',
-            meta: { align: 'text-right' },
-            cell: ({ getValue }) => (
-                <span className="font-black text-[#0071E3] text-right block">
-                    {getValue()?.toLocaleString()}đ
-                </span>
-            ),
-        },
-    ], []);
-
-    const table = useReactTable({
-        data,
-        columns,
-        pageCount: Math.ceil(totalOrders / pageSize),
-        state: {
-            pagination: {
-                pageIndex,
-                pageSize,
-            },
-        },
-        manualPagination: true,
-        getCoreRowModel: getCoreRowModel(),
-    });
-
-    const paginationCount = table.getPageCount();
+    const paginationCount = Math.ceil(totalOrders / pageSize);
     const actualPage = pageIndex + 1;
 
     const renderPageNumbers = () => {
@@ -177,26 +96,32 @@ export default function OrdersTable({ data, totalOrders, pageIndex, pageSize, on
         if (paginationCount <= 1) return pages;
 
         if (actualPage > 4) {
-            pages.push(<span key="dots-1" className="px-2 self-center">...</span>);
+            pages.push(<span key="dots-1" className="px-2 self-center text-gray-400">...</span>);
         }
 
         // Dynamic pages around current
-        const start = Math.max(1, pageIndex - 1);
-        const end = Math.min(paginationCount - 2, pageIndex + 1);
+        let start = Math.max(1, pageIndex - 1);
+        let end = Math.min(paginationCount - 2, pageIndex + 1);
+
+        // Adjust if near start or end
+        if (pageIndex <= 2) end = Math.min(paginationCount - 2, 4);
+        if (pageIndex >= paginationCount - 3) start = Math.max(1, paginationCount - 5);
 
         for (let i = start; i <= end; i++) {
-            pages.push(
-                <NumberButton key={i} onClick={() => onPageChange(i)} active={pageIndex === i}>
-                    {i + 1}
-                </NumberButton>
-            );
+            if (i > 0 && i < paginationCount - 1) {
+                pages.push(
+                    <NumberButton key={i} onClick={() => onPageChange(i)} active={pageIndex === i}>
+                        {i + 1}
+                    </NumberButton>
+                );
+            }
         }
 
         if (actualPage < paginationCount - 3) {
-            pages.push(<span key="dots-2" className="px-2 self-center">...</span>);
+            pages.push(<span key="dots-2" className="px-2 self-center text-gray-400">...</span>);
         }
 
-        // Always show last page if it's not the first
+        // Always show last page
         if (paginationCount > 1) {
             pages.push(
                 <NumberButton key={paginationCount - 1} onClick={() => onPageChange(paginationCount - 1)} active={pageIndex === paginationCount - 1}>
@@ -209,88 +134,102 @@ export default function OrdersTable({ data, totalOrders, pageIndex, pageSize, on
     };
 
     return (
-        <div className="bg-white rounded-2xl border border-[#F5F5F7] shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-                <Table>
-                    <TableHead>
-                        {table.getHeaderGroups().map((headerGroup) => (
-                            <TableRow
-                                key={headerGroup.id}
-                                className="bg-[#F9F9FA]"
-                            >
-                                {headerGroup.headers.map((header) => (
-                                    <TableHeaderCell
-                                        key={header.id}
-                                        className={classNames(header.column.columnDef.meta?.align, "py-3 text-[11px] font-bold text-[#86868B] uppercase tracking-wider")}
-                                    >
-                                        {flexRender(
-                                            header.column.columnDef.header,
-                                            header.getContext(),
-                                        )}
-                                    </TableHeaderCell>
+        <div className="space-y-3">
+            {/* Order Cards List */}
+            <div className="space-y-3">
+                {data.map((o) => {
+                    const items = Array.isArray(o.items) ? o.items : JSON.parse(o.items || '[]');
+                    return (
+                        <div
+                            key={o.id}
+                            onClick={() => onOrderClick(o)}
+                            className="bg-white p-4 rounded-2xl shadow-sm border border-[#F5F5F7] active:scale-[0.98] transition-all cursor-pointer"
+                        >
+                            <div className="flex justify-between items-start mb-2">
+                                <div>
+                                    <p className="font-bold text-[14px] text-[#1D1D1F] flex items-center gap-2 flex-wrap">
+                                        {o.order_code || `#${o.id}`}
+                                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${o.status === 'completed' ? 'bg-green-100 text-green-700' : o.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-[#E8E8ED] text-[#1D1D1F]'}`}>
+                                            {o.status || 'completed'}
+                                        </span>
+                                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${o.payment_method === 'transfer' ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-600'}`}>
+                                            {o.payment_method === 'transfer' ? 'transfer' : 'cash'}
+                                        </span>
+                                    </p>
+                                    <p className="text-[12px] text-[#86868B] mt-0.5">{new Date(o.timestamp).toLocaleString()}</p>
+                                    {o.customer_name && o.customer_name !== 'Khách lẻ' && (
+                                        <p className="text-[12px] text-[#1D1D1F] font-medium mt-1">👤 {o.customer_name}</p>
+                                    )}
+                                </div>
+                                <span className="font-black text-[#0071E3] text-[18px]">{o.total?.toLocaleString()}đ</span>
+                            </div>
+                            <div className="text-[11px] text-[#86868B] border-t border-[#F5F5F7] pt-2 mt-2">
+                                {items?.slice(0, 4).map((item, idx) => (
+                                    <span key={idx} className="inline-block bg-[#F5F5F7] px-2 py-0.5 rounded mr-1 mb-1">
+                                        {item.displayName || item.name} x{item.quantity}
+                                    </span>
                                 ))}
-                            </TableRow>
-                        ))}
-                    </TableHead>
-                    <TableBody>
-                        {table.getRowModel().rows.map((row) => (
-                            <TableRow key={row.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => onOrderClick(row.original)}>
-                                {row.getVisibleCells().map((cell) => (
-                                    <TableCell
-                                        key={cell.id}
-                                        className={classNames(cell.column.columnDef.meta?.align, "py-4")}
-                                    >
-                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                    </TableCell>
-                                ))}
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
+                                {items?.length > 4 && <span className="text-[#0071E3] font-bold">+{items.length - 4} khác</span>}
+                            </div>
+                            {o.note && <p className="text-[11px] text-[#86868B] mt-2 italic">📝 {o.note}</p>}
+                        </div>
+                    );
+                })}
+
+                {data.length === 0 && (
+                    <div className="bg-white py-12 rounded-2xl border border-[#F5F5F7] text-center text-[#86868B]">
+                        <p className="text-4xl mb-2">📦</p>
+                        <p className="font-medium">Không có đơn hàng</p>
+                    </div>
+                )}
             </div>
 
             {/* Pagination Controls */}
-            <div className="p-4 border-t border-[#F5F5F7] flex items-center justify-between sm:justify-center">
-                {/* Desktop Pagination */}
-                <div className="hidden gap-1 sm:inline-flex">
-                    <TextButton
-                        onClick={() => onPageChange(pageIndex - 1)}
-                        disabled={pageIndex === 0}
-                    >
-                        <RiArrowLeftSLine className="size-5" aria-hidden={true} />
-                    </TextButton>
+            {paginationCount > 1 && (
+                <div className="mt-6 flex items-center justify-between sm:justify-center">
+                    {/* Desktop Pagination */}
+                    <div className="hidden gap-1 sm:inline-flex bg-white p-1.5 rounded-xl shadow-sm border border-[#F5F5F7]">
+                        <TextButton
+                            onClick={() => onPageChange(pageIndex - 1)}
+                            disabled={pageIndex === 0}
+                        >
+                            <RiArrowLeftSLine className="size-5" aria-hidden={true} />
+                        </TextButton>
 
-                    {renderPageNumbers()}
+                        {renderPageNumbers()}
 
-                    <TextButton
-                        onClick={() => onPageChange(pageIndex + 1)}
-                        disabled={pageIndex >= paginationCount - 1}
-                    >
-                        <RiArrowRightSLine className="size-5" aria-hidden={true} />
-                    </TextButton>
+                        <TextButton
+                            onClick={() => onPageChange(pageIndex + 1)}
+                            disabled={pageIndex >= paginationCount - 1}
+                        >
+                            <RiArrowRightSLine className="size-5" aria-hidden={true} />
+                        </TextButton>
+                    </div>
+
+                    {/* Mobile Pagination */}
+                    <div className="flex sm:hidden items-center justify-between w-full bg-white p-3 rounded-xl shadow-sm border border-[#F5F5F7]">
+                        <p className="text-[13px] font-medium text-[#1D1D1F]">
+                            Trang {actualPage} / {paginationCount}
+                        </p>
+                        <div className="inline-flex items-center rounded-lg shadow-sm border border-[#F5F5F7]">
+                            <MobileButton
+                                position="left"
+                                onClick={() => onPageChange(pageIndex - 1)}
+                                disabled={pageIndex === 0}
+                            >
+                                <RiArrowLeftSLine className="size-5" aria-hidden={true} />
+                            </MobileButton>
+                            <MobileButton
+                                position="right"
+                                onClick={() => onPageChange(pageIndex + 1)}
+                                disabled={pageIndex >= paginationCount - 1}
+                            >
+                                <RiArrowRightSLine className="size-5" aria-hidden={true} />
+                            </MobileButton>
+                        </div>
+                    </div>
                 </div>
-
-                {/* Mobile Pagination */}
-                <p className="text-tremor-default tabular-nums text-tremor-content dark:text-dark-tremor-content sm:hidden">
-                    Trang <span className="font-medium text-tremor-content-strong">{actualPage}</span> / {paginationCount}
-                </p>
-                <div className="inline-flex items-center rounded-tremor-small shadow-tremor-input dark:shadow-dark-tremor-input sm:hidden ml-4">
-                    <MobileButton
-                        position="left"
-                        onClick={() => onPageChange(pageIndex - 1)}
-                        disabled={pageIndex === 0}
-                    >
-                        <RiArrowLeftSLine className="size-5" aria-hidden={true} />
-                    </MobileButton>
-                    <MobileButton
-                        position="right"
-                        onClick={() => onPageChange(pageIndex + 1)}
-                        disabled={pageIndex >= paginationCount - 1}
-                    >
-                        <RiArrowRightSLine className="size-5" aria-hidden={true} />
-                    </MobileButton>
-                </div>
-            </div>
+            )}
         </div>
     );
 }
