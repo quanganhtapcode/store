@@ -187,7 +187,7 @@ const AnalyticsComponents = ({ authToken }) => {
     return (
         <div className="bg-[#F9FAFB] min-h-screen p-3 sm:p-6 lg:p-8 space-y-8 rounded-[2rem]">
             {/* KPI Section */}
-            <Grid numItemsSm={2} numItemsLg={3} className="gap-5 sm:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
                 {[
                     { n: 'Today', v: kpis.todayRevenue, p: kpis.yesterdayRevenue, u: 'đ' },
                     { n: 'Month to Date', v: kpis.monthRevenue, p: kpis.lastMonthRevenue, u: 'đ' },
@@ -205,7 +205,7 @@ const AnalyticsComponents = ({ authToken }) => {
                         </dd>
                     </Card>
                 ))}
-            </Grid>
+            </div>
 
             {/* Main Daily Performance Card */}
             <Card className="p-0 bg-white border-none ring-1 ring-gray-200 shadow-sm rounded-2xl overflow-hidden">
