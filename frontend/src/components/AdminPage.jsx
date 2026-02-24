@@ -3,13 +3,25 @@ import {
     ChevronLeft, Package, Receipt, TrendingUp, ShoppingBag,
     Plus, Edit3, Trash2, Save, X, Upload, Image as ImageIcon,
     QrCode, Sparkles, ArrowUpRight, ScanLine, Search, Grid,
-    List as ListIcon, MoreHorizontal, Camera, Calendar, FileText, CheckCircle, XCircle, Clock, Truck, BarChart3, RefreshCw, AlertCircle, ShieldCheck, Download
+    List as ListIcon, MoreHorizontal, Camera, Calendar, FileText, CheckCircle, XCircle, Clock, Truck, BarChart3, RefreshCw, AlertCircle, ShieldCheck, Download,
+    DollarSign, Users, Activity, TrendingDown
 } from 'lucide-react';
 import { Html5Qrcode } from "html5-qrcode";
 import OrderModal from './OrderModal';
-import { LogOut, PieChart } from 'lucide-react';
-import AnalyticsComponents from './AnalyticsComponents';
-import OrdersTable from './OrdersTable';
+import { LogOut } from 'lucide-react';
+import {
+    MetricCard,
+    SimpleLineChart,
+    BarChart,
+    PieChart,
+    ComparisonCard,
+    StatsGrid,
+    DayOfWeekChart,
+    SpendingSegments,
+    PeakHoursCard,
+    InsightCard
+} from './AnalyticsComponents';
+import { EnhancedDashboardView } from './EnhancedDashboard';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 const IMAGE_BASE_URL = API_URL.replace('/api', '');
@@ -136,22 +148,22 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
     const [orders, setOrders] = useState([]);
     const [logs, setLogs] = useState([]);
     const [stats, setStats] = useState({ todayRevenue: 0, todayOrders: 0, monthRevenue: 0, topProducts: [], productsMonthly: [] });
-
-    // Helper to get YYYY-MM-DD in Vietnam timezone
-    // Helper to get YYYY-MM-DD in Vietnam timezone (Bulletproof)
-    const getVNDateStr = (date = new Date()) => {
-        // Use sv-SE as it's the only locale that consistently returns YYYY-MM-DD
-        return date.toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
-    };
-
-    // Initialize dateFilter with today's range in VN
-    const [dateFilter, setDateFilter] = useState({ start: getVNDateStr(), end: getVNDateStr() });
-
-    // Orders Pagination state
-    const [pageIndex, setPageIndex] = useState(0);
-    const [pageSize] = useState(20);
-    const [totalOrders, setTotalOrders] = useState(0);
-    const [totalOrdersRevenue, setTotalOrdersRevenue] = useState(0);
+    const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
+    
+    // Analytics States
+    const [analyticsData, setAnalyticsData] = useState({
+        dailyRevenue: [],
+        topProducts: [],
+        categories: [],
+        brands: [],
+        comparison: null,
+        hourlyPattern: [],
+        metrics: {},
+        dayOfWeek: [],
+        customerSpending: null,
+        monthlyTrend: [],
+        peakHours: null
+    });
 
     // Import State
     const [importCart, setImportCart] = useState([]);
@@ -184,27 +196,13 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
     };
 
     // Fetchers
-    const fetchOrders = useCallback(async (page = 0) => {
-        const offset = page * pageSize;
-        let url = `${API_URL}/orders?limit=${pageSize}&offset=${offset}`; // Use pagination
-
-        if (dateFilter.start) {
-            url += `&startDate=${dateFilter.start}`;
-            // If end is missing, use start date as end too
-            url += `&endDate=${dateFilter.end || dateFilter.start}`;
-        }
-
-        try {
-            const res = await fetch(url);
-            const data = await res.json();
-            setOrders(data.data || []);
-            setTotalOrders(data.pagination?.total || 0);
-            setTotalOrdersRevenue(data.pagination?.totalRevenue || 0);
-            setPageIndex(page);
-        } catch (e) {
-            console.error('Fetch orders error:', e);
-        }
-    }, [dateFilter, pageSize]);
+    const fetchOrders = useCallback(async () => {
+        let url = `${API_URL}/orders?limit=100`; // Load more for admin
+        if (dateFilter.start && dateFilter.end) url += `&startDate=${dateFilter.start}&endDate=${dateFilter.end}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        setOrders(data.data || data); // Handle both formats format
+    }, [dateFilter]);
 
     const fetchLogs = useCallback(async () => {
         const res = await fetch(`${API_URL}/logs`);
@@ -222,6 +220,79 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
             setStats({ ...data, productsMonthly: prodData });
         } catch (e) { console.error(e); }
     }, []);
+    
+    // Fetch analytics data
+    const fetchAnalytics = useCallback(async () => {
+        try {
+            const [
+                dailyRevenueRes,
+                topProductsRes,
+                categoriesRes,
+                brandsRes,
+                comparisonRes,
+                hourlyPatternRes,
+                metricsRes,
+                dayOfWeekRes,
+                customerSpendingRes,
+                monthlyTrendRes,
+                peakHoursRes
+            ] = await Promise.all([
+                fetch(`${API_URL}/analytics/daily-revenue?days=30`),
+                fetch(`${API_URL}/analytics/top-products?limit=10&period=month`),
+                fetch(`${API_URL}/analytics/categories`),
+                fetch(`${API_URL}/analytics/brands`),
+                fetch(`${API_URL}/analytics/comparison?period=month`),
+                fetch(`${API_URL}/analytics/hourly-pattern?days=30`),
+                fetch(`${API_URL}/analytics/metrics?period=month`),
+                fetch(`${API_URL}/analytics/day-of-week?days=90`),
+                fetch(`${API_URL}/analytics/customer-spending?period=month`),
+                fetch(`${API_URL}/analytics/monthly-trend?year=${new Date().getFullYear()}`),
+                fetch(`${API_URL}/analytics/peak-hours?days=30`)
+            ]);
+
+            const [
+                dailyRevenue, 
+                topProducts, 
+                categories, 
+                brands, 
+                comparison, 
+                hourlyPattern, 
+                metrics,
+                dayOfWeek,
+                customerSpending,
+                monthlyTrend,
+                peakHoursData
+            ] = await Promise.all([
+                dailyRevenueRes.json(),
+                topProductsRes.json(),
+                categoriesRes.json(),
+                brandsRes.json(),
+                comparisonRes.json(),
+                hourlyPatternRes.json(),
+                metricsRes.json(),
+                dayOfWeekRes.json(),
+                customerSpendingRes.json(),
+                monthlyTrendRes.json(),
+                peakHoursRes.json()
+            ]);
+
+            setAnalyticsData({
+                dailyRevenue,
+                topProducts,
+                categories,
+                brands,
+                comparison,
+                hourlyPattern,
+                metrics,
+                dayOfWeek,
+                customerSpending,
+                monthlyTrend,
+                peakHours: peakHoursData.peakHours
+            });
+        } catch (e) {
+            console.error('Analytics fetch error:', e);
+        }
+    }, []);
 
     const syncImages = async () => {
         if (confirm('Tải toàn bộ lung ảnh về server máy chủ? (Mất vài phút)')) {
@@ -234,10 +305,13 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
     };
 
     useEffect(() => {
-        if (activeTab === 'orders') fetchOrders(0);
+        if (activeTab === 'orders') fetchOrders();
         if (activeTab === 'logs') fetchLogs();
-        if (activeTab === 'dashboard') fetchStats();
-    }, [activeTab, fetchOrders, fetchLogs, fetchStats]);
+        if (activeTab === 'dashboard') {
+            fetchStats();
+            fetchAnalytics();
+        }
+    }, [activeTab, fetchOrders, fetchLogs, fetchStats, fetchAnalytics]);
 
     // Product Logic
     const [searchTerm, setSearchTerm] = useState('');
@@ -255,6 +329,7 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
             end: new Date().toISOString().split('T')[0]
         });
         const [exporting, setExporting] = React.useState(false);
+        const [analyticsView, setAnalyticsView] = React.useState('overview'); // 'overview', 'detailed'
 
         // Server-side Excel export function
         const exportExcel = async (type) => {
@@ -639,101 +714,23 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
         // Compute low stock products
         const lowStockProducts = products.filter(p => p.stock <= 5);
 
+        // Use Enhanced Dashboard View
         return (
-            <div className="space-y-4 pb-20">
-                {/* Export Modal */}
-                {showExportModal && <ExportModal />}
-                {lowStockProducts.length > 0 && (
-                    <div className="bg-red-50 p-5 rounded-[2rem] border border-red-100 shadow-sm animate-in fade-in slide-in-from-top-4">
-                        <h3 className="font-bold text-red-600 mb-3 flex items-center gap-2">
-                            <AlertCircle size={20} /> Sắp hết hàng ({lowStockProducts.length})
-                        </h3>
-                        <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
-                            {lowStockProducts.map(p => (
-                                <div key={p.id} className="bg-white/80 backdrop-blur p-2.5 rounded-xl border border-red-100 w-32 flex-shrink-0" onClick={() => { setEditingProduct(p); setActiveTab('products') }}>
-                                    <p className="text-[11px] font-bold text-[#1D1D1F] line-clamp-1 mb-1">{p.name}</p>
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-[10px] text-red-500 font-black bg-red-100 px-1.5 py-0.5 rounded">Còn {p.stock}</span>
-                                        <span className="text-[10px] text-[#86868B]">Chạm sửa</span>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-[#1D1D1F] text-white p-5 rounded-[2rem] shadow-lg col-span-2">
-                        <p className="text-[12px] opacity-60 font-bold uppercase tracking-wider mb-1">Doanh thu hôm nay</p>
-                        <h2 className="text-[32px] font-black">{stats.todayRevenue?.toLocaleString()}đ</h2>
-                        <div className="mt-2 flex gap-2">
-                            <span className="bg-white/20 px-2 py-1 rounded-lg text-[11px] font-bold">{stats.todayOrders} đơn</span>
-                        </div>
-                    </div>
-                    <div className="bg-white p-5 rounded-[2rem] border border-[#F5F5F7] shadow-sm">
-                        <p className="text-[11px] text-[#86868B] font-bold uppercase">Tháng này</p>
-                        <p className="text-[20px] font-black text-[#0071E3] mt-1">{stats.monthRevenue?.toLocaleString()}đ</p>
-                    </div>
-                    <div className="bg-white p-5 rounded-[2rem] border border-[#F5F5F7] shadow-sm">
-                        <p className="text-[11px] text-[#86868B] font-bold uppercase">Kho hàng</p>
-                        <p className="text-[20px] font-black text-[#1D1D1F] mt-1">{products.length} <span className="text-[14px] font-bold text-[#86868B]">sản phẩm</span></p>
-                    </div>
-                </div>
-
-                <div className="bg-white p-5 rounded-[2rem] border border-[#F5F5F7] shadow-sm">
-                    <h3 className="font-bold text-[#1D1D1F] mb-4 flex items-center gap-2"><TrendingUp size={18} /> Top Bán Chạy (Tổng thể)</h3>
-                    <div className="space-y-3">
-                        {stats.topProducts?.map((p, i) => (
-                            <div key={i} className="flex justify-between items-center py-2 border-b border-[#F5F5F7] last:border-0">
-                                <span className="text-[13px] font-medium text-[#1D1D1F] truncate max-w-[70%]">{i + 1}. {p.name}</span>
-                                <span className="text-[12px] font-bold text-[#0071E3]">{p.total_sold} đã bán</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Monthly Detailed Stats */}
-                <div className="bg-white p-5 rounded-[2rem] border border-[#F5F5F7] shadow-sm">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-bold text-[#1D1D1F] flex items-center gap-2">📊 Chi tiết doanh thu tháng này</h3>
-                        <button
-                            onClick={() => setShowExportModal(true)}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-[#34C759] text-white text-[12px] font-bold rounded-xl active:scale-95 transition-all shadow-sm hover:bg-[#2DB84D]"
-                        >
-                            <Download size={14} />
-                            Xuất Báo Cáo
-                        </button>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-[13px]">
-                            <thead>
-                                <tr className="border-b border-[#F5F5F7]">
-                                    <th className="pb-2 font-bold text-[#86868B] pl-2">Sản phẩm</th>
-                                    <th className="pb-2 font-bold text-[#86868B] text-right">SL</th>
-                                    <th className="pb-2 font-bold text-[#86868B] text-right pr-2">Doanh thu</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {stats.productsMonthly?.slice(0, 10).map((p, i) => (
-                                    <tr key={i} className="border-b border-[#F5F5F7] last:border-0 hover:bg-gray-50 transition-colors">
-                                        <td className="py-3 font-medium text-[#1D1D1F] pl-2 truncate max-w-[150px]">{i + 1}. {p.name}</td>
-                                        <td className="py-3 text-right font-bold text-[#1D1D1F]">{p.total_sold}</td>
-                                        <td className="py-3 text-right font-bold text-[#0071E3] pr-2">{p.revenue?.toLocaleString()}</td>
-                                    </tr>
-                                ))}
-                                {(!stats.productsMonthly || stats.productsMonthly.length === 0) && (
-                                    <tr><td colSpan="3" className="py-4 text-center text-[#86868B]">Chưa có dữ liệu tháng này</td></tr>
-                                )}
-                            </tbody>
-                        </table>
-                        {stats.productsMonthly?.length > 10 && (
-                            <p className="text-center text-[#86868B] text-[11px] mt-3 font-medium">...và {stats.productsMonthly.length - 10} sản phẩm khác</p>
-                        )}
-                    </div>
-                </div>
-            </div>
+            <EnhancedDashboardView
+                analyticsView={analyticsView}
+                setAnalyticsView={setAnalyticsView}
+                stats={stats}
+                products={products}
+                analyticsData={analyticsData}
+                lowStockProducts={lowStockProducts}
+                setEditingProduct={setEditingProduct}
+                setActiveTab={setActiveTab}
+                setShowExportModal={setShowExportModal}
+                showExportModal={showExportModal}
+                ExportModal={ExportModal}
+            />
         );
-    };
+    }
 
     const ProductsTab = () => {
         // Helper: Normalize text for search (remove accents)
@@ -1067,7 +1064,6 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
                 <div className="flex bg-[#F5F5F7] p-1 rounded-2xl overflow-x-auto scrollbar-hide">
                     {[
                         { id: 'dashboard', l: 'Tổng quan', i: BarChart3 },
-                        { id: 'analytics', l: 'Phân tích', i: PieChart },
                         { id: 'products', l: 'Sản phẩm', i: Package },
                         { id: 'import', l: 'Nhập hàng', i: Truck },
                         { id: 'orders', l: 'Đơn hàng', i: Receipt },
@@ -1130,7 +1126,6 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
                 <div className="max-w-4xl mx-auto">
                     {/* Tabs - conditional render with lazy loading images */}
                     {activeTab === 'dashboard' && <DashboardTab />}
-                    {activeTab === 'analytics' && <AnalyticsComponents authToken={authToken} />}
                     {activeTab === 'products' && <ProductsTab />}
                     {activeTab === 'import' && <ImportTab />}
 
@@ -1142,10 +1137,11 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
                                 <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                                     <button
                                         onClick={() => {
-                                            const todayStr = getVNDateStr();
-                                            setDateFilter({ start: todayStr, end: todayStr });
+                                            const today = new Date();
+                                            today.setHours(0, 0, 0, 0);
+                                            setDateFilter({ start: today.toISOString().split('T')[0], end: '' });
                                         }}
-                                        className={`px-3 py-1.5 rounded-lg text-[12px] font-bold flex-shrink-0 transition-all ${dateFilter.start === getVNDateStr() && dateFilter.end === dateFilter.start
+                                        className={`px-3 py-1.5 rounded-lg text-[12px] font-bold flex-shrink-0 transition-all ${dateFilter.start === new Date().toISOString().split('T')[0] && !dateFilter.end
                                             ? 'bg-[#0071E3] text-white'
                                             : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E8E8ED]'
                                             }`}
@@ -1154,13 +1150,9 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
                                     </button>
                                     <button
                                         onClick={() => {
-                                            const end = new Date();
-                                            const start = new Date();
-                                            start.setDate(start.getDate() - 7);
-                                            setDateFilter({
-                                                start: getVNDateStr(start),
-                                                end: getVNDateStr(end)
-                                            });
+                                            const d = new Date();
+                                            d.setDate(d.getDate() - 7);
+                                            setDateFilter({ start: d.toISOString().split('T')[0], end: '' });
                                         }}
                                         className="px-3 py-1.5 rounded-lg text-[12px] font-bold flex-shrink-0 bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E8E8ED] transition-all"
                                     >
@@ -1168,13 +1160,9 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
                                     </button>
                                     <button
                                         onClick={() => {
-                                            const end = new Date();
-                                            const start = new Date();
-                                            start.setDate(1);
-                                            setDateFilter({
-                                                start: getVNDateStr(start),
-                                                end: getVNDateStr(end)
-                                            });
+                                            const d = new Date();
+                                            d.setDate(1);
+                                            setDateFilter({ start: d.toISOString().split('T')[0], end: '' });
                                         }}
                                         className="px-3 py-1.5 rounded-lg text-[12px] font-bold flex-shrink-0 bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E8E8ED] transition-all"
                                     >
@@ -1215,15 +1203,80 @@ const AdminPage = ({ products, history, refreshData, onBackToPos, authToken, aut
                             </div>
 
                             {/* Filtered Orders List */}
-                            <OrdersTable
-                                data={orders}
-                                totalOrders={totalOrders}
-                                totalRevenue={totalOrdersRevenue}
-                                pageIndex={pageIndex}
-                                pageSize={pageSize}
-                                onPageChange={(idx) => fetchOrders(idx)}
-                                onOrderClick={(o) => setEditingOrder(o)}
-                            />
+                            {(() => {
+                                const filteredOrders = orders.filter(o => {
+                                    if (!dateFilter.start && !dateFilter.end) return true;
+                                    const orderDate = new Date(o.timestamp);
+                                    if (dateFilter.start) {
+                                        const startDate = new Date(dateFilter.start);
+                                        startDate.setHours(0, 0, 0, 0);
+                                        if (orderDate < startDate) return false;
+                                    }
+                                    if (dateFilter.end) {
+                                        const endDate = new Date(dateFilter.end);
+                                        endDate.setHours(23, 59, 59, 999);
+                                        if (orderDate > endDate) return false;
+                                    }
+                                    return true;
+                                });
+
+                                const totalFiltered = filteredOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+
+                                return (
+                                    <>
+                                        {/* Summary */}
+                                        <div className="bg-[#0071E3]/10 p-3 rounded-xl flex justify-between items-center">
+                                            <span className="text-[12px] text-[#0071E3] font-bold">
+                                                {filteredOrders.length} đơn hàng
+                                            </span>
+                                            <span className="text-[14px] text-[#0071E3] font-black">
+                                                Tổng: {totalFiltered.toLocaleString()}đ
+                                            </span>
+                                        </div>
+
+                                        {/* Orders */}
+                                        {filteredOrders.map(o => {
+                                            const items = typeof o.items === 'string' ? JSON.parse(o.items) : o.items;
+                                            return (
+                                                <div key={o.id} onClick={() => setEditingOrder(o)} className="bg-white p-4 rounded-2xl shadow-sm border border-[#F5F5F7] active:scale-[0.98] transition-all cursor-pointer">
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <div>
+                                                            <p className="font-bold text-[14px] text-[#1D1D1F] flex items-center gap-2 flex-wrap">
+                                                                {o.order_code || `#${o.id}`}
+                                                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${o.status === 'completed' ? 'bg-green-100 text-green-700' : o.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-[#E8E8ED] text-[#1D1D1F]'}`}>
+                                                                    {o.status || 'completed'}
+                                                                </span>
+                                                                <span className="text-[10px] bg-[#E8E8ED] px-1.5 py-0.5 rounded">{o.payment_method || 'cash'}</span>
+                                                            </p>
+                                                            <p className="text-[12px] text-[#86868B] mt-0.5">{new Date(o.timestamp).toLocaleString()}</p>
+                                                            {o.customer_name && o.customer_name !== 'Khách lẻ' && (
+                                                                <p className="text-[12px] text-[#1D1D1F] font-medium mt-1">👤 {o.customer_name}</p>
+                                                            )}
+                                                        </div>
+                                                        <span className="font-black text-[#0071E3] text-[16px]">{o.total?.toLocaleString()}đ</span>
+                                                    </div>
+                                                    <div className="text-[11px] text-[#86868B] border-t border-[#F5F5F7] pt-2 mt-2">
+                                                        {items?.slice(0, 3).map((item, idx) => (
+                                                            <span key={idx} className="inline-block bg-[#F5F5F7] px-2 py-0.5 rounded mr-1 mb-1">
+                                                                {item.displayName || item.name} x{item.quantity}
+                                                            </span>
+                                                        ))}
+                                                        {items?.length > 3 && <span className="text-[#0071E3]">+{items.length - 3} khác</span>}
+                                                    </div>
+                                                    {o.note && <p className="text-[11px] text-[#86868B] mt-2 italic">📝 {o.note}</p>}
+                                                </div>
+                                            );
+                                        })}
+
+                                        {filteredOrders.length === 0 && (
+                                            <div className="text-center py-12 text-[#86868B]">
+                                                <p className="text-4xl mb-2">📦</p>
+                                                <p className="font-medium">Không có đơn hàng trong khoảng thời gian này</p>
+                                            </div>
+                                        )}
+                                    </>
+                                );
+                            })()}
                         </div>
                     )}
                     {activeTab === 'logs' && (
