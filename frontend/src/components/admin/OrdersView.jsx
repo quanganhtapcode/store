@@ -251,15 +251,15 @@ const OrdersView = ({ orders, dateFilter, setDateFilter, fetchOrders, authToken 
             {/* Header & Date Filter */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">Đơn hàng</h2>
-                    <p className="text-sm text-gray-500 mt-1">Danh sách tất cả giao dịch bán hàng</p>
+                    <h2 className="text-xl font-bold text-tremor-content-strong dark:text-dark-tremor-content-strong">Đơn hàng</h2>
+                    <p className="text-sm text-tremor-content dark:text-dark-tremor-content mt-1">Danh sách tất cả giao dịch bán hàng</p>
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 mt-2 md:mt-0">
-                    <div className="flex bg-gray-100 p-1 rounded-lg">
-                         <button onClick={() => { const d = new Date(); setDateFilter({ start: String(d.toISOString().split('T')[0]), end: '' }); }} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${isFiltered && !dateFilter.end && dateFilter.start === new Date().toISOString().split('T')[0] ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>Hôm nay</button>
-                         <button onClick={() => { const d = new Date(); d.setDate(1); setDateFilter({ start: String(d.toISOString().split('T')[0]), end: '' }); }} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${isFiltered && !dateFilter.end && dateFilter.start === new Date(new Date().setDate(1)).toISOString().split('T')[0] ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>Tháng này</button>
-                         <button onClick={() => setDateFilter({ start: '', end: '' })} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${!isFiltered ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>Tất cả</button>
+                    <div className="flex bg-tremor-background-muted dark:bg-dark-tremor-background-muted p-1 rounded-lg border border-tremor-border dark:border-dark-tremor-border">
+                         <button onClick={() => { const d = new Date(); setDateFilter({ start: String(d.toISOString().split('T')[0]), end: '' }); }} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${isFiltered && !dateFilter.end && dateFilter.start === new Date().toISOString().split('T')[0] ? 'bg-tremor-background dark:bg-dark-tremor-background shadow text-tremor-content-strong dark:text-dark-tremor-content-strong' : 'text-tremor-content dark:text-dark-tremor-content hover:text-tremor-content-emphasis'}`}>Hôm nay</button>
+                         <button onClick={() => { const d = new Date(); d.setDate(1); setDateFilter({ start: String(d.toISOString().split('T')[0]), end: '' }); }} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${isFiltered && !dateFilter.end && dateFilter.start === new Date(new Date().setDate(1)).toISOString().split('T')[0] ? 'bg-tremor-background dark:bg-dark-tremor-background shadow text-tremor-content-strong dark:text-dark-tremor-content-strong' : 'text-tremor-content dark:text-dark-tremor-content hover:text-tremor-content-emphasis'}`}>Tháng này</button>
+                         <button onClick={() => setDateFilter({ start: '', end: '' })} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${!isFiltered ? 'bg-tremor-background dark:bg-dark-tremor-background shadow text-tremor-content-strong dark:text-dark-tremor-content-strong' : 'text-tremor-content dark:text-dark-tremor-content hover:text-tremor-content-emphasis'}`}>Tất cả</button>
                     </div>
                 </div>
             </div>
@@ -269,31 +269,31 @@ const OrdersView = ({ orders, dateFilter, setDateFilter, fetchOrders, authToken 
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                     <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
                         <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium text-gray-500 w-12 sm:w-auto">Từ</span>
-                            <input type="date" value={dateFilter.start} onChange={e => setDateFilter({ ...dateFilter, start: e.target.value })} className="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block px-3 py-1.5 outline-none" />
+                            <span className="text-xs font-medium text-tremor-content dark:text-dark-tremor-content w-12 sm:w-auto">Từ</span>
+                            <input type="date" value={dateFilter.start} onChange={e => setDateFilter({ ...dateFilter, start: e.target.value })} className="bg-tremor-background-muted dark:bg-dark-tremor-background-muted border border-tremor-border dark:border-dark-tremor-border text-tremor-content-strong dark:text-dark-tremor-content-strong text-sm rounded-lg focus:ring-tremor-brand focus:border-tremor-brand block px-3 py-1.5 outline-none" />
                         </div>
                         <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium text-gray-500 w-12 sm:w-auto">Đến</span>
-                            <input type="date" value={dateFilter.end} onChange={e => setDateFilter({ ...dateFilter, end: e.target.value })} className="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block px-3 py-1.5 outline-none" />
+                            <span className="text-xs font-medium text-tremor-content dark:text-dark-tremor-content w-12 sm:w-auto">Đến</span>
+                            <input type="date" value={dateFilter.end} onChange={e => setDateFilter({ ...dateFilter, end: e.target.value })} className="bg-tremor-background-muted dark:bg-dark-tremor-background-muted border border-tremor-border dark:border-dark-tremor-border text-tremor-content-strong dark:text-dark-tremor-content-strong text-sm rounded-lg focus:ring-tremor-brand focus:border-tremor-brand block px-3 py-1.5 outline-none" />
                         </div>
                     </div>
                     
                     <div className="flex items-center gap-6 pr-4">
                         <div>
-                            <p className="text-xs font-medium text-gray-500">Số lượng đơn</p>
-                            <p className="text-xl font-bold text-gray-900">{filteredOrders.length}</p>
+                            <p className="text-xs font-medium text-tremor-content dark:text-dark-tremor-content">Số lượng đơn</p>
+                            <p className="text-xl font-bold text-tremor-content-strong dark:text-dark-tremor-content-strong">{filteredOrders.length}</p>
                         </div>
-                        <div className="w-px h-8 bg-gray-200" />
+                        <div className="w-px h-8 bg-tremor-border dark:bg-dark-tremor-border" />
                         <div>
-                            <p className="text-xs font-medium text-gray-500">Tổng doanh thu</p>
-                            <p className="text-xl font-bold text-blue-600">{totalFiltered.toLocaleString('vi-VN')}đ</p>
+                            <p className="text-xs font-medium text-tremor-content dark:text-dark-tremor-content">Tổng doanh thu</p>
+                            <p className="text-xl font-bold text-tremor-brand dark:text-dark-tremor-brand">{totalFiltered.toLocaleString('vi-VN')}đ</p>
                         </div>
                     </div>
                 </div>
             </Card>
 
             <Card className="p-0 sm:p-0 overflow-hidden">
-                <div className="p-4 border-b border-tremor-border dark:border-dark-tremor-border flex justify-between items-center bg-gray-50/50">
+                <div className="p-4 border-b border-tremor-border dark:border-dark-tremor-border flex justify-between items-center bg-tremor-background-muted/50 dark:bg-dark-tremor-background-muted/50">
                     <div className="relative max-w-sm w-full">
                         <TextInput 
                             icon={Search}
@@ -306,7 +306,7 @@ const OrdersView = ({ orders, dateFilter, setDateFilter, fetchOrders, authToken 
 
                 <div className="overflow-x-auto relative min-h-[400px]">
                     <Table>
-                        <TableHead className="bg-gray-50/50">
+                        <TableHead className="bg-tremor-background-muted/50 dark:bg-dark-tremor-background-muted/50">
                             {table.getHeaderGroups().map((headerGroup) => (
                                 <TableRow key={headerGroup.id} className="border-b border-tremor-border dark:border-dark-tremor-border">
                                     {headerGroup.headers.map((header) => (
@@ -368,7 +368,7 @@ const OrdersView = ({ orders, dateFilter, setDateFilter, fetchOrders, authToken 
                     </Table>
                 </div>
                 {/* Pagination Controls */}
-                <div className="p-4 border-t border-tremor-border dark:border-dark-tremor-border bg-gray-50/50 flex items-center justify-between sm:justify-center">
+                <div className="p-4 border-t border-tremor-border dark:border-dark-tremor-border bg-tremor-background-muted/50 dark:bg-dark-tremor-background-muted/50 flex items-center justify-between sm:justify-center">
                     {/* long pagination button form only for desktop view */}
                     <div className="hidden gap-0.5 sm:inline-flex">
                         <TextButton onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()} className="group">
