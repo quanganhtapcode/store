@@ -178,11 +178,15 @@ const OrdersView = ({ orders, dateFilter, setDateFilter, fetchOrders, authToken 
                     return (
                         <div className="flex flex-wrap gap-1 max-w-[200px]">
                             {items.slice(0, 2).map((item, idx) => (
-                                <Badge key={idx} size="xs" color="gray">
-                                    {item.displayName || item.name} ×{item.quantity}
-                                </Badge>
+                                <span key={idx} className="inline-flex items-center rounded-tremor-small px-1.5 py-0.5 text-[10px] sm:text-[11px] font-medium bg-gray-100 text-gray-800 ring-1 ring-inset ring-gray-600/10 dark:bg-gray-500/20 dark:text-gray-300 dark:ring-gray-400/20">
+                                    {item.displayName || item.name} <span className="ml-1 opacity-70">×{item.quantity}</span>
+                                </span>
                             ))}
-                            {items.length > 2 && <Badge size="xs" color="blue">+{items.length - 2}</Badge>}
+                            {items.length > 2 && (
+                                <span className="inline-flex items-center rounded-tremor-small px-1.5 py-0.5 text-[10px] sm:text-[11px] font-medium bg-blue-100 text-blue-800 ring-1 ring-inset ring-blue-600/10 dark:bg-blue-500/20 dark:text-blue-400 dark:ring-blue-400/20">
+                                    +{items.length - 2}
+                                </span>
+                            )}
                         </div>
                     );
                 },
@@ -194,10 +198,16 @@ const OrdersView = ({ orders, dateFilter, setDateFilter, fetchOrders, authToken 
                 accessorKey: 'status',
                 cell: ({ getValue }) => {
                     const status = getValue();
+                    const text = status === 'completed' ? 'Hoàn thành' : status === 'cancelled' ? 'Đã hủy' : status || 'completed';
+                    const colorClasses = status === 'completed' 
+                        ? 'bg-emerald-100 text-emerald-800 ring-emerald-600/10 dark:bg-emerald-500/20 dark:text-emerald-500 dark:ring-emerald-400/20'
+                        : status === 'cancelled' ? 'bg-red-100 text-red-800 ring-red-600/10 dark:bg-red-500/20 dark:text-red-500 dark:ring-red-400/20' 
+                        : 'bg-gray-100 text-gray-800 ring-gray-600/10 dark:bg-gray-500/20 dark:text-gray-400 dark:ring-gray-400/20';
+                        
                     return (
-                        <Badge color={status === 'completed' ? 'emerald' : status === 'cancelled' ? 'red' : 'gray'}>
-                            {status === 'completed' ? 'Hoàn thành' : status === 'cancelled' ? 'Đã hủy' : status || 'completed'}
-                        </Badge>
+                        <span className={classNames(colorClasses, 'inline-flex items-center rounded-tremor-small px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset whitespace-nowrap')}>
+                            {text}
+                        </span>
                     );
                 },
                 meta: { align: 'text-left' },
@@ -205,11 +215,19 @@ const OrdersView = ({ orders, dateFilter, setDateFilter, fetchOrders, authToken 
             {
                 header: 'Thanh toán',
                 accessorKey: 'payment_method',
-                cell: ({ getValue }) => (
-                    <Badge color={getValue() === 'transfer' ? 'indigo' : 'amber'} icon={undefined}>
-                        {getValue() === 'transfer' ? 'CK' : 'Tiền mặt'}
-                    </Badge>
-                ),
+                cell: ({ getValue }) => {
+                    const isTransfer = getValue() === 'transfer';
+                    const text = isTransfer ? 'CK' : 'Tiền mặt';
+                    const colorClasses = isTransfer 
+                        ? 'bg-indigo-100 text-indigo-800 ring-indigo-600/10 dark:bg-indigo-500/20 dark:text-indigo-400 dark:ring-indigo-400/20'
+                        : 'bg-amber-100 text-amber-800 ring-amber-600/10 dark:bg-amber-500/20 dark:text-amber-500 dark:ring-amber-400/20';
+
+                    return (
+                        <span className={classNames(colorClasses, 'inline-flex items-center rounded-tremor-small px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset whitespace-nowrap')}>
+                            {text}
+                        </span>
+                    );
+                },
                 meta: { align: 'text-left' },
             },
             {

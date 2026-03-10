@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
     flexRender,
     getCoreRowModel,
@@ -74,13 +74,20 @@ const MobileButton = ({ onClick, disabled, children, position }) => {
 };
 
 const LogsView = ({ logs }) => {
-    const getActionColor = (action) => {
-        if (action?.includes('ADD')) return 'emerald';
-        if (action?.includes('DELETE')) return 'red';
-        if (action?.includes('UPDATE')) return 'blue';
-        if (action?.includes('IMPORT')) return 'purple';
-        if (action?.includes('LOGIN')) return 'indigo';
-        return 'gray';
+    const [actionFilter, setActionFilter] = useState('');
+
+    const filteredLogs = useMemo(() => {
+        if (!actionFilter) return logs;
+        return logs.filter(log => log.action?.includes(actionFilter));
+    }, [logs, actionFilter]);
+
+    const getActionClasses = (action) => {
+        if (action?.includes('ADD')) return 'bg-emerald-100 text-emerald-800 ring-emerald-600/10 dark:bg-emerald-500/20 dark:text-emerald-500 dark:ring-emerald-400/20';
+        if (action?.includes('DELETE')) return 'bg-red-100 text-red-800 ring-red-600/10 dark:bg-red-500/20 dark:text-red-500 dark:ring-red-400/20';
+        if (action?.includes('UPDATE')) return 'bg-blue-100 text-blue-800 ring-blue-600/10 dark:bg-blue-500/20 dark:text-blue-500 dark:ring-blue-400/20';
+        if (action?.includes('IMPORT')) return 'bg-purple-100 text-purple-800 ring-purple-600/10 dark:bg-purple-500/20 dark:text-purple-500 dark:ring-purple-400/20';
+        if (action?.includes('LOGIN')) return 'bg-indigo-100 text-indigo-800 ring-indigo-600/10 dark:bg-indigo-500/20 dark:text-indigo-500 dark:ring-indigo-400/20';
+        return 'bg-gray-100 text-gray-800 ring-gray-600/10 dark:bg-gray-500/20 dark:text-gray-400 dark:ring-gray-400/20';
     };
 
     const columns = useMemo(
@@ -91,9 +98,14 @@ const LogsView = ({ logs }) => {
                 cell: ({ getValue }) => {
                     const action = getValue();
                     return (
-                        <Badge color={getActionColor(action)}>
+                        <span
+                            className={classNames(
+                                getActionClasses(action),
+                                'inline-flex items-center rounded-tremor-small px-2 py-0.5 text-tremor-label font-medium ring-1 ring-inset whitespace-nowrap'
+                            )}
+                        >
                             {action}
-                        </Badge>
+                        </span>
                     );
                 },
                 meta: { align: 'text-left' },
@@ -126,7 +138,7 @@ const LogsView = ({ logs }) => {
     );
 
     const table = useReactTable({
-        data: logs,
+        data: filteredLogs,
         columns,
         getCoreRowModel: getCoreRowModel(),
         getPaginationRowModel: getPaginationRowModel(),
@@ -146,8 +158,24 @@ const LogsView = ({ logs }) => {
                     <h2 className="text-xl font-bold text-tremor-content-strong dark:text-dark-tremor-content-strong">Nhật ký hoạt động</h2>
                     <p className="text-sm text-tremor-content dark:text-dark-tremor-content mt-1">Lịch sử mọi thao tác trong hệ thống</p>
                 </div>
-                <div className="flex bg-tremor-background-muted dark:bg-dark-tremor-background-muted p-[3px] rounded-lg border border-tremor-border dark:border-dark-tremor-border">
-                    <span className="text-sm px-3 py-1.5 text-tremor-content-strong dark:text-dark-tremor-content-strong font-medium">Tổng <span className="font-bold">{logs.length}</span> thao tác</span>
+                
+                <div className="flex flex-col sm:flex-row gap-3 items-center mt-2 md:mt-0">
+                    <select
+                        value={actionFilter}
+                        onChange={(e) => setActionFilter(e.target.value)}
+                        className="bg-tremor-background dark:bg-dark-tremor-background border border-tremor-border dark:border-dark-tremor-border text-tremor-content-strong dark:text-dark-tremor-content-strong text-sm rounded-lg focus:ring-tremor-brand focus:border-tremor-brand block w-full sm:w-auto px-3 py-1.5 outline-none cursor-pointer"
+                    >
+                        <option value="">Tất cả thao tác</option>
+                        <option value="ADD">Thêm mới (ADD)</option>
+                        <option value="UPDATE">Cập nhật (UPDATE)</option>
+                        <option value="DELETE">Xóa (DELETE)</option>
+                        <option value="IMPORT">Nhập hàng (IMPORT)</option>
+                        <option value="LOGIN">Đăng nhập (LOGIN)</option>
+                    </select>
+
+                    <div className="flex bg-tremor-background-muted dark:bg-dark-tremor-background-muted p-[3px] rounded-lg border border-tremor-border dark:border-dark-tremor-border">
+                        <span className="text-sm px-3 py-1.5 text-tremor-content-strong dark:text-dark-tremor-content-strong font-medium">Lọc được <span className="font-bold">{filteredLogs.length}</span> / {logs.length}</span>
+                    </div>
                 </div>
             </div>
 
