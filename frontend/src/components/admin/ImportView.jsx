@@ -110,11 +110,6 @@ const HistoryTable = ({ loading, history, suppliers, fmt }) => {
             }
         },
         {
-            header: 'Ghi chú',
-            accessorKey: 'note',
-            cell: ({ getValue }) => <span className="text-sm text-tremor-content italic truncate max-w-[150px] inline-block">{getValue() || '—'}</span>
-        },
-        {
             header: 'Tổng tiền',
             accessorKey: 'total_cost',
             meta: { align: 'text-right' },
