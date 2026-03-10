@@ -317,13 +317,10 @@ const DashboardView = ({ stats, products, analyticsData, setActiveTab }) => {
             {chartConfig && (
                 <Card className="p-0">
                     {/* Header */}
-                    <div className="p-6">
+                    <div className="p-6 pb-2">
                         <h3 className="font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong">
                             {chartConfig.title}
                         </h3>
-                        <p className="mt-1 text-tremor-default leading-6 text-tremor-content dark:text-dark-tremor-content">
-                            {chartConfig.subtitle}
-                        </p>
                     </div>
                     {/* Chart area */}
                     <div className="border-t border-tremor-border p-6 dark:border-dark-tremor-border">
@@ -393,13 +390,10 @@ const DashboardView = ({ stats, products, analyticsData, setActiveTab }) => {
 
                 {/* Hourly Pattern */}
                 <Card className="p-0">
-                    <div className="p-6">
+                    <div className="p-6 pb-2">
                         <h3 className="font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong">
                             Bán hàng theo giờ (Trung vị)
                         </h3>
-                        <p className="mt-1 text-tremor-default text-tremor-content dark:text-dark-tremor-content">
-                            Median doanh thu và số đơn tại từng khung giờ từ 6h–22h.
-                        </p>
                     </div>
                     <div className="border-t border-tremor-border p-6 dark:border-dark-tremor-border">
                         <ul role="list" className="flex flex-wrap gap-x-16 gap-y-6">
@@ -449,13 +443,10 @@ const DashboardView = ({ stats, products, analyticsData, setActiveTab }) => {
 
                 {/* Median by Day of Week */}
                 <Card className="p-0">
-                    <div className="p-6">
+                    <div className="p-6 pb-2">
                         <h3 className="font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong">
                             Doanh thu theo ngày (Trung vị)
                         </h3>
-                        <p className="mt-1 text-tremor-default text-tremor-content dark:text-dark-tremor-content">
-                            Median doanh thu từng ngày trong tuần, loại bỏ ảnh hưởng của ngày bất thường.
-                        </p>
                     </div>
                     <div className="border-t border-tremor-border p-6 dark:border-dark-tremor-border">
                         <ul role="list" className="flex flex-wrap gap-x-16 gap-y-6">
