@@ -171,7 +171,7 @@ const DashboardView = ({ stats, products, analyticsData, setActiveTab }) => {
 
     // ── Hourly Pattern Chart data ──
     const hourlyChartData = useMemo(() => {
-        const hourData = data.timeOfDay || [];
+        const hourData = data.medianTimeOfDay || [];
         const hourMap = {};
         hourData.forEach(h => { hourMap[h.hour] = h; });
         const result = [];
@@ -179,20 +179,24 @@ const DashboardView = ({ stats, products, analyticsData, setActiveTab }) => {
             const entry = hourMap[h];
             result.push({
                 'Giờ': `${h}h`,
-                'Doanh thu': entry?.total || 0,
-                'Số đơn': entry?.count || 0,
+                'Doanh thu (Median)': entry?.median || 0,
+                'Số đơn (Median)': entry?.medianCount || 0,
             });
         }
         return result;
-    }, [data.timeOfDay]);
+    }, [data.medianTimeOfDay]);
 
     // Hourly totals for summary
     const hourlyTotal = useMemo(() => {
-        return (data.timeOfDay || []).reduce((s, d) => s + (d.total || 0), 0);
-    }, [data.timeOfDay]);
+        const vals = hourlyChartData.map(d => d['Doanh thu (Median)']).filter(v => v > 0);
+        if (vals.length === 0) return 0;
+        return Math.round(vals.reduce((s, v) => s + v, 0));
+    }, [hourlyChartData]);
     const hourlyOrders = useMemo(() => {
-        return (data.timeOfDay || []).reduce((s, d) => s + (d.count || 0), 0);
-    }, [data.timeOfDay]);
+        const vals = hourlyChartData.map(d => d['Số đơn (Median)']).filter(v => v > 0);
+        if (vals.length === 0) return 0;
+        return Math.round(vals.reduce((s, v) => s + v, 0));
+    }, [hourlyChartData]);
 
     // ── Median by Day of Week ──
     const medianDayData = useMemo(() => {
@@ -391,10 +395,10 @@ const DashboardView = ({ stats, products, analyticsData, setActiveTab }) => {
                 <Card className="p-0">
                     <div className="p-6">
                         <h3 className="font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong">
-                            Bán hàng theo giờ
+                            Bán hàng theo giờ (Trung vị)
                         </h3>
                         <p className="mt-1 text-tremor-default text-tremor-content dark:text-dark-tremor-content">
-                            Phân bổ doanh thu và số đơn từ 6h–22h. Giúp xác định khung giờ cao điểm.
+                            Median doanh thu và số đơn tại từng khung giờ từ 6h–22h.
                         </p>
                     </div>
                     <div className="border-t border-tremor-border p-6 dark:border-dark-tremor-border">
@@ -407,7 +411,7 @@ const DashboardView = ({ stats, products, analyticsData, setActiveTab }) => {
                                     </p>
                                 </div>
                                 <p className="whitespace-nowrap text-tremor-default text-tremor-content dark:text-dark-tremor-content">
-                                    Tổng doanh thu
+                                    Tổng doanh thu (Median / Ngày)
                                 </p>
                             </li>
                             <li>
@@ -418,15 +422,15 @@ const DashboardView = ({ stats, products, analyticsData, setActiveTab }) => {
                                     </p>
                                 </div>
                                 <p className="whitespace-nowrap text-tremor-default text-tremor-content dark:text-dark-tremor-content">
-                                    Tổng đơn hàng
+                                    Tổng đơn hàng (Median / Ngày)
                                 </p>
                             </li>
                         </ul>
-                        {hourlyChartData.some(d => d['Doanh thu'] > 0) ? (
+                        {hourlyChartData.some(d => d['Doanh thu (Median)'] > 0) ? (
                             <BarChart
                                 data={hourlyChartData}
                                 index="Giờ"
-                                categories={['Doanh thu']}
+                                categories={['Doanh thu (Median)']}
                                 colors={['blue']}
                                 showLegend={false}
                                 showAnimation={true}

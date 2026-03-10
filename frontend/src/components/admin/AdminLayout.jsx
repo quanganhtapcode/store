@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
     BarChart3, Package, Truck, Receipt, FileText, LogOut,
-    ShieldCheck, Menu, X, ChevronLeft, Users, Settings,
-    Home, ChevronRight, Bell, Search
+    Menu, X, ChevronLeft, Users, Settings, Home, Bell, Search,
+    Sun, Moon
 } from 'lucide-react';
 import DashboardView from './DashboardView';
 import ProductsView from './ProductsView';
@@ -33,7 +33,7 @@ const GROUP_LABELS = {
 const AdminLayout = ({ products, history, refreshData, onBackToPos, authToken, authUser, onLogout }) => {
     const [activeTab, setActiveTab] = useState('dashboard');
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
 
     // Data states
     const [orders, setOrders] = useState([]);
@@ -92,6 +92,15 @@ const AdminLayout = ({ products, history, refreshData, onBackToPos, authToken, a
         if (activeTab === 'import') fetchSuppliers();
     }, [activeTab, fetchOrders, fetchLogs, fetchStats, fetchAnalytics, fetchSuppliers]);
 
+    useEffect(() => {
+        if (theme === 'dark') {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+        localStorage.setItem('theme', theme);
+    }, [theme]);
+
     const handleSetup2FA = async () => {
         try {
             const res = await fetch(`${API_URL}/auth/2fa/setup`, {
@@ -138,159 +147,139 @@ const AdminLayout = ({ products, history, refreshData, onBackToPos, authToken, a
     };
 
     return (
-        <div className="flex h-screen bg-[#f0f2f5] font-['Inter'] overflow-hidden">
+        <div className={`flex h-screen bg-gray-50 dark:bg-gray-950 font-['Inter'] overflow-hidden text-gray-900 dark:text-gray-50`}>
             {/* Mobile sidebar overlay */}
             {sidebarOpen && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
+                <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
             )}
 
-            {/* Sidebar */}
-            <aside className={`
+            {/* Sidebar matches Tremor Template */}
+            <nav className={`
                 fixed lg:static inset-y-0 left-0 z-50
-                bg-[#0f172a] text-white
-                flex flex-col
-                transform transition-all duration-300 ease-in-out
+                flex flex-col w-72
+                transform transition-transform duration-300 ease-in-out
                 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-                ${sidebarCollapsed ? 'w-[72px]' : 'w-[260px]'}
-                shadow-2xl lg:shadow-none
             `}>
-                {/* Logo Area */}
-                <div className={`h-16 flex items-center border-b border-white/10 flex-shrink-0 ${sidebarCollapsed ? 'justify-center px-2' : 'px-5'}`}>
-                    {!sidebarCollapsed ? (
-                        <div className="flex items-center justify-between w-full">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/30">
-                                    <BarChart3 size={18} className="text-white" />
-                                </div>
-                                <div>
-                                    <h1 className="font-black text-[15px] tracking-tight">Admin Panel</h1>
-                                    <p className="text-[10px] text-blue-300/70 font-medium">Quản trị hệ thống</p>
-                                </div>
+                <aside className="flex grow flex-col gap-y-6 overflow-y-auto border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950 p-4">
+                    
+                    {/* Header / Logo */}
+                    <div className="flex items-center justify-between pb-2">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 font-black bg-indigo-600 text-white rounded-lg flex items-center justify-center shadow-sm">
+                                CH
                             </div>
-                            <button onClick={() => setSidebarOpen(false)} className="p-1.5 hover:bg-white/10 rounded-lg lg:hidden">
-                                <X size={18} />
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-lg flex items-center justify-center">
-                            <BarChart3 size={18} />
-                        </div>
-                    )}
-                </div>
-
-                {/* Navigation */}
-                <nav className="flex-1 overflow-y-auto py-4 scrollbar-hide">
-                    {Object.entries(groupedMenu).map(([group, items]) => (
-                        <div key={group} className="mb-2">
-                            {!sidebarCollapsed && (
-                                <p className="px-5 mb-2 text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em]">
-                                    {GROUP_LABELS[group]}
-                                </p>
-                            )}
-                            <div className="space-y-0.5 px-3">
-                                {items.map(item => {
-                                    const isActive = activeTab === item.id;
-                                    return (
-                                        <button
-                                            key={item.id}
-                                            onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }}
-                                            className={`
-                                                w-full flex items-center gap-3 rounded-xl transition-all duration-200
-                                                ${sidebarCollapsed ? 'justify-center px-0 py-2.5' : 'px-3 py-2.5'}
-                                                ${isActive
-                                                    ? 'bg-gradient-to-r from-blue-500/20 to-indigo-500/20 text-blue-400 shadow-inner'
-                                                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-                                                }
-                                            `}
-                                            title={sidebarCollapsed ? item.label : ''}
-                                        >
-                                            <item.icon size={19} className={isActive ? 'text-blue-400' : 'text-slate-500'} />
-                                            {!sidebarCollapsed && (
-                                                <span className={`text-[13px] font-semibold ${isActive ? 'text-blue-300' : ''}`}>
-                                                    {item.label}
-                                                </span>
-                                            )}
-                                            {isActive && !sidebarCollapsed && (
-                                                <div className="ml-auto w-1.5 h-1.5 bg-blue-400 rounded-full" />
-                                            )}
-                                        </button>
-                                    );
-                                })}
+                            <div>
+                                <h1 className="font-semibold text-sm text-gray-900 dark:text-white">Cát Hải Store</h1>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Admin Panel</p>
                             </div>
                         </div>
-                    ))}
-                </nav>
-
-                {/* Sidebar Footer */}
-                <div className={`border-t border-white/10 p-3 flex-shrink-0 ${sidebarCollapsed ? 'flex flex-col items-center gap-2' : ''}`}>
-                    {!sidebarCollapsed && (
-                        <div className="flex items-center gap-3 px-2 py-2 mb-2">
-                            <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-[12px] font-bold">
-                                {(authUser || 'A').charAt(0).toUpperCase()}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-[12px] font-bold text-slate-200 truncate">{authUser || 'Admin'}</p>
-                                <p className="text-[10px] text-slate-500">Quản trị viên</p>
-                            </div>
-                        </div>
-                    )}
-                    <div className={`flex ${sidebarCollapsed ? 'flex-col' : ''} gap-1`}>
-                        <button
-                            onClick={onBackToPos}
-                            className={`flex items-center gap-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-all ${sidebarCollapsed ? 'p-2.5' : 'flex-1 px-3 py-2 text-[12px] font-medium'}`}
-                            title="POS"
-                        >
-                            <ChevronLeft size={16} />
-                            {!sidebarCollapsed && 'POS'}
-                        </button>
-                        <button
-                            onClick={onLogout}
-                            className={`flex items-center gap-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all ${sidebarCollapsed ? 'p-2.5' : 'flex-1 px-3 py-2 text-[12px] font-medium'}`}
-                            title="Đăng xuất"
-                        >
-                            <LogOut size={16} />
-                            {!sidebarCollapsed && 'Đăng xuất'}
+                        <button onClick={() => setSidebarOpen(false)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md lg:hidden text-gray-500">
+                            <X size={18} />
                         </button>
                     </div>
-                </div>
 
-                {/* Collapse toggle (desktop only) */}
-                <button
-                    onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                    className="hidden lg:flex absolute -right-3 top-20 w-6 h-6 bg-[#0f172a] border border-slate-700 rounded-full items-center justify-center text-slate-400 hover:text-white shadow-lg z-10"
-                >
-                    <ChevronRight size={12} className={`transition-transform ${sidebarCollapsed ? '' : 'rotate-180'}`} />
-                </button>
-            </aside>
+                    {/* Navigation */}
+                    <nav aria-label="core navigation links" className="flex flex-1 flex-col space-y-8">
+                        {Object.entries(groupedMenu).map(([group, items]) => (
+                            <div key={group}>
+                                <span className="text-xs font-medium leading-6 text-gray-500 dark:text-gray-400">
+                                    {GROUP_LABELS[group]}
+                                </span>
+                                <ul role="list" className="space-y-0.5 mt-1">
+                                    {items.map(item => {
+                                        const isActive = activeTab === item.id;
+                                        return (
+                                            <li key={item.id}>
+                                                <button
+                                                    onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }}
+                                                    className={`
+                                                        w-full flex items-center gap-x-2.5 rounded-md px-2 py-1.5 text-sm font-medium transition-colors
+                                                        ${isActive
+                                                            ? "text-indigo-600 dark:text-indigo-400 bg-gray-100 dark:bg-gray-900"
+                                                            : "text-gray-700 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-400 hover:dark:text-gray-50 hover:dark:bg-gray-900"
+                                                        }
+                                                    `}
+                                                >
+                                                    <item.icon className="size-4 shrink-0" aria-hidden="true" />
+                                                    {item.label}
+                                                </button>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            </div>
+                        ))}
+                    </nav>
+
+                    {/* Sidebar Footer */}
+                    <div className="mt-auto flex flex-col gap-2 pt-4 border-t border-gray-200 dark:border-gray-800">
+                        {/* Theme Toggle */}
+                        <button
+                            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                            className="flex items-center gap-x-2.5 rounded-md px-2 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:text-gray-400 hover:dark:bg-gray-900 transition-colors"
+                        >
+                            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                            {theme === 'dark' ? 'Giao diện sáng' : 'Giao diện tối'}
+                        </button>
+                        
+                        <button
+                            onClick={onBackToPos}
+                            className="flex items-center gap-x-2.5 rounded-md px-2 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:text-gray-400 hover:dark:bg-gray-900 transition-colors"
+                        >
+                            <ChevronLeft size={16} />
+                            Về màn hình POS
+                        </button>
+                        
+                        <div className="flex items-center justify-between mt-2">
+                             <div className="flex items-center gap-2 px-2">
+                                <div className="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center text-xs font-bold text-gray-700 dark:text-gray-300">
+                                    {(authUser || 'A').charAt(0).toUpperCase()}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-bold text-gray-900 dark:text-gray-100 truncate">{authUser || 'Admin'}</p>
+                                    <p className="text-[10px] text-gray-500">Quản trị viên</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={onLogout}
+                                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-md transition-colors"
+                                title="Đăng xuất"
+                            >
+                                <LogOut size={16} />
+                            </button>
+                        </div>
+                    </div>
+                </aside>
+            </nav>
 
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                 {/* Top Header */}
-                <header className="h-16 bg-white border-b border-gray-200/80 flex items-center justify-between px-4 lg:px-6 flex-shrink-0 z-10">
+                <header className="h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-4 lg:px-6 flex-shrink-0 z-10 shadow-sm">
                     <div className="flex items-center gap-3">
                         <button
                             onClick={() => setSidebarOpen(true)}
-                            className="lg:hidden p-2 hover:bg-gray-100 rounded-xl text-gray-600"
+                            className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl text-gray-600 dark:text-gray-400"
                         >
                             <Menu size={20} />
                         </button>
                         <div>
-                            <h2 className="text-[16px] font-bold text-gray-900">{currentPage?.label || 'Tổng quan'}</h2>
-                            <p className="text-[11px] text-gray-400 font-medium hidden sm:block">
+                            <h2 className="text-[16px] font-bold text-gray-900 dark:text-gray-100">{currentPage?.label || 'Tổng quan'}</h2>
+                            <p className="text-[11px] text-gray-500 dark:text-gray-400 font-medium hidden sm:block">
                                 {new Date().toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                             </p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <button className="p-2 hover:bg-gray-100 rounded-xl text-gray-500 relative">
+                        <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl text-gray-500 dark:text-gray-400 relative">
                             <Bell size={18} />
-                            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
+                            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white dark:ring-gray-900" />
                         </button>
-                        <div className="hidden sm:flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-1.5 border border-gray-200/50">
-                            <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white">
+                        <div className="hidden sm:flex items-center gap-2 bg-gray-50 dark:bg-gray-800 rounded-xl px-3 py-1.5 border border-gray-200/50 dark:border-gray-700">
+                            <div className="w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center text-[10px] font-bold text-white">
                                 {(authUser || 'A').charAt(0).toUpperCase()}
                             </div>
-                            <span className="text-[12px] font-semibold text-gray-700">{authUser || 'Admin'}</span>
+                            <span className="text-[12px] font-semibold text-gray-700 dark:text-gray-300">{authUser || 'Admin'}</span>
                         </div>
                     </div>
                 </header>

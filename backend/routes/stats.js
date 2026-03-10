@@ -215,6 +215,34 @@ router.get('/detailed', async (req, res) => {
             count: groupedByDayW[day].length
         }));
 
+        // MEDIAN SALES BY HOUR
+        const allHourlyTotals = await dbAll(`
+            SELECT 
+                strftime('%H', timestamp / 1000, 'unixepoch', '+7 hours') as hour_of_day,
+                strftime('%Y-%m-%d', timestamp / 1000, 'unixepoch', '+7 hours') as date,
+                SUM(total) as total,
+                COUNT(*) as count
+            FROM orders
+            WHERE status = 'completed'
+            GROUP BY date, hour_of_day
+        `);
+
+        const groupedByHour = Array.from({ length: 24 }, () => ({ totals: [], counts: [] }));
+        allHourlyTotals.forEach(row => {
+            const h = parseInt(row.hour_of_day, 10);
+            if (h >= 0 && h <= 23) {
+                groupedByHour[h].totals.push(row.total);
+                groupedByHour[h].counts.push(row.count);
+            }
+        });
+
+        const medianByHour = groupedByHour.map((data, hour) => ({
+            hour: hour,
+            median: calculateMedian(data.totals),
+            medianCount: calculateMedian(data.counts),
+            sampleDays: data.totals.length
+        })).filter(h => h.sampleDays > 0);
+
         res.json({
             paymentMethods: paymentData,
             dayOfWeek: dayOfWeekData,
@@ -226,6 +254,7 @@ router.get('/detailed', async (req, res) => {
                 previous: lastMonthTrend
             },
             medianDayOfWeek: medianByDayW,
+            medianTimeOfDay: medianByHour,
             kpis: kpiComparisons[0] || {
                 todayRevenue: 0, todayOrders: 0, yesterdayRevenue: 0,
                 yesterdayOrders: 0, monthRevenue: 0, lastMonthRevenue: 0
