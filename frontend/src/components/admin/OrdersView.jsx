@@ -22,7 +22,7 @@ import {
     Badge,
     TextInput
 } from '@tremor/react';
-import OrderModal from '../OrderModal';
+// Redundant OrderModal removed, handled in AdminLayout
 
 const TextButton = ({ onClick, disabled, children, className }) => {
   return (
@@ -100,8 +100,7 @@ function IndeterminateCheckbox({ indeterminate, className, ...rest }) {
     );
 }
 
-const OrdersView = ({ orders, dateFilter, setDateFilter, fetchOrders, authToken }) => {
-    const [editingOrder, setEditingOrder] = useState(null);
+const OrdersView = ({ orders, dateFilter, setDateFilter, fetchOrders, authToken, onOrderClick }) => {
     const [rowSelection, setRowSelection] = useState({});
     const [globalFilter, setGlobalFilter] = useState('');
 
@@ -346,7 +345,7 @@ const OrdersView = ({ orders, dateFilter, setDateFilter, fetchOrders, authToken 
                                 table.getRowModel().rows.map((row) => (
                                     <TableRow
                                         key={row.id}
-                                        onClick={() => setEditingOrder(row.original)}
+                                        onClick={() => onOrderClick && onOrderClick(row.original)}
                                         className="select-none cursor-pointer hover:bg-tremor-background-muted hover:dark:bg-dark-tremor-background-muted transition-colors"
                                     >
                                         {row.getVisibleCells().map((cell, index) => (
@@ -476,15 +475,7 @@ const OrdersView = ({ orders, dateFilter, setDateFilter, fetchOrders, authToken 
                 </div>
             </div>
 
-            {/* Order Modal */}
-            {editingOrder && (
-                <OrderModal
-                    order={editingOrder}
-                    authToken={authToken}
-                    onClose={() => setEditingOrder(null)}
-                    onSave={() => { fetchOrders(); setEditingOrder(null); setRowSelection({}); }}
-                />
-            )}
+            {/* Redundant modal removed, handled by AdminLayout */}
         </div>
     );
 };

@@ -73,7 +73,7 @@ const MobileButton = ({ onClick, disabled, children, position }) => {
   );
 };
 
-const LogsView = ({ logs }) => {
+const LogsView = ({ logs, orders, onOrderClick }) => {
     const [actionFilter, setActionFilter] = useState('');
 
     const filteredLogs = useMemo(() => {
@@ -84,7 +84,7 @@ const LogsView = ({ logs }) => {
     const getActionClasses = (action) => {
         if (action?.includes('ADD')) return 'bg-emerald-100 text-emerald-800 ring-emerald-600/10 dark:bg-emerald-500/20 dark:text-emerald-500 dark:ring-emerald-400/20';
         if (action?.includes('DELETE')) return 'bg-red-100 text-red-800 ring-red-600/10 dark:bg-red-500/20 dark:text-red-500 dark:ring-red-400/20';
-        if (action?.includes('UPDATE')) return 'bg-blue-100 text-blue-800 ring-blue-600/10 dark:bg-blue-500/20 dark:text-blue-500 dark:ring-blue-400/20';
+        if (action?.includes('UPDATE') || action?.includes('CREATE_ORDER')) return 'bg-blue-100 text-blue-800 ring-blue-600/10 dark:bg-blue-500/20 dark:text-blue-500 dark:ring-blue-400/20';
         if (action?.includes('IMPORT')) return 'bg-purple-100 text-purple-800 ring-purple-600/10 dark:bg-purple-500/20 dark:text-purple-500 dark:ring-purple-400/20';
         if (action?.includes('LOGIN')) return 'bg-indigo-100 text-indigo-800 ring-indigo-600/10 dark:bg-indigo-500/20 dark:text-indigo-500 dark:ring-indigo-400/20';
         return 'bg-gray-100 text-gray-800 ring-gray-600/10 dark:bg-gray-500/20 dark:text-gray-400 dark:ring-gray-400/20';
@@ -113,7 +113,32 @@ const LogsView = ({ logs }) => {
             {
                 header: 'Chi tiết',
                 accessorKey: 'details',
-                cell: ({ getValue }) => <span className="text-tremor-content-strong dark:text-dark-tremor-content-strong max-w-xl truncate line-clamp-2">{getValue()}</span>,
+                cell: ({ getValue }) => {
+                    const details = getValue();
+                    // Match ORD followed by digits
+                    const match = details.match(/(ORD\d+)/);
+                    if (match && onOrderClick) {
+                        const orderCode = match[1];
+                        const parts = details.split(orderCode);
+                        return (
+                            <span className="text-tremor-content-strong dark:text-dark-tremor-content-strong max-w-xl">
+                                {parts[0]}
+                                <button
+                                    onClick={() => {
+                                        const found = orders.find(o => o.order_code === orderCode);
+                                        if (found) onOrderClick(found);
+                                        else alert('Không tìm thấy dữ liệu đơn hàng này');
+                                    }}
+                                    className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline mx-1 cursor-pointer"
+                                >
+                                    {orderCode}
+                                </button>
+                                {parts[1]}
+                            </span>
+                        );
+                    }
+                    return <span className="text-tremor-content-strong dark:text-dark-tremor-content-strong max-w-xl truncate line-clamp-2">{details}</span>;
+                },
                 meta: { align: 'text-left' },
             },
             {
@@ -166,10 +191,13 @@ const LogsView = ({ logs }) => {
                         className="bg-tremor-background dark:bg-dark-tremor-background border border-tremor-border dark:border-dark-tremor-border text-tremor-content-strong dark:text-dark-tremor-content-strong text-sm rounded-lg focus:ring-tremor-brand focus:border-tremor-brand block w-full sm:w-auto px-3 py-1.5 outline-none cursor-pointer"
                     >
                         <option value="">Tất cả thao tác</option>
-                        <option value="ADD">Thêm mới (ADD)</option>
-                        <option value="UPDATE">Cập nhật (UPDATE)</option>
-                        <option value="DELETE">Xóa (DELETE)</option>
+                        <option value="CREATE_ORDER">Tạo đơn hàng (CREATE)</option>
+                        <option value="UPDATE_ORDER">Sửa đơn hàng (UPDATE)</option>
+                        <option value="DELETE_ORDER">Xóa đơn hàng (DELETE)</option>
                         <option value="IMPORT">Nhập hàng (IMPORT)</option>
+                        <option value="ADD">Thêm mới SP (ADD)</option>
+                        <option value="UPDATE">Cập nhật SP (UPDATE)</option>
+                        <option value="DELETE">Xóa SP (DELETE)</option>
                         <option value="LOGIN">Đăng nhập (LOGIN)</option>
                     </select>
 

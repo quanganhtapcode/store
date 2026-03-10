@@ -11,6 +11,7 @@ import OrdersView from './OrdersView';
 import SuppliersView from './SuppliersView';
 import LogsView from './LogsView';
 import SettingsView from './SettingsView';
+import OrderModal from '../OrderModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
@@ -45,6 +46,7 @@ const AdminLayout = ({ products, history, refreshData, onBackToPos, authToken, a
     const [analyticsData, setAnalyticsData] = useState(null);
     const [suppliers, setSuppliers] = useState([]);
     const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
+    const [editingOrder, setEditingOrder] = useState(null);
 
     // Fetchers
     const fetchOrders = useCallback(async () => {
@@ -88,7 +90,7 @@ const AdminLayout = ({ products, history, refreshData, onBackToPos, authToken, a
     }, []);
 
     useEffect(() => {
-        if (activeTab === 'orders') fetchOrders();
+        if (activeTab === 'orders' || activeTab === 'logs') fetchOrders();
         if (activeTab === 'logs') fetchLogs();
         if (activeTab === 'dashboard') { fetchStats(); fetchAnalytics(); }
         if (['suppliers', 'import', 'import_history', 'import_analysis', 'import_recommend'].includes(activeTab)) fetchSuppliers();
@@ -142,11 +144,11 @@ const AdminLayout = ({ products, history, refreshData, onBackToPos, authToken, a
             case 'import_recommend':
                 return <ImportView subView="recommend" setActiveTab={setActiveTab} products={products} suppliers={suppliers} refreshData={refreshData} authToken={authToken} onLogout={onLogout} />;
             case 'orders':
-                return <OrdersView orders={orders} dateFilter={dateFilter} setDateFilter={setDateFilter} fetchOrders={fetchOrders} authToken={authToken} />;
+                return <OrdersView orders={orders} dateFilter={dateFilter} setDateFilter={setDateFilter} fetchOrders={fetchOrders} authToken={authToken} onOrderClick={setEditingOrder} />;
             case 'suppliers':
                 return <SuppliersView suppliers={suppliers} refreshSuppliers={fetchSuppliers} authToken={authToken} onLogout={onLogout} />;
             case 'logs':
-                return <LogsView logs={logs} />;
+                return <LogsView logs={logs} orders={orders} onOrderClick={setEditingOrder} />;
             case 'settings':
                 return <SettingsView authUser={authUser} authToken={authToken} onLogout={onLogout} handleSetup2FA={handleSetup2FA} />;
             default:
@@ -279,16 +281,7 @@ const AdminLayout = ({ products, history, refreshData, onBackToPos, authToken, a
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl text-gray-500 dark:text-gray-400 relative">
-                            <Bell size={18} />
-                            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white dark:ring-gray-900" />
-                        </button>
-                        <div className="hidden sm:flex items-center gap-2 bg-gray-50 dark:bg-gray-800 rounded-xl px-3 py-1.5 border border-gray-200/50 dark:border-gray-700">
-                            <div className="w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center text-[10px] font-bold text-white">
-                                {(authUser || 'A').charAt(0).toUpperCase()}
-                            </div>
-                            <span className="text-[12px] font-semibold text-gray-700 dark:text-gray-300">{authUser || 'Admin'}</span>
-                        </div>
+                        {/* Removed Bell and User info as requested */}
                     </div>
                 </header>
 
@@ -298,6 +291,16 @@ const AdminLayout = ({ products, history, refreshData, onBackToPos, authToken, a
                         {renderContent()}
                     </div>
                 </main>
+
+                {/* Global Order Modal */}
+                {editingOrder && (
+                    <OrderModal
+                        order={editingOrder}
+                        authToken={authToken}
+                        onClose={() => setEditingOrder(null)}
+                        onSave={() => { fetchOrders(); setEditingOrder(null); }}
+                    />
+                )}
             </div>
 
             {/* Global Styles */}
