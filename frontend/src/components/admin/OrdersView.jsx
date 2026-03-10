@@ -160,14 +160,14 @@ const OrdersView = ({ orders, dateFilter, setDateFilter, fetchOrders, authToken,
             {
                 header: 'Khách hàng',
                 accessorKey: 'customer_name',
-                cell: ({ getValue }) => getValue() === 'Khách lẻ' ? <span className="text-gray-400 font-normal">Khách lẻ</span> : getValue(),
+                cell: ({ getValue }) => <div className="max-w-[100px] truncate">{getValue() === 'Khách lẻ' ? <span className="text-gray-400 font-normal">Khách lẻ</span> : getValue()}</div>,
                 meta: { align: 'text-left' },
             },
             {
                 header: 'Thời gian',
                 accessorKey: 'timestamp',
-                cell: ({ getValue }) => <span className="text-tremor-content whitespace-nowrap">{new Date(getValue()).toLocaleString('vi-VN')}</span>,
-                meta: { align: 'text-left' },
+                cell: ({ getValue }) => <span className="text-tremor-content text-[11px] sm:text-tremor-default whitespace-nowrap">{new Date(getValue()).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>,
+                meta: { align: 'text-left', className: 'hidden sm:table-cell' },
             },
             {
                 header: 'Sản phẩm',
@@ -189,7 +189,7 @@ const OrdersView = ({ orders, dateFilter, setDateFilter, fetchOrders, authToken,
                         </div>
                     );
                 },
-                meta: { align: 'text-left' },
+                meta: { align: 'text-left', className: 'hidden md:table-cell' },
                 enableGlobalFilter: false,
             },
             {
@@ -209,7 +209,7 @@ const OrdersView = ({ orders, dateFilter, setDateFilter, fetchOrders, authToken,
                         </span>
                     );
                 },
-                meta: { align: 'text-left' },
+                meta: { align: 'text-left', className: 'hidden sm:table-cell' },
             },
             {
                 header: 'Thanh toán',
@@ -227,7 +227,7 @@ const OrdersView = ({ orders, dateFilter, setDateFilter, fetchOrders, authToken,
                         </span>
                     );
                 },
-                meta: { align: 'text-left' },
+                meta: { align: 'text-left', className: 'hidden sm:table-cell' },
             },
             {
                 header: 'Tổng tiền',
@@ -272,11 +272,11 @@ const OrdersView = ({ orders, dateFilter, setDateFilter, fetchOrders, authToken,
                     <p className="text-sm text-tremor-content dark:text-dark-tremor-content mt-1">Danh sách tất cả giao dịch bán hàng</p>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-3 mt-2 md:mt-0">
-                    <div className="flex bg-tremor-background-muted dark:bg-dark-tremor-background-muted p-1 rounded-lg border border-tremor-border dark:border-dark-tremor-border">
-                         <button onClick={() => { const d = new Date(); setDateFilter({ start: String(d.toISOString().split('T')[0]), end: '' }); }} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${isFiltered && !dateFilter.end && dateFilter.start === new Date().toISOString().split('T')[0] ? 'bg-tremor-background dark:bg-dark-tremor-background shadow text-tremor-content-strong dark:text-dark-tremor-content-strong' : 'text-tremor-content dark:text-dark-tremor-content hover:text-tremor-content-emphasis'}`}>Hôm nay</button>
-                         <button onClick={() => { const d = new Date(); d.setDate(1); setDateFilter({ start: String(d.toISOString().split('T')[0]), end: '' }); }} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${isFiltered && !dateFilter.end && dateFilter.start === new Date(new Date().setDate(1)).toISOString().split('T')[0] ? 'bg-tremor-background dark:bg-dark-tremor-background shadow text-tremor-content-strong dark:text-dark-tremor-content-strong' : 'text-tremor-content dark:text-dark-tremor-content hover:text-tremor-content-emphasis'}`}>Tháng này</button>
-                         <button onClick={() => setDateFilter({ start: '', end: '' })} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${!isFiltered ? 'bg-tremor-background dark:bg-dark-tremor-background shadow text-tremor-content-strong dark:text-dark-tremor-content-strong' : 'text-tremor-content dark:text-dark-tremor-content hover:text-tremor-content-emphasis'}`}>Tất cả</button>
+                <div className="flex flex-col sm:flex-row gap-2 mt-3 md:mt-0 w-full sm:w-auto">
+                    <div className="grid grid-cols-3 sm:flex bg-tremor-background-muted dark:bg-dark-tremor-background-muted p-1 rounded-lg border border-tremor-border dark:border-dark-tremor-border w-full sm:w-auto">
+                         <button onClick={() => { const d = new Date(); setDateFilter({ start: String(d.toISOString().split('T')[0]), end: '' }); }} className={`px-2 py-1.5 rounded-md text-[11px] sm:text-xs font-medium transition-all ${isFiltered && !dateFilter.end && dateFilter.start === new Date().toISOString().split('T')[0] ? 'bg-tremor-background dark:bg-dark-tremor-background shadow text-tremor-content-strong dark:text-dark-tremor-content-strong' : 'text-tremor-content dark:text-dark-tremor-content hover:text-tremor-content-emphasis'}`}>Hôm nay</button>
+                         <button onClick={() => { const d = new Date(); d.setDate(1); setDateFilter({ start: String(d.toISOString().split('T')[0]), end: '' }); }} className={`px-2 py-1.5 rounded-md text-[11px] sm:text-xs font-medium transition-all ${isFiltered && !dateFilter.end && dateFilter.start === new Date(new Date().setDate(1)).toISOString().split('T')[0] ? 'bg-tremor-background dark:bg-dark-tremor-background shadow text-tremor-content-strong dark:text-dark-tremor-content-strong' : 'text-tremor-content dark:text-dark-tremor-content hover:text-tremor-content-emphasis'}`}>Tháng này</button>
+                         <button onClick={() => setDateFilter({ start: '', end: '' })} className={`px-2 py-1.5 rounded-md text-[11px] sm:text-xs font-medium transition-all ${!isFiltered ? 'bg-tremor-background dark:bg-dark-tremor-background shadow text-tremor-content-strong dark:text-dark-tremor-content-strong' : 'text-tremor-content dark:text-dark-tremor-content hover:text-tremor-content-emphasis'}`}>Tất cả</button>
                     </div>
                 </div>
             </div>
@@ -284,26 +284,25 @@ const OrdersView = ({ orders, dateFilter, setDateFilter, fetchOrders, authToken,
             {/* Custom Range Filter & Stats */}
             <Card className="p-4 sm:p-5 border-tremor-border">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                    <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium text-tremor-content dark:text-dark-tremor-content w-12 sm:w-auto">Từ</span>
-                            <input type="date" value={dateFilter.start} onChange={e => setDateFilter({ ...dateFilter, start: e.target.value })} className="bg-tremor-background-muted dark:bg-dark-tremor-background-muted border border-tremor-border dark:border-dark-tremor-border text-tremor-content-strong dark:text-dark-tremor-content-strong text-sm rounded-lg focus:ring-tremor-brand focus:border-tremor-brand block px-3 py-1.5 outline-none" />
+                    <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center w-full lg:w-auto">
+                        <div className="flex items-center gap-2 flex-1 sm:flex-none">
+                            <span className="text-[10px] uppercase font-bold text-tremor-content dark:text-dark-tremor-content w-8">Từ</span>
+                            <input type="date" value={dateFilter.start} onChange={e => setDateFilter({ ...dateFilter, start: e.target.value })} className="flex-1 bg-tremor-background-muted dark:bg-dark-tremor-background-muted border border-tremor-border dark:border-dark-tremor-border text-tremor-content-strong dark:text-dark-tremor-content-strong text-sm rounded-lg focus:ring-tremor-brand focus:border-tremor-brand block px-3 py-2 outline-none" />
                         </div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium text-tremor-content dark:text-dark-tremor-content w-12 sm:w-auto">Đến</span>
-                            <input type="date" value={dateFilter.end} onChange={e => setDateFilter({ ...dateFilter, end: e.target.value })} className="bg-tremor-background-muted dark:bg-dark-tremor-background-muted border border-tremor-border dark:border-dark-tremor-border text-tremor-content-strong dark:text-dark-tremor-content-strong text-sm rounded-lg focus:ring-tremor-brand focus:border-tremor-brand block px-3 py-1.5 outline-none" />
+                        <div className="flex items-center gap-2 flex-1 sm:flex-none">
+                            <span className="text-[10px] uppercase font-bold text-tremor-content dark:text-dark-tremor-content w-8">Đến</span>
+                            <input type="date" value={dateFilter.end} onChange={e => setDateFilter({ ...dateFilter, end: e.target.value })} className="flex-1 bg-tremor-background-muted dark:bg-dark-tremor-background-muted border border-tremor-border dark:border-dark-tremor-border text-tremor-content-strong dark:text-dark-tremor-content-strong text-sm rounded-lg focus:ring-tremor-brand focus:border-tremor-brand block px-3 py-2 outline-none" />
                         </div>
                     </div>
                     
-                    <div className="flex items-center gap-6 pr-4">
-                        <div>
-                            <p className="text-xs font-medium text-tremor-content dark:text-dark-tremor-content">Số lượng đơn</p>
-                            <p className="text-xl font-bold text-tremor-content-strong dark:text-dark-tremor-content-strong">{filteredOrders.length}</p>
+                    <div className="grid grid-cols-2 gap-4 w-full lg:w-auto lg:flex lg:items-center lg:gap-6 lg:pr-4">
+                        <div className="bg-tremor-background-muted/30 dark:bg-dark-tremor-background-muted/30 p-3 rounded-xl lg:bg-transparent lg:p-0">
+                            <p className="text-[10px] uppercase tracking-wider font-bold text-tremor-content dark:text-dark-tremor-content">Số lượng đơn</p>
+                            <p className="text-xl lg:text-2xl font-black text-tremor-content-strong dark:text-dark-tremor-content-strong">{filteredOrders.length}</p>
                         </div>
-                        <div className="w-px h-8 bg-tremor-border dark:bg-dark-tremor-border" />
-                        <div>
-                            <p className="text-xs font-medium text-tremor-content dark:text-dark-tremor-content">Tổng doanh thu</p>
-                            <p className="text-xl font-bold text-tremor-brand dark:text-dark-tremor-brand">{totalFiltered.toLocaleString('vi-VN')}đ</p>
+                        <div className="bg-tremor-background-muted/30 dark:bg-dark-tremor-background-muted/30 p-3 rounded-xl lg:bg-transparent lg:p-0">
+                            <p className="text-[10px] uppercase tracking-wider font-bold text-tremor-content dark:text-dark-tremor-content">Doanh thu</p>
+                            <p className="text-xl lg:text-2xl font-black text-tremor-brand dark:text-dark-tremor-brand">{totalFiltered.toLocaleString('vi-VN')}đ</p>
                         </div>
                     </div>
                 </div>
@@ -327,7 +326,7 @@ const OrdersView = ({ orders, dateFilter, setDateFilter, fetchOrders, authToken,
                             {table.getHeaderGroups().map((headerGroup) => (
                                 <TableRow key={headerGroup.id} className="border-b border-tremor-border dark:border-dark-tremor-border">
                                     {headerGroup.headers.map((header) => (
-                                        <TableHeaderCell key={header.id} className={classNames(header.column.columnDef.meta.align)}>
+                                        <TableHeaderCell key={header.id} className={classNames(header.column.columnDef.meta.align, header.column.columnDef.meta.className)}>
                                             {flexRender(header.column.columnDef.header, header.getContext())}
                                         </TableHeaderCell>
                                     ))}
@@ -354,7 +353,8 @@ const OrdersView = ({ orders, dateFilter, setDateFilter, fetchOrders, authToken,
                                                 className={classNames(
                                                     row.getIsSelected() ? 'bg-tremor-background-muted dark:bg-dark-tremor-background-muted' : '',
                                                     cell.column.columnDef.meta.align,
-                                                    'relative'
+                                                    cell.column.columnDef.meta.className,
+                                                    'relative whitespace-nowrap'
                                                 )}
                                             >
                                                 {index === 0 && row.getIsSelected() && (
