@@ -122,7 +122,9 @@ app.get('/api/auth/2fa/setup', verifyToken, async (req, res) => {
 // --- LOGS ROUTE ---
 app.get('/api/logs', async (req, res) => {
     try {
-        const logs = await dbAll("SELECT * FROM activity_logs ORDER BY timestamp DESC LIMIT 50");
+        const limitStr = req.query.limit ? req.query.limit : '100000';
+        const limit = parseInt(limitStr);
+        const logs = await dbAll(`SELECT * FROM activity_logs ORDER BY timestamp DESC LIMIT ${limit}`);
         res.json(logs);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
