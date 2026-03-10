@@ -51,8 +51,8 @@ router.post('/', verifyToken, async (req, res) => {
         const imageUrl = saveImage(data.image, id);
 
         await dbRun(
-            `INSERT INTO products (id, name, brand, category, price, case_price, units_per_case, stock, code, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [id, data.name, data.brand || '', data.category || 'Khác', data.price, data.case_price || 0, data.units_per_case || 1, data.stock || 0, data.code || '', imageUrl]
+            `INSERT INTO products (id, name, brand, category, price, case_price, units_per_case, stock, code, image, cost_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, data.name, data.brand || '', data.category || 'Khác', data.price, data.case_price || 0, data.units_per_case || 1, data.stock || 0, data.code || '', imageUrl, data.cost_price || 0]
         );
 
         logActivity('ADD_PRODUCT', `Added ${data.name}`);
@@ -79,8 +79,8 @@ router.put('/:id', verifyToken, async (req, res) => {
         }
 
         await dbRun(
-            `UPDATE products SET name = ?, brand = ?, category = ?, price = ?, case_price = ?, units_per_case = ?, stock = ?, code = ?, image = ? WHERE id = ?`,
-            [data.name, data.brand, data.category, data.price, data.case_price, data.units_per_case, data.stock, data.code, imageUrl, id]
+            `UPDATE products SET name = ?, brand = ?, category = ?, price = ?, case_price = ?, units_per_case = ?, stock = ?, code = ?, image = ?, cost_price = ? WHERE id = ?`,
+            [data.name, data.brand, data.category, data.price, data.case_price, data.units_per_case, data.stock, data.code, imageUrl, data.cost_price || 0, id]
         );
 
         logActivity('UPDATE_PRODUCT', `Updated ${data.name}`);

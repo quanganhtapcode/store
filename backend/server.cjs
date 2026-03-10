@@ -69,6 +69,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api/products', require('./routes/products'));
 app.use('/api/orders', require('./routes/orders'));
 app.use('/api/stats', require('./routes/stats'));
+app.use('/api/suppliers', require('./routes/suppliers'));
 
 // Reports route (with DB init)
 const reportsRoute = require('./routes/reports');
@@ -126,9 +127,16 @@ app.get('/api/logs', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- IMPORT ROUTE ---
+// --- IMPORT ROUTES ---
+app.get('/api/imports', async (req, res) => {
+    try {
+        const imports = await dbAll("SELECT * FROM import_notes ORDER BY timestamp DESC LIMIT 100");
+        res.json(imports);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/imports', verifyToken, async (req, res) => {
-    const { items, total_cost, note, timestamp } = req.body;
+    const { items, total_cost, note, timestamp, supplier_id } = req.body;
     const errors = validateImport({ items });
     if (errors.length > 0) return res.status(400).json({ error: errors.join(', ') });
 
@@ -136,11 +144,15 @@ app.post('/api/imports', verifyToken, async (req, res) => {
         await dbRun('BEGIN TRANSACTION');
         const id = 'IMP-' + Date.now();
 
-        await dbRun(`INSERT INTO import_notes (id, timestamp, total_cost, note, items) VALUES (?, ?, ?, ?, ?)`,
-            [id, timestamp || Date.now(), total_cost || 0, note || '', JSON.stringify(items)]);
+        await dbRun(`INSERT INTO import_notes (id, timestamp, total_cost, note, items, supplier_id) VALUES (?, ?, ?, ?, ?, ?)`,
+            [id, timestamp || Date.now(), total_cost || 0, note || '', JSON.stringify(items), supplier_id || null]);
 
         for (const item of items) {
             await dbRun("UPDATE products SET stock = stock + ? WHERE id = ?", [item.quantity, item.id]);
+            // Update cost_price if provided
+            if (item.importPrice && item.importPrice > 0) {
+                await dbRun("UPDATE products SET cost_price = ? WHERE id = ?", [item.importPrice, item.id]);
+            }
         }
 
         await dbRun('COMMIT');
@@ -151,6 +163,119 @@ app.post('/api/imports', verifyToken, async (req, res) => {
         res.status(500).json({ error: e.message });
     }
 });
+
+// --- PROFIT ANALYSIS ---
+app.get('/api/stats/profit-analysis', async (req, res) => {
+    try {
+        const thirtyDaysAgo = Date.now() - 30 * 86400000;
+
+        // Get all products with cost & selling price
+        const products = await dbAll("SELECT id, name, brand, price, cost_price, stock, total_sold FROM products");
+
+        // Get 30-day sales per product
+        const sales30d = await dbAll(`
+            SELECT oi.product_id, SUM(oi.quantity) as qty_sold, SUM(oi.price * oi.quantity) as revenue
+            FROM order_items oi
+            JOIN orders o ON oi.order_id = o.id
+            WHERE o.timestamp >= ?
+            GROUP BY oi.product_id
+        `, [thirtyDaysAgo]);
+
+        const salesMap = {};
+        sales30d.forEach(s => { salesMap[s.product_id] = s; });
+
+        const analysis = products.map(p => {
+            const s = salesMap[p.id] || { qty_sold: 0, revenue: 0 };
+            const costPrice = p.cost_price || 0;
+            const sellPrice = p.price || 0;
+            const margin = sellPrice > 0 && costPrice > 0 ? ((sellPrice - costPrice) / sellPrice * 100) : 0;
+            const profit30d = s.qty_sold * (sellPrice - costPrice);
+            const dailyAvgSales = s.qty_sold / 30;
+            const daysOfStock = dailyAvgSales > 0 ? Math.round(p.stock / dailyAvgSales) : 999;
+
+            return {
+                id: p.id,
+                name: p.name,
+                brand: p.brand,
+                sellPrice,
+                costPrice,
+                margin: Math.round(margin * 10) / 10,
+                stock: p.stock,
+                sold30d: s.qty_sold,
+                revenue30d: s.revenue,
+                profit30d,
+                dailyAvgSales: Math.round(dailyAvgSales * 10) / 10,
+                daysOfStock,
+            };
+        }).filter(p => p.sold30d > 0);
+
+        // Sort by profit descending
+        analysis.sort((a, b) => b.profit30d - a.profit30d);
+
+        res.json({
+            products: analysis,
+            summary: {
+                totalRevenue30d: analysis.reduce((s, p) => s + p.revenue30d, 0),
+                totalCost30d: analysis.reduce((s, p) => s + (p.costPrice * p.sold30d), 0),
+                totalProfit30d: analysis.reduce((s, p) => s + p.profit30d, 0),
+                avgMargin: analysis.length > 0
+                    ? Math.round(analysis.reduce((s, p) => s + p.margin, 0) / analysis.filter(p => p.margin > 0).length * 10) / 10
+                    : 0,
+            }
+        });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// --- PURCHASE RECOMMENDATIONS ---
+app.get('/api/stats/purchase-recommendations', async (req, res) => {
+    try {
+        const thirtyDaysAgo = Date.now() - 30 * 86400000;
+
+        const products = await dbAll("SELECT id, name, brand, price, cost_price, stock FROM products");
+        const sales30d = await dbAll(`
+            SELECT oi.product_id, SUM(oi.quantity) as qty_sold
+            FROM order_items oi
+            JOIN orders o ON oi.order_id = o.id
+            WHERE o.timestamp >= ?
+            GROUP BY oi.product_id
+        `, [thirtyDaysAgo]);
+
+        const salesMap = {};
+        sales30d.forEach(s => { salesMap[s.product_id] = s.qty_sold; });
+
+        const recommendations = products.map(p => {
+            const sold30d = salesMap[p.id] || 0;
+            const dailyAvg = sold30d / 30;
+            const targetDays = 14; // restock for 14 days
+            const suggestedQty = Math.max(0, Math.ceil(dailyAvg * targetDays) - p.stock);
+            const costPrice = p.cost_price || 0;
+            const margin = p.price > 0 && costPrice > 0 ? ((p.price - costPrice) / p.price * 100) : 0;
+            const urgency = p.stock <= 0 ? 'critical' : (p.stock <= dailyAvg * 3) ? 'high' : (p.stock <= dailyAvg * 7) ? 'medium' : 'low';
+
+            return {
+                id: p.id,
+                name: p.name,
+                brand: p.brand,
+                stock: p.stock,
+                sold30d,
+                dailyAvg: Math.round(dailyAvg * 10) / 10,
+                suggestedQty,
+                estimatedCost: suggestedQty * costPrice,
+                costPrice,
+                sellPrice: p.price,
+                margin: Math.round(margin * 10) / 10,
+                urgency,
+            };
+        }).filter(r => r.suggestedQty > 0);
+
+        // Sort by urgency then margin
+        const urgencyOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+        recommendations.sort((a, b) => urgencyOrder[a.urgency] - urgencyOrder[b.urgency] || b.margin - a.margin);
+
+        res.json(recommendations);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 
 // GET ALL IMPORTS
 app.get('/api/imports', async (req, res) => {

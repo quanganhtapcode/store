@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import QRScanner from './components/QRScanner';
 import POSView from './components/POSView';
-import AdminPage from './components/AdminPage';
+import AdminLayout from './components/admin/AdminLayout';
 import ReceiptModal from './components/ReceiptModal';
 import LoginPage from './components/LoginPage';
 import StatsModal from './components/StatsModal';
@@ -151,7 +151,7 @@ const App = () => {
             return <LoginPage onLogin={handleLogin} />;
         }
         return (
-            <AdminPage
+            <AdminLayout
                 products={products}
                 history={history}
                 refreshData={fetchData}

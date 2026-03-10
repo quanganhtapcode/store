@@ -159,6 +159,26 @@ const initDatabase = () => {
             items TEXT
         )`);
 
+        // Suppliers
+        db.run(`CREATE TABLE IF NOT EXISTS suppliers (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            contact_person TEXT,
+            phone TEXT,
+            email TEXT,
+            address TEXT,
+            note TEXT,
+            created_at INTEGER,
+            updated_at INTEGER
+        )`);
+
+        // Add supplier_id to import_notes if not exists
+        db.run(`ALTER TABLE import_notes ADD COLUMN supplier_id TEXT`, (err) => {
+            if (err && !err.message.includes('duplicate column')) {
+                // Column may already exist
+            }
+        });
+
         // Add discount and original_total columns if not exist
         db.run(`ALTER TABLE orders ADD COLUMN discount INTEGER DEFAULT 0`, (err) => {
             if (err && !err.message.includes('duplicate column')) {
@@ -168,6 +188,13 @@ const initDatabase = () => {
         db.run(`ALTER TABLE orders ADD COLUMN original_total INTEGER`, (err) => {
             if (err && !err.message.includes('duplicate column')) {
                 console.log('Note: Column original_total already exists or error:', err.message);
+            }
+        });
+
+        // Add cost_price to products if not exists
+        db.run(`ALTER TABLE products ADD COLUMN cost_price INTEGER DEFAULT 0`, (err) => {
+            if (err && !err.message.includes('duplicate column')) {
+                // Column may already exist
             }
         });
 
