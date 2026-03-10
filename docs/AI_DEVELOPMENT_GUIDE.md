@@ -6,24 +6,30 @@ Tài liệu này dành cho các AI assistant (Claude, GPT, Gemini, etc.) hiểu 
 
 ## 📁 Cấu trúc Dự án
 
-```
 gemini-pos/
 ├── frontend/           # React + Vite (Deploy: Vercel)
 │   └── src/
-│       ├── components/ # React components
+│       ├── components/
+│       │   ├── pos/    # Các components cho bán hàng
+│       │   ├── admin/  # Các components quản trị (Dashboard, Orders, Products, ...)
+│       │   └── ui/     # Các components UI dùng chung
 │       └── App.jsx     # Main app + routing
 │
 ├── backend/            # Express.js API (Deploy: VPS)
-│   ├── server.cjs      # Main server file
+│   ├── config/         # database.js, auth.js
+│   ├── routes/         # orders.js, products.js, stats.js, suppliers.js...
+│   ├── utils/          # helpers.js
+│   ├── middleware/     # (nếu có)
+│   ├── server.cjs      # Main server file (entry point)
 │   └── public/images/  # Product images (local storage)
 │
 ├── database/           # SQLite database
 │   ├── pos.db          # Main database file
-│   └── schema.sql      # Schema reference
+│   └── migrate_*.cjs   # Các script migrate manual
 │
-├── docs/               # Documentation
-├── scripts/            # Deployment scripts
-└── data/               # CSV data files
+├── docs/               # Documentation (API, Schema, Deploy...)
+├── scripts/            # Deployment & Maintenance scripts
+└── data/               # CSV data files (sample data)
 ```
 
 ---
@@ -56,10 +62,13 @@ gemini-pos/
 
 | File | Mô tả | Khi nào cần sửa |
 |------|-------|-----------------|
-| `frontend/src/App.jsx` | Main app, routing, API calls | Thêm route mới, sửa logic |
-| `frontend/src/components/POSView.jsx` | Giao diện bán hàng | UI bán hàng, giỏ hàng |
-| `frontend/src/components/AdminPage.jsx` | Trang quản trị | Quản lý SP, thống kê |
-| `frontend/src/components/OrderModal.jsx` | Modal đơn hàng | Chi tiết, sửa đơn hàng |
+| `frontend/src/App.jsx` | Main app, routing, Auth Context | Thêm route mới, sửa check login |
+| `frontend/src/components/pos/POSView.jsx` | Giao diện bán hàng | UI bán hàng, giỏ hàng |
+| `frontend/src/components/admin/AdminLayout.jsx` | Khung Trang quản trị | Sidebar, layout tổng |
+| `frontend/src/components/admin/DashboardView.jsx`| Báo cáo tổng quan | Update chart, KPI cards |
+| `frontend/src/components/admin/OrdersView.jsx` | Danh sách đơn hàng | react-table Tremor view |
+| `frontend/src/components/admin/OrderModal.jsx` | Modal đơn hàng | Chi tiết, sửa đơn hàng |
+| `frontend/src/components/admin/SuppliersView.jsx`| Quản lý nhà cung cấp | NCC và Table Tremor |
 | `frontend/vite.config.js` | Vite config | Build config, proxy |
 | `frontend/tailwind.config.js` | Tailwind config | Theme, colors |
 
@@ -67,16 +76,18 @@ gemini-pos/
 
 | File | Mô tả | Khi nào cần sửa |
 |------|-------|-----------------|
-| `backend/server.cjs` | Express server, tất cả API | Thêm API mới, sửa logic |
+| `backend/server.cjs` | Express server setup | Config App, Cron, Error handlers |
+| `backend/config/database.js`| SQLite Connection | Setup dbPath, Pragmas, Schema |
+| `backend/routes/*.js`| Router Endpoints | Từng cụm Tính năng (Products, Stats...) |
 | `backend/package.json` | Dependencies | Thêm thư viện mới |
 
 ### Database
 
 | File | Mô tả | Khi nào cần sửa |
 |------|-------|-----------------|
-| `database/pos.db` | SQLite database | Không sửa trực tiếp |
-| `database/schema.sql` | Schema reference | Cập nhật khi thay đổi schema |
-| `database/migrate-db.cjs` | Migration script | Thêm cột mới |
+| `database/pos.db` | SQLite database | Không sửa trực tiếp, tự tạo ra nếu chưa có |
+| `docs/DATABASE_SCHEMA.md` | Schema reference | Cập nhật khi thay đổi schema |
+| `backend/config/database.js`| Migration & Init Script | Thêm cột mới trong `initDatabase` |
 
 ---
 
@@ -111,18 +122,26 @@ GET    /api/logs               // Nhật ký hoạt động
 -- Products: Sản phẩm
 products(id TEXT PK, name, brand, category, price INT, 
          case_price INT, units_per_case INT, stock INT, 
-         code TEXT, image TEXT, total_sold INT)
+         cost_price INT, code TEXT, image TEXT, total_sold INT)
 
 -- Orders: Đơn hàng  
-orders(id INT PK AUTO, order_code TEXT, total INT, 
+orders(id INT PK AUTO, order_code TEXT, total INT, original_total INT, discount INT,
        timestamp INT, items TEXT/JSON, customer_name TEXT,
        payment_method TEXT, status TEXT, note TEXT)
+
+-- Order Items: Bảng Detail Đơn Hàng dùng để thống kê
+order_items(id INT PK AUTO, order_id INT, product_id TEXT, 
+            quantity INT, price INT)
+
+-- Suppliers: Nhà cung cấp
+suppliers(id TEXT PK, name TEXT, contact_person TEXT, phone TEXT, 
+          email TEXT, address TEXT, note TEXT, created_at INT, updated_at INT)
 
 -- Activity Logs: Nhật ký
 activity_logs(id INT PK AUTO, action TEXT, details TEXT, timestamp INT)
 
 -- Import Notes: Phiếu nhập
-import_notes(id TEXT PK, timestamp INT, total_cost INT, 
+import_notes(id TEXT PK, supplier_id TEXT, timestamp INT, total_cost INT, 
              note TEXT, items TEXT/JSON)
 ```
 
@@ -197,8 +216,8 @@ VITE_API_URL=https://api.quanganh.org/v1/store
 
 ### 3. Database Path
 ```javascript
-// Backend reads database from:
-const dbPath = path.join(__dirname, '../database/pos.db');
+// Backend reads database resolving from ENVs or paths using getDbPath():
+const dbPath = path.join(__dirname, '../database/pos.db'); // inside backend/config/database.js
 ```
 
 ### 4. CORS
@@ -226,8 +245,8 @@ const dbPath = path.join(__dirname, '../database/pos.db');
 4. Push GitHub (Vercel auto-deploy)
 
 ### Thay đổi Database Schema
-1. Cập nhật `database/schema.sql` 
-2. Thêm migration trong `backend/server.cjs` (db.serialize block)
+1. Cập nhật `backend/config/database.js` (`initDatabase` function)
+2. Thêm script ALTER TABLE/CREATE TABLE trong phần Init để tự Create IF NOT EXISTS.
 3. Cập nhật `docs/DATABASE_SCHEMA.md`
 
 ---
@@ -239,10 +258,10 @@ const dbPath = path.join(__dirname, '../database/pos.db');
 ssh root@203.55.176.10 "pm2 status"
 
 # View VPS logs
-ssh root@203.55.176.10 "pm2 logs pos-api --lines 50"
+ssh root@203.55.176.10 "pm2 logs store-api --lines 50"
 
 # Restart VPS server
-ssh root@203.55.176.10 "pm2 restart pos-api"
+ssh root@203.55.176.10 "pm2 restart store-api"
 
 # Test API
 curl https://api.quanganh.org/v1/store/products

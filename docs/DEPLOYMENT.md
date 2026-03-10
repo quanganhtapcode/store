@@ -59,10 +59,10 @@ Toàn bộ hệ thống nằm tại: **`/var/www/store/`**
 | `/scripts/` | **Script tự động** | Chứa `backup.sh` chạy cronjob |
 
 ### 2.2. Quản Lý Service (PM2)
-Bên Backend chạy dưới PM2 với tên process là `pos-api`.
+Bên Backend chạy dưới PM2 với tên process là `store-api`.
 
-- **Start/Restart:** `pm2 restart pos-api`
-- **Check Status:** `pm2 status` hoặc `pm2 logs pos-api`
+- **Start/Restart:** `pm2 restart store-api`
+- **Check Status:** `pm2 status` hoặc `pm2 logs store-api`
 - **Port:** `3001`
 
 ### 2.3. Quy trình Deploy Code Mới
@@ -77,7 +77,7 @@ Bên Backend chạy dưới PM2 với tên process là `pos-api`.
    # Nếu dùng git
    git pull origin main
    npm install
-   pm2 restart pos-api
+   pm2 restart store-api
    ```
    *(Hoặc copy thủ công file server.cjs nếu không dùng git trực tiếp trên VPS)*
 
@@ -137,16 +137,16 @@ scp -r backend/public/images/* root@203.55.176.10:/var/www/store/api/public/imag
 
 ### Kiểm tra Logs
 ```bash
-pm2 logs pos-api
+pm2 logs store-api
 ```
 
 ### Nếu Server API không phản hồi
-1. Check PM2: `pm2 status` xem `pos-api` có online không.
-2. Restart: `pm2 restart pos-api`.
+1. Check PM2: `pm2 status` xem `store-api` có online không.
+2. Restart: `pm2 restart store-api`.
 3. Check Nginx: `systemctl status nginx`.
 
 ### Khôi phục dữ liệu từ Backup
-1. Stop service: `pm2 stop pos-api`
+1. Stop service: `pm2 stop store-api`
 2. Copy file backup từ `/backups/` về `/api/database/`.
 3. Đổi tên thành `pos.db`.
-4. Start service: `pm2 start pos-api`
+4. Start service: `pm2 start store-api`

@@ -64,6 +64,7 @@ Content-Type: application/json
     "case_price": 260000,
     "units_per_case": 24,
     "stock": 100,
+    "cost_price": 8500,
     "code": "8934822100022",
     "image": "data:image/jpeg;base64,..." // hoặc URL
 }
@@ -96,7 +97,8 @@ Content-Type: application/json
 {
     "name": "Coca-Cola 330ml (Updated)",
     "price": 13000,
-    "stock": 200
+    "stock": 200,
+    "cost_price": 9000
 }
 ```
 
@@ -308,6 +310,71 @@ GET /api/stats
 
 ---
 
+### GET /api/stats/detailed
+
+Lấy báo cáo theo ngày, giờ, hình thức thanh toán và danh mục.
+
+**Request:**
+```http
+GET /api/stats/detailed?startDate=...&endDate=...
+```
+
+**Response:**
+```json
+{
+    "paymentMethods": [...],
+    "dayOfWeek": [...],
+    "timeOfDay": [...],
+    "topProducts": [...],
+    "categories": [...],
+    "dailyTrend": { "current": [...], "previous": [...] },
+    "medianDayOfWeek": [...],
+    "medianTimeOfDay": [...],
+    "kpis": { "todayRevenue": 10000, ... }
+}
+```
+
+---
+
+### GET /api/stats/profit-analysis
+
+Phân tích lợi nhuận dựa trên `price` và `cost_price`.
+
+**Request:**
+```http
+GET /api/stats/profit-analysis
+```
+
+---
+
+### GET /api/stats/purchase-recommendations
+
+Gợi ý mua hàng dựa trên AI tồn kho và tốc độ bán (`sold30d` và `sold7d`).
+
+**Request:**
+```http
+GET /api/stats/purchase-recommendations
+```
+
+---
+
+## 🏢 Suppliers API
+
+### GET /api/suppliers
+
+Lấy danh sách nhà cung cấp.
+
+**Request:**
+```http
+GET /api/suppliers
+```
+
+### POST /api/suppliers
+
+Thêm nhà cung cấp mới. (Hỗ trợ PUT cho cập nhật và DELETE cho xoá).
+
+---
+
 ## 📥 Import API
 
 ### POST /api/imports
@@ -320,12 +387,13 @@ POST /api/imports
 Content-Type: application/json
 
 {
+    "supplier_id": "SUP-123456",
     "items": [
-        { "id": "PRD-A1B2C3", "quantity": 100 },
-        { "id": "PRD-D4E5F6", "quantity": 50 }
+        { "id": "PRD-A1B2C3", "quantity": 100, "cost": 8000 },
+        { "id": "PRD-D4E5F6", "quantity": 50, "cost": 150000 }
     ],
-    "total_cost": 5000000,
-    "note": "Nhập từ NCC ABC"
+    "total_cost": 8300000,
+    "note": "Nhập kho đợt 1"
 }
 ```
 

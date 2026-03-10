@@ -32,7 +32,7 @@ const DAY_LABELS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
 /* ── KPI Tab Cards ── */
 const KPITabs = ({ items, selected, onSelect }) => (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {items.map((item) => {
             const isActive = selected === item.id;
             const change = item.change;
@@ -65,7 +65,7 @@ const KPITabs = ({ items, selected, onSelect }) => (
                             </span>
                         )}
                     </div>
-                    <p className="text-tremor-label text-tremor-content dark:text-dark-tremor-content mt-1">
+                    <p className="text-tremor-label text-tremor-content dark:text-dark-tremor-content mt-1 truncate">
                         {item.sub}
                     </p>
                     {isActive && (

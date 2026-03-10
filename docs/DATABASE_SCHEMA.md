@@ -12,8 +12,10 @@ Hệ thống sử dụng **SQLite** làm database chính với các bảng sau:
 |------|-------|----------------------------|
 | `products` | Thông tin sản phẩm | ~100-500 |
 | `orders` | Đơn hàng | Tăng theo thời gian |
-| `activity_logs` | Nhật ký hoạt động | Giới hạn 100 gần nhất |
+| `order_items` | Chi tiết trong mặt hàng | Tăng theo thời gian x Số SP |
+| `suppliers` | Thông tin Nhà cung cấp | ~10-100 |
 | `import_notes` | Phiếu nhập hàng | Theo nhu cầu |
+| `activity_logs` | Nhật ký hoạt động | Giới hạn 100 gần nhất |
 
 ---
 
@@ -33,6 +35,7 @@ CREATE TABLE products (
     case_price INTEGER,           -- Giá bán theo thùng (VNĐ)
     units_per_case INTEGER,       -- Số đơn vị trong 1 thùng
     stock INTEGER DEFAULT 0,      -- Số lượng tồn kho
+    cost_price INTEGER DEFAULT 0, -- Giá nhập trung bình
     code TEXT,                    -- Mã vạch/Barcode
     image TEXT,                   -- URL hoặc path ảnh local
     total_sold INTEGER DEFAULT 0  -- Tổng số lượng đã bán (trending)
@@ -51,6 +54,7 @@ CREATE TABLE products (
 | `case_price` | INTEGER | YES | Giá bán theo thùng, null nếu không bán thùng |
 | `units_per_case` | INTEGER | YES | Số chai/lon trong 1 thùng |
 | `stock` | INTEGER | NO | Số lượng tồn kho hiện tại |
+| `cost_price` | INTEGER | NO | Giá nhập hàng hiện tại (để tính tỷ suất lợi nhuận) |
 | `code` | TEXT | YES | Mã vạch để quét |
 | `image` | TEXT | YES | Đường dẫn ảnh: `/images/PRD-XXXXXX.jpg` hoặc URL |
 | `total_sold` | INTEGER | NO | Tổng số đã bán để xếp hạng Trending |
@@ -85,12 +89,14 @@ Lưu trữ lịch sử đơn hàng.
 CREATE TABLE orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,  -- ID tự tăng
     order_code TEXT UNIQUE,                -- Mã đơn hàng (ORD-YYYYMMDD-NNNN)
-    total INTEGER NOT NULL,                -- Tổng tiền (VNĐ)
+    total INTEGER NOT NULL,                -- Tổng tiền (VNĐ) đã chiết khấu
+    original_total INTEGER,                -- Tiền trước chiết khấu
+    discount INTEGER DEFAULT 0,            -- Số tiền giảm giá
     timestamp INTEGER NOT NULL,            -- Thời gian tạo (Unix ms)
-    items TEXT NOT NULL,                   -- Chi tiết sản phẩm (JSON)
+    items TEXT NOT NULL,                   -- Chi tiết sản phẩm (JSON dạng chuỗi để fallback)
     customer_name TEXT DEFAULT 'Khách lẻ', -- Tên khách hàng
     payment_method TEXT DEFAULT 'cash',    -- Phương thức thanh toán
-    status TEXT DEFAULT 'completed',       -- Trạng thái đơn hàng
+    status TEXT DEFAULT 'completed',       -- Trạng thái
     note TEXT                              -- Ghi chú
 );
 ```
@@ -101,7 +107,9 @@ CREATE TABLE orders (
 |-----|------|-------|
 | `id` | INTEGER | ID tự động tăng |
 | `order_code` | TEXT | Mã đơn: `ORD-20260101-0001` (ngày + số thứ tự) |
-| `total` | INTEGER | Tổng tiền đơn hàng |
+| `total` | INTEGER | Tổng tiền hiển thị khách hàng thu cuối cùng |
+| `original_total` | INTEGER | Tổng tiền ban đầu |
+| `discount` | INTEGER | Số tiền được giảm giá |
 | `timestamp` | INTEGER | Unix timestamp (milliseconds) |
 | `items` | TEXT | JSON array chứa chi tiết sản phẩm |
 | `customer_name` | TEXT | Tên khách hàng hoặc "Khách lẻ" |
@@ -131,6 +139,48 @@ CREATE TABLE orders (
         "units_per_case": 24
     }
 ]
+```
+
+---
+
+## 🛒 Bảng: `order_items`
+
+Bảng chuẩn hóa chi tiết sản phẩm trong từng đơn hàng, chuyên dụng cho truy vấn cực nhanh báo cáo/thống kê thay cho việc Query JSON array `items` trong bảng `orders`.
+
+### Cấu trúc
+
+```sql
+CREATE TABLE order_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id INTEGER,
+    product_id TEXT,
+    quantity INTEGER,
+    price INTEGER,
+    FOREIGN KEY(order_id) REFERENCES orders(id),
+    FOREIGN KEY(product_id) REFERENCES products(id)
+);
+```
+
+---
+
+## 🏬 Bảng: `suppliers`
+
+Lưu trữ thông tin Nhà Cung Cấp hàng hoá.
+
+### Cấu trúc
+
+```sql
+CREATE TABLE suppliers (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    contact_person TEXT,
+    phone TEXT,
+    email TEXT,
+    address TEXT,
+    note TEXT,
+    created_at INTEGER,
+    updated_at INTEGER
+);
 ```
 
 ---
@@ -172,6 +222,7 @@ Lưu trữ phiếu nhập hàng.
 ```sql
 CREATE TABLE import_notes (
     id TEXT PRIMARY KEY,          -- Mã phiếu nhập (IMP-XXXXXX)
+    supplier_id TEXT,             -- Mã nhà cung cấp (FK)
     timestamp INTEGER NOT NULL,   -- Thời gian nhập
     total_cost INTEGER,           -- Tổng chi phí nhập
     note TEXT,                    -- Ghi chú
@@ -197,22 +248,25 @@ CREATE TABLE import_notes (
 
 ```
 ┌─────────────┐       ┌─────────────┐
-│  products   │◄──────│   orders    │
-│             │ items │             │
-└─────────────┘       └─────────────┘
-       ▲                     │
-       │                     │
-       │              ┌──────▼──────┐
+│  products   │◄──────│ order_items │◄─────┐
+│             │       └─────────────┘      │
+└─────────────┘                            │
+       ▲                                   │
+       ├─────────────────────┐      ┌──────┴──────┐
+       │                     │      │   orders    │
+       │              ┌──────▼──────┐─────────────┘
        │              │activity_logs│
        │              └─────────────┘
-       │
-┌──────┴──────┐
-│import_notes │
-└─────────────┘
+       │                     ▲  
+┌──────┴──────┐              │
+│import_notes │      ┌───────┴─────┐
+│supplier_id  │◄─────┤  suppliers  │
+└─────────────┘      └─────────────┘
 ```
 
-- `orders.items` tham chiếu đến `products.id`
-- `import_notes.items` tham chiếu đến `products.id`
+- `order_items.product_id` tham chiếu đến `products.id`
+- `order_items.order_id` tham chiếu đến `orders.id`
+- `import_notes.supplier_id` tham chiếu đến `suppliers.id`
 - `activity_logs` ghi lại mọi thay đổi
 
 ---
