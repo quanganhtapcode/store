@@ -1,13 +1,20 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
     Card, Table, TableBody, TableCell,
-    TableHead, TableHeaderCell, TableRow, BarChart,
+    TableHead, TableHeaderCell, TableRow, BarChart, Badge
 } from '@tremor/react';
 import {
     Truck, Package, Search, X, Plus, Minus, Trash2,
     CheckCircle, Image as ImageIcon, ChevronDown, Clock,
-    TrendingUp, AlertTriangle, ShoppingCart, DollarSign, Percent, ArrowRight
+    TrendingUp, AlertTriangle, ShoppingCart, DollarSign, Percent, ArrowRight,
+    ChevronLeft, ChevronRight, FileText
 } from 'lucide-react';
+import {
+    flexRender,
+    getCoreRowModel,
+    getPaginationRowModel,
+    useReactTable,
+} from '@tanstack/react-table';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
@@ -47,6 +54,159 @@ const URGENCY_MAP = {
     high: { label: 'Ưu tiên cao', color: 'bg-orange-100 text-orange-700', dotColor: 'bg-orange-500' },
     medium: { label: 'Nên nhập', color: 'bg-yellow-100 text-yellow-700', dotColor: 'bg-yellow-500' },
     low: { label: 'Bình thường', color: 'bg-green-100 text-green-700', dotColor: 'bg-green-500' },
+};
+
+// Pagination Components
+const TextButton = ({ onClick, disabled, children, className }) => (
+    <button type="button" className={classNames("rounded-tremor-small bg-tremor-background p-2 text-tremor-default shadow-tremor-input ring-1 ring-inset ring-tremor-ring hover:bg-tremor-background-muted disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-tremor-background dark:bg-dark-tremor-background dark:shadow-dark-tremor-input dark:ring-dark-tremor-ring hover:dark:bg-dark-tremor-background-muted disabled:hover:dark:bg-dark-tremor-background", className)} onClick={onClick} disabled={disabled}>{children}</button>
+);
+const NumberButton = ({ active, onClick, children, position }) => (
+    <button type="button" className={classNames('min-w-[36px] flex items-center justify-center rounded-tremor-small p-2 text-tremor-default text-tremor-content-strong disabled:opacity-50 dark:text-dark-tremor-content-strong', active ? 'bg-tremor-brand font-semibold text-white dark:bg-dark-tremor-brand dark:text-dark-tremor-brand-inverted' : 'hover:bg-tremor-background-muted hover:dark:bg-dark-tremor-background', position === 'left' ? 'rounded-l-tremor-small' : position === 'right' ? 'rounded-r-tremor-small' : '')} onClick={onClick} aria-current={active ? 'page' : undefined}>{children}</button>
+);
+const MobileButton = ({ onClick, disabled, children, position }) => (
+    <button type="button" className={classNames('group p-2 flex items-center justify-center text-tremor-default ring-1 ring-inset ring-tremor-ring hover:bg-tremor-background-muted disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-tremor-background dark:ring-dark-tremor-ring hover:dark:bg-dark-tremor-background disabled:hover:dark:bg-dark-tremor-background', position === 'left' ? 'rounded-l-tremor-small' : position === 'right' ? '-ml-px rounded-r-tremor-small' : '')} onClick={onClick} disabled={disabled}>{children}</button>
+);
+
+const HistoryTable = ({ loading, history, suppliers, fmt }) => {
+    const columns = useMemo(() => [
+        {
+            header: 'Mã phiếu',
+            accessorKey: 'id',
+            cell: ({ getValue }) => <span className="font-semibold text-tremor-content-strong dark:text-dark-tremor-content-strong">{getValue()}</span>,
+        },
+        {
+            header: 'Nhà cung cấp',
+            accessorKey: 'supplier_id',
+            cell: ({ getValue }) => {
+                const s = suppliers.find(su => su.id === getValue());
+                return s ? <span className="inline-flex items-center rounded-tremor-small px-2 py-0.5 text-[11px] font-medium bg-blue-100 text-blue-800 ring-1 ring-inset ring-blue-600/10 dark:bg-blue-500/20 dark:text-blue-400 dark:ring-blue-400/20">{s.name}</span> : <span className="text-tremor-content-subtle">—</span>;
+            }
+        },
+        {
+            header: 'Thời gian',
+            accessorKey: 'timestamp',
+            cell: ({ getValue }) => <span className="text-tremor-content dark:text-dark-tremor-content whitespace-nowrap"><Clock size={12} className="inline mr-1" />{new Date(getValue()).toLocaleString('vi-VN')}</span>,
+        },
+        {
+            header: 'Sản phẩm',
+            accessorKey: 'items',
+            cell: ({ getValue }) => {
+                const itemsStr = getValue();
+                const items = typeof itemsStr === 'string' ? JSON.parse(itemsStr) : (itemsStr || []);
+                return (
+                    <div className="flex flex-wrap gap-1 max-w-[250px]">
+                        {items.slice(0, 3).map((item, idx) => (
+                            <span key={idx} className="inline-flex items-center rounded-tremor-small px-1.5 py-0.5 text-[10px] sm:text-[11px] font-medium bg-gray-100 text-gray-800 ring-1 ring-inset ring-gray-600/10 dark:bg-gray-500/20 dark:text-gray-300 dark:ring-gray-400/20">
+                                {item.name} <span className="ml-1 opacity-70">×{item.quantity}</span>
+                            </span>
+                        ))}
+                        {items.length > 3 && (
+                            <span className="inline-flex items-center rounded-tremor-small px-1.5 py-0.5 text-[10px] sm:text-[11px] font-medium bg-blue-100 text-blue-800 ring-1 ring-inset ring-blue-600/10 dark:bg-blue-500/20 dark:text-blue-400 dark:ring-blue-400/20">
+                                +{items.length - 3}
+                            </span>
+                        )}
+                    </div>
+                );
+            }
+        },
+        {
+            header: 'Ghi chú',
+            accessorKey: 'note',
+            cell: ({ getValue }) => <span className="text-sm text-tremor-content italic truncate max-w-[150px] inline-block">{getValue() || '—'}</span>
+        },
+        {
+            header: 'Tổng tiền',
+            accessorKey: 'total_cost',
+            meta: { align: 'text-right' },
+            cell: ({ getValue }) => <span className="font-bold text-tremor-brand dark:text-dark-tremor-brand whitespace-nowrap">{fmt(getValue())}</span>
+        }
+    ], [suppliers, fmt]);
+
+    const table = useReactTable({
+        data: history,
+        columns,
+        getCoreRowModel: getCoreRowModel(),
+        getPaginationRowModel: getPaginationRowModel(),
+        initialState: { pagination: { pageSize: 50 } }
+    });
+
+    const paginationCount = table.getPageCount();
+    const actualPage = table.getState().pagination.pageIndex + 1;
+
+    if (loading) return <div className="text-center py-12 text-tremor-content"><div className="w-8 h-8 border-2 border-tremor-brand border-t-transparent rounded-full animate-spin mx-auto mb-3" />Đang tải...</div>;
+    if (history.length === 0) return <Card className="p-0"><div className="text-center py-12"><FileText size={48} className="mx-auto mb-3 text-tremor-content-subtle" /><p className="text-tremor-content font-medium">Chưa có lịch sử nhập kho</p></div></Card>;
+
+    return (
+        <Card className="p-0 sm:p-0 overflow-hidden">
+            <div className="overflow-x-auto relative min-h-[400px]">
+                <Table>
+                    <TableHead className="bg-tremor-background-muted/50 dark:bg-dark-tremor-background-muted/50">
+                        {table.getHeaderGroups().map((headerGroup) => (
+                            <TableRow key={headerGroup.id} className="border-b border-tremor-border dark:border-dark-tremor-border">
+                                {headerGroup.headers.map((header) => (
+                                    <TableHeaderCell key={header.id} className={classNames(header.column.columnDef.meta?.align || 'text-left')}>
+                                        {flexRender(header.column.columnDef.header, header.getContext())}
+                                    </TableHeaderCell>
+                                ))}
+                            </TableRow>
+                        ))}
+                    </TableHead>
+                    <TableBody>
+                        {table.getRowModel().rows.map((row) => (
+                            <TableRow key={row.id} className="hover:bg-tremor-background-muted hover:dark:bg-dark-tremor-background-muted transition-colors">
+                                {row.getVisibleCells().map((cell) => (
+                                    <TableCell key={cell.id} className={classNames(cell.column.columnDef.meta?.align || 'text-left', 'align-middle')}>
+                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                    </TableCell>
+                                ))}
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
+            {/* Pagination Controls */}
+            <div className="p-4 border-t border-tremor-border dark:border-dark-tremor-border bg-tremor-background-muted/50 dark:bg-dark-tremor-background-muted/50 flex items-center justify-between sm:justify-center">
+                <div className="hidden gap-0.5 sm:inline-flex">
+                    <TextButton onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()} className="group"><span className="sr-only">Previous</span><ChevronLeft className="size-5 text-tremor-content-emphasis group-hover:text-tremor-content-strong dark:text-dark-tremor-content-emphasis group-hover:dark:text-dark-tremor-content-strong" aria-hidden={true} /></TextButton>
+                    <NumberButton onClick={() => table.setPageIndex(0)} active={actualPage === 1}>1</NumberButton>
+                    {actualPage > 4 ? (
+                        actualPage < paginationCount - 2 ? (
+                            <>
+                                <NumberButton onClick={() => table.setPageIndex(actualPage - 3)} active={false}>...</NumberButton>
+                                <NumberButton onClick={() => table.setPageIndex(actualPage - 2)} active={actualPage === actualPage - 1}>{actualPage - 1}</NumberButton>
+                                <NumberButton onClick={() => table.setPageIndex(actualPage - 1)} active={true}>{actualPage}</NumberButton>
+                                <NumberButton onClick={() => table.setPageIndex(actualPage)} active={actualPage === actualPage + 1}>{actualPage + 1}</NumberButton>
+                                <NumberButton onClick={() => table.setPageIndex(actualPage + 1)} active={false}>...</NumberButton>
+                            </>
+                        ) : (
+                            <>
+                                <NumberButton onClick={() => table.setPageIndex(1)} active={false}>2</NumberButton>
+                                <NumberButton onClick={() => table.setPageIndex(paginationCount - 5)} active={false}>...</NumberButton>
+                                <NumberButton onClick={() => table.setPageIndex(paginationCount - 4)} active={actualPage === paginationCount - 3}>{paginationCount - 3}</NumberButton>
+                                <NumberButton onClick={() => table.setPageIndex(paginationCount - 3)} active={actualPage === paginationCount - 2}>{paginationCount - 2}</NumberButton>
+                                <NumberButton onClick={() => table.setPageIndex(paginationCount - 2)} active={actualPage === paginationCount - 1}>{paginationCount - 1}</NumberButton>
+                            </>
+                        )
+                    ) : (
+                        <>
+                            {paginationCount >= 2 && <NumberButton onClick={() => table.setPageIndex(1)} active={actualPage === 2}>2</NumberButton>}
+                            {paginationCount >= 3 && <NumberButton onClick={() => table.setPageIndex(2)} active={actualPage === 3}>3</NumberButton>}
+                            {paginationCount >= 4 && <NumberButton onClick={() => table.setPageIndex(3)} active={actualPage === 4}>4</NumberButton>}
+                            {paginationCount > 5 && <NumberButton onClick={() => table.setPageIndex(4)} active={false}>...</NumberButton>}
+                            {paginationCount > 5 && <NumberButton onClick={() => table.setPageIndex(paginationCount - 2)} active={false}>{paginationCount - 1}</NumberButton>}
+                        </>
+                    )}
+                    {paginationCount > 1 && <NumberButton onClick={() => table.setPageIndex(paginationCount - 1)} active={actualPage === paginationCount}>{paginationCount}</NumberButton>}
+                    <TextButton onClick={() => table.nextPage()} disabled={!table.getCanNextPage()} className="group"><span className="sr-only">Next</span><ChevronRight className="size-5 text-tremor-content-emphasis group-hover:text-tremor-content-strong dark:text-dark-tremor-content-emphasis group-hover:dark:text-dark-tremor-content-strong" aria-hidden={true} /></TextButton>
+                </div>
+                <p className="text-tremor-default tabular-nums text-tremor-content dark:text-dark-tremor-content sm:hidden">Trang <span className="font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong">{actualPage}</span> / <span className="font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong">{paginationCount || 1}</span></p>
+                <div className="inline-flex items-center rounded-tremor-small shadow-tremor-input dark:shadow-dark-tremor-input sm:hidden">
+                    <MobileButton position="left" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}><span className="sr-only">Previous</span><ChevronLeft className="size-5 text-tremor-content-emphasis group-hover:text-tremor-content-strong dark:text-dark-tremor-content-emphasis group-hover:dark:text-dark-tremor-content-strong" aria-hidden={true} /></MobileButton>
+                    <MobileButton position="right" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}><span className="sr-only">Next</span><ChevronRight className="size-5 text-tremor-content-emphasis group-hover:text-tremor-content-strong dark:text-dark-tremor-content-emphasis group-hover:dark:text-dark-tremor-content-strong" aria-hidden={true} /></MobileButton>
+                </div>
+            </div>
+        </Card>
+    );
 };
 
 /* ═══════════════════════════════════════════ */
@@ -411,40 +571,8 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
 
             {/* ═══ HISTORY ═══ */}
             {viewMode === 'history' && (
-                <div className="space-y-3">
-                    {loadingHistory ? (
-                        <div className="text-center py-12 text-tremor-content">
-                            <div className="w-8 h-8 border-2 border-tremor-brand border-t-transparent rounded-full animate-spin mx-auto mb-3" />Đang tải...
-                        </div>
-                    ) : importHistory.length === 0 ? (
-                        <Card className="p-0"><div className="text-center py-12"><Package size={48} className="mx-auto mb-3 text-tremor-content-subtle" /><p className="text-tremor-content font-medium">Chưa có lịch sử</p></div></Card>
-                    ) : (
-                        importHistory.map(imp => {
-                            const items = typeof imp.items === 'string' ? JSON.parse(imp.items) : imp.items;
-                            const supplier = suppliers.find(s => s.id === imp.supplier_id);
-                            return (
-                                <Card key={imp.id} className="p-5">
-                                    <div className="flex justify-between items-start mb-3">
-                                        <div>
-                                            <p className="font-bold text-sm text-tremor-content-strong dark:text-dark-tremor-content-strong flex items-center gap-2">
-                                                {imp.id}
-                                                {supplier && <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-lg font-medium">{supplier.name}</span>}
-                                            </p>
-                                            <p className="text-xs text-tremor-content mt-0.5">{new Date(imp.timestamp).toLocaleString('vi-VN')}</p>
-                                        </div>
-                                        <span className="font-black text-tremor-brand text-base">{fmt(imp.total_cost)}</span>
-                                    </div>
-                                    <div className="flex gap-1.5 flex-wrap">
-                                        {items.slice(0, 4).map((item, idx) => (
-                                            <span key={idx} className="text-xs bg-tremor-background-muted dark:bg-dark-tremor-background-muted text-tremor-content px-2 py-1 rounded-lg">{item.name} ×{item.quantity}</span>
-                                        ))}
-                                        {items.length > 4 && <span className="text-xs text-tremor-brand self-center">+{items.length - 4}</span>}
-                                    </div>
-                                    {imp.note && <p className="text-xs text-tremor-content mt-2 italic">📝 {imp.note}</p>}
-                                </Card>
-                            );
-                        })
-                    )}
+                <div className="space-y-3 mt-4">
+                    <HistoryTable loading={loadingHistory} history={importHistory} suppliers={suppliers} fmt={fmt} />
                 </div>
             )}
 
