@@ -8,7 +8,8 @@ const { validateOrder, generateOrderCode, getDayRangeVI } = require('../utils/he
 router.get('/', async (req, res) => {
     const { startDate, endDate, limit, offset } = req.query;
 
-    const limitNum = Math.min(parseInt(limit) || 50, 200);
+    // If limit is provided, use it, otherwise don't restrict tightly (allow all for frontend pagination)
+    const limitNum = parseInt(limit) || 100000;
     const offsetNum = parseInt(offset) || 0;
 
     let baseQuery = "SELECT * FROM orders";

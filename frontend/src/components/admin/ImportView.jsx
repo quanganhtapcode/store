@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
     Card, Table, TableBody, TableCell,
     TableHead, TableHeaderCell, TableRow, BarChart,
@@ -52,7 +52,7 @@ const URGENCY_MAP = {
 /* ═══════════════════════════════════════════ */
 /* ── Import View ─────────────────────────── */
 /* ═══════════════════════════════════════════ */
-const ImportView = ({ products, suppliers, refreshData, authToken, onLogout }) => {
+const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, authToken, onLogout }) => {
     const [importCart, setImportCart] = useState([]);
     const [importSearch, setImportSearch] = useState('');
     const [selectedSupplier, setSelectedSupplier] = useState('');
@@ -61,7 +61,7 @@ const ImportView = ({ products, suppliers, refreshData, authToken, onLogout }) =
     const [editingQty, setEditingQty] = useState(null);
     const [editingPrice, setEditingPrice] = useState(null);
     const [submitting, setSubmitting] = useState(false);
-    const [viewMode, setViewMode] = useState('import'); // 'import' | 'history' | 'analysis' | 'recommend'
+    const viewMode = subView || 'import';
     const [importHistory, setImportHistory] = useState([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [profitData, setProfitData] = useState(null);
@@ -128,16 +128,16 @@ const ImportView = ({ products, suppliers, refreshData, authToken, onLogout }) =
         finally { setSubmitting(false); }
     };
 
-    const fetchHistory = async () => {
+    const fetchHistory = useCallback(async () => {
         setLoadingHistory(true);
         try {
             const res = await fetch(`${API_URL}/imports`);
             setImportHistory(await res.json());
         } catch (e) { console.error(e); }
         setLoadingHistory(false);
-    };
+    }, []);
 
-    const fetchProfitAnalysis = async () => {
+    const fetchProfitAnalysis = useCallback(async () => {
         setLoadingAnalysis(true);
         try {
             const [profitRes, recsRes] = await Promise.all([
@@ -148,7 +148,12 @@ const ImportView = ({ products, suppliers, refreshData, authToken, onLogout }) =
             setRecommendations(await recsRes.json());
         } catch (e) { console.error(e); }
         setLoadingAnalysis(false);
-    };
+    }, []);
+
+    useEffect(() => {
+        if (viewMode === 'history') fetchHistory();
+        if (viewMode === 'analysis' || viewMode === 'recommend') fetchProfitAnalysis();
+    }, [viewMode, fetchHistory, fetchProfitAnalysis]);
 
     // Auto-add recommendations to cart
     const addRecommendationsToCart = (recs) => {
@@ -164,38 +169,28 @@ const ImportView = ({ products, suppliers, refreshData, authToken, onLogout }) =
                 }
             }
         });
-        setViewMode('import');
+        setActiveTab('import');
     };
 
-    const tabs = [
-        { id: 'import', label: 'Nhập kho', icon: Truck },
-        { id: 'history', label: 'Lịch sử', icon: Clock, onSelect: fetchHistory },
-        { id: 'analysis', label: 'Lợi nhuận', icon: TrendingUp, onSelect: fetchProfitAnalysis },
-        { id: 'recommend', label: 'Gợi ý nhập', icon: ShoppingCart, onSelect: fetchProfitAnalysis },
-    ];
+    const viewTitles = {
+        'import': { title: 'Tạo phiếu nhập', desc: 'Nhập hàng vào kho và cập nhật giá', icon: Truck },
+        'history': { title: 'Lịch sử nhập kho', desc: 'Theo dõi các phiếu nhập hàng đã tạo', icon: Clock },
+        'analysis': { title: 'Phân tích lợi nhuận', desc: 'Tình hình doanh thu, chi phí và tồn kho', icon: TrendingUp },
+        'recommend': { title: 'Gợi ý nhập hàng', desc: 'Tính toán thông minh dựa trên AI', icon: ShoppingCart },
+    };
+
+    const currentTitle = viewTitles[viewMode] || viewTitles['import'];
 
     return (
         <div className="space-y-5 animate-in">
             {/* Header */}
-            <div className="flex items-center justify-between flex-wrap gap-3">
-                <div>
-                    <h2 className="text-xl font-bold text-tremor-content-strong dark:text-dark-tremor-content-strong">Nhập hàng</h2>
-                    <p className="text-tremor-default text-tremor-content dark:text-dark-tremor-content">Tạo phiếu nhập kho, phân tích lợi nhuận & gợi ý mua hàng</p>
+            <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                    <currentTitle.icon size={20} />
                 </div>
-                <div className="flex bg-tremor-background-muted dark:bg-dark-tremor-background-muted p-1 rounded-tremor-default border border-tremor-border dark:border-dark-tremor-border">
-                    {tabs.map(t => (
-                        <button key={t.id}
-                            onClick={() => { setViewMode(t.id); t.onSelect?.(); }}
-                            className={classNames(
-                                'px-3 py-2 rounded-tremor-small text-xs font-semibold transition-all flex items-center gap-1.5',
-                                viewMode === t.id
-                                    ? 'bg-tremor-background text-tremor-content-strong shadow-sm dark:bg-dark-tremor-background dark:text-dark-tremor-content-strong'
-                                    : 'text-tremor-content dark:text-dark-tremor-content'
-                            )}
-                        >
-                            <t.icon size={14} />{t.label}
-                        </button>
-                    ))}
+                <div>
+                    <h2 className="text-xl font-bold text-tremor-content-strong dark:text-dark-tremor-content-strong">{currentTitle.title}</h2>
+                    <p className="text-tremor-default text-tremor-content dark:text-dark-tremor-content">{currentTitle.desc}</p>
                 </div>
             </div>
 
@@ -627,7 +622,7 @@ const ImportView = ({ products, suppliers, refreshData, authToken, onLogout }) =
                                                                         if (prev.find(i => i.id === r.id)) return prev;
                                                                         return [...prev, { ...product, quantity: r.suggestedQty, importPrice: r.costPrice || Math.round(product.price * 0.7) }];
                                                                     });
-                                                                    setViewMode('import');
+                                                                    setActiveTab('import');
                                                                 }
                                                             }}
                                                                 className="text-tremor-brand hover:text-blue-700 transition-colors" title="Thêm vào phiếu">

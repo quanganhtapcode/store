@@ -24,6 +24,58 @@ import {
 } from '@tremor/react';
 import OrderModal from '../OrderModal';
 
+const TextButton = ({ onClick, disabled, children, className }) => {
+  return (
+    <button
+      type="button"
+      className={classNames(
+        "rounded-tremor-small bg-tremor-background p-2 text-tremor-default shadow-tremor-input ring-1 ring-inset ring-tremor-ring hover:bg-tremor-background-muted disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-tremor-background dark:bg-dark-tremor-background dark:shadow-dark-tremor-input dark:ring-dark-tremor-ring hover:dark:bg-dark-tremor-background-muted disabled:hover:dark:bg-dark-tremor-background",
+        className
+      )}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {children}
+    </button>
+  );
+};
+
+const NumberButton = ({ active, onClick, children, position }) => {
+  return (
+    <button
+      type="button"
+      className={classNames(
+        'min-w-[36px] flex items-center justify-center rounded-tremor-small p-2 text-tremor-default text-tremor-content-strong disabled:opacity-50 dark:text-dark-tremor-content-strong',
+        active
+          ? 'bg-tremor-brand font-semibold text-white dark:bg-dark-tremor-brand dark:text-dark-tremor-brand-inverted'
+          : 'hover:bg-tremor-background-muted hover:dark:bg-dark-tremor-background',
+        position === 'left' ? 'rounded-l-tremor-small' : position === 'right' ? 'rounded-r-tremor-small' : '',
+      )}
+      onClick={onClick}
+      aria-current={classNames(active ? 'page' : '')}
+    >
+      {children}
+    </button>
+  );
+};
+
+const MobileButton = ({ onClick, disabled, children, position }) => {
+  return (
+    <button
+      type="button"
+      className={classNames(
+        'group p-2 flex items-center justify-center text-tremor-default ring-1 ring-inset ring-tremor-ring hover:bg-tremor-background-muted disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-tremor-background dark:ring-dark-tremor-ring hover:dark:bg-dark-tremor-background disabled:hover:dark:bg-dark-tremor-background',
+        position === 'left' ? 'rounded-l-tremor-small' : position === 'right' ? '-ml-px rounded-r-tremor-small' : '',
+      )}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {children}
+    </button>
+  );
+};
+
+
 function classNames(...classes) {
     return classes.filter(Boolean).join(' ');
 }
@@ -186,11 +238,13 @@ const OrdersView = ({ orders, dateFilter, setDateFilter, fetchOrders, authToken 
         },
         onGlobalFilterChange: setGlobalFilter,
         initialState: {
-            pagination: { pageSize: 15 }
+            pagination: { pageSize: 50 }
         }
     });
 
     const isFiltered = dateFilter.start || dateFilter.end;
+    const paginationCount = table.getPageCount();
+    const actualPage = table.getState().pagination.pageIndex + 1;
 
     return (
         <div className="space-y-6 animate-in">
@@ -313,27 +367,64 @@ const OrdersView = ({ orders, dateFilter, setDateFilter, fetchOrders, authToken 
                         </TableFoot>
                     </Table>
                 </div>
-                
                 {/* Pagination Controls */}
-                <div className="p-4 flex items-center justify-between border-t border-tremor-border dark:border-dark-tremor-border bg-gray-50/50">
-                    <span className="text-sm text-gray-500">
-                        Trang {table.getState().pagination.pageIndex + 1} / {table.getPageCount() || 1}
-                    </span>
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => table.previousPage()}
-                            disabled={!table.getCanPreviousPage()}
-                            className="bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 shadow-sm"
-                        >
-                            Trước
-                        </button>
-                        <button
-                            onClick={() => table.nextPage()}
-                            disabled={!table.getCanNextPage()}
-                            className="bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 shadow-sm"
-                        >
-                            Sau
-                        </button>
+                <div className="p-4 border-t border-tremor-border dark:border-dark-tremor-border bg-gray-50/50 flex items-center justify-between sm:justify-center">
+                    {/* long pagination button form only for desktop view */}
+                    <div className="hidden gap-0.5 sm:inline-flex">
+                        <TextButton onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()} className="group">
+                            <span className="sr-only">Previous</span>
+                            <ChevronLeft className="size-5 text-tremor-content-emphasis group-hover:text-tremor-content-strong dark:text-dark-tremor-content-emphasis group-hover:dark:text-dark-tremor-content-strong" aria-hidden={true} />
+                        </TextButton>
+                        <NumberButton onClick={() => table.setPageIndex(0)} active={actualPage === 1}>1</NumberButton>
+                        {actualPage > 4 ? (
+                            actualPage < paginationCount - 2 ? (
+                                <>
+                                    <NumberButton onClick={() => table.setPageIndex(actualPage - 3)} active={false}>...</NumberButton>
+                                    <NumberButton onClick={() => table.setPageIndex(actualPage - 2)} active={actualPage === actualPage - 1}>{actualPage - 1}</NumberButton>
+                                    <NumberButton onClick={() => table.setPageIndex(actualPage - 1)} active={true}>{actualPage}</NumberButton>
+                                    <NumberButton onClick={() => table.setPageIndex(actualPage)} active={actualPage === actualPage + 1}>{actualPage + 1}</NumberButton>
+                                    <NumberButton onClick={() => table.setPageIndex(actualPage + 1)} active={false}>...</NumberButton>
+                                </>
+                            ) : (
+                                <>
+                                    <NumberButton onClick={() => table.setPageIndex(1)} active={false}>2</NumberButton>
+                                    <NumberButton onClick={() => table.setPageIndex(paginationCount - 5)} active={false}>...</NumberButton>
+                                    <NumberButton onClick={() => table.setPageIndex(paginationCount - 4)} active={actualPage === paginationCount - 3}>{paginationCount - 3}</NumberButton>
+                                    <NumberButton onClick={() => table.setPageIndex(paginationCount - 3)} active={actualPage === paginationCount - 2}>{paginationCount - 2}</NumberButton>
+                                    <NumberButton onClick={() => table.setPageIndex(paginationCount - 2)} active={actualPage === paginationCount - 1}>{paginationCount - 1}</NumberButton>
+                                </>
+                            )
+                        ) : (
+                            <>
+                                {paginationCount >= 2 && <NumberButton onClick={() => table.setPageIndex(1)} active={actualPage === 2}>2</NumberButton>}
+                                {paginationCount >= 3 && <NumberButton onClick={() => table.setPageIndex(2)} active={actualPage === 3}>3</NumberButton>}
+                                {paginationCount >= 4 && <NumberButton onClick={() => table.setPageIndex(3)} active={actualPage === 4}>4</NumberButton>}
+                                {paginationCount > 5 && <NumberButton onClick={() => table.setPageIndex(4)} active={false}>...</NumberButton>}
+                                {paginationCount > 5 && <NumberButton onClick={() => table.setPageIndex(paginationCount - 2)} active={false}>{paginationCount - 1}</NumberButton>}
+                            </>
+                        )}
+                        {paginationCount > 1 && (
+                            <NumberButton onClick={() => table.setPageIndex(paginationCount - 1)} active={actualPage === paginationCount}>{paginationCount}</NumberButton>
+                        )}
+                        <TextButton onClick={() => table.nextPage()} disabled={!table.getCanNextPage()} className="group">
+                            <span className="sr-only">Next</span>
+                            <ChevronRight className="size-5 text-tremor-content-emphasis group-hover:text-tremor-content-strong dark:text-dark-tremor-content-emphasis group-hover:dark:text-dark-tremor-content-strong" aria-hidden={true} />
+                        </TextButton>
+                    </div>
+                    
+                    <p className="text-tremor-defaulttabular-nums text-tremor-content dark:text-dark-tremor-content sm:hidden">
+                        Trang <span className="font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong">{actualPage}</span> / <span className="font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong">{paginationCount || 1}</span>
+                    </p>
+                    
+                    <div className="inline-flex items-center rounded-tremor-small shadow-tremor-input dark:shadow-dark-tremor-input sm:hidden">
+                        <MobileButton position="left" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
+                            <span className="sr-only">Previous</span>
+                            <ChevronLeft className="size-5 text-tremor-content-emphasis group-hover:text-tremor-content-strong dark:text-dark-tremor-content-emphasis group-hover:dark:text-dark-tremor-content-strong" aria-hidden={true} />
+                        </MobileButton>
+                        <MobileButton position="right" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
+                            <span className="sr-only">Next</span>
+                            <ChevronRight className="size-5 text-tremor-content-emphasis group-hover:text-tremor-content-strong dark:text-dark-tremor-content-emphasis group-hover:dark:text-dark-tremor-content-strong" aria-hidden={true} />
+                        </MobileButton>
                     </div>
                 </div>
             </Card>

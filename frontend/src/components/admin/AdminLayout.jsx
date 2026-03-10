@@ -19,6 +19,9 @@ const MENU_ITEMS = [
     { id: 'products', label: 'Sản phẩm', icon: Package, group: 'main' },
     { id: 'orders', label: 'Đơn hàng', icon: Receipt, group: 'main' },
     { id: 'import', label: 'Nhập hàng', icon: Truck, group: 'inventory' },
+    { id: 'import_history', label: 'Lịch sử nhập', icon: FileText, group: 'inventory' },
+    { id: 'import_analysis', label: 'Lợi nhuận gộp', icon: BarChart3, group: 'inventory' },
+    { id: 'import_recommend', label: 'Gợi ý mua', icon: Package, group: 'inventory' },
     { id: 'suppliers', label: 'Nhà cung cấp', icon: Users, group: 'inventory' },
     { id: 'logs', label: 'Nhật ký', icon: FileText, group: 'system' },
     { id: 'settings', label: 'Cài đặt', icon: Settings, group: 'system' },
@@ -45,7 +48,7 @@ const AdminLayout = ({ products, history, refreshData, onBackToPos, authToken, a
 
     // Fetchers
     const fetchOrders = useCallback(async () => {
-        let url = `${API_URL}/orders?limit=100`;
+        let url = `${API_URL}/orders?limit=100000`;
         if (dateFilter.start && dateFilter.end) url += `&startDate=${dateFilter.start}&endDate=${dateFilter.end}`;
         const res = await fetch(url);
         const data = await res.json();
@@ -88,8 +91,7 @@ const AdminLayout = ({ products, history, refreshData, onBackToPos, authToken, a
         if (activeTab === 'orders') fetchOrders();
         if (activeTab === 'logs') fetchLogs();
         if (activeTab === 'dashboard') { fetchStats(); fetchAnalytics(); }
-        if (activeTab === 'suppliers') fetchSuppliers();
-        if (activeTab === 'import') fetchSuppliers();
+        if (['suppliers', 'import', 'import_history', 'import_analysis', 'import_recommend'].includes(activeTab)) fetchSuppliers();
     }, [activeTab, fetchOrders, fetchLogs, fetchStats, fetchAnalytics, fetchSuppliers]);
 
     useEffect(() => {
@@ -132,7 +134,13 @@ const AdminLayout = ({ products, history, refreshData, onBackToPos, authToken, a
             case 'products':
                 return <ProductsView products={products} refreshData={refreshData} authToken={authToken} onLogout={onLogout} />;
             case 'import':
-                return <ImportView products={products} suppliers={suppliers} refreshData={refreshData} authToken={authToken} onLogout={onLogout} />;
+                return <ImportView subView="import" setActiveTab={setActiveTab} products={products} suppliers={suppliers} refreshData={refreshData} authToken={authToken} onLogout={onLogout} />;
+            case 'import_history':
+                return <ImportView subView="history" setActiveTab={setActiveTab} products={products} suppliers={suppliers} refreshData={refreshData} authToken={authToken} onLogout={onLogout} />;
+            case 'import_analysis':
+                return <ImportView subView="analysis" setActiveTab={setActiveTab} products={products} suppliers={suppliers} refreshData={refreshData} authToken={authToken} onLogout={onLogout} />;
+            case 'import_recommend':
+                return <ImportView subView="recommend" setActiveTab={setActiveTab} products={products} suppliers={suppliers} refreshData={refreshData} authToken={authToken} onLogout={onLogout} />;
             case 'orders':
                 return <OrdersView orders={orders} dateFilter={dateFilter} setDateFilter={setDateFilter} fetchOrders={fetchOrders} authToken={authToken} />;
             case 'suppliers':
