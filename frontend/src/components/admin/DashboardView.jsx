@@ -317,7 +317,7 @@ const DashboardView = ({ stats, products, analyticsData, setActiveTab }) => {
             {chartConfig && (
                 <Card className="p-0">
                     {/* Header */}
-                    <div className="p-6 pb-2">
+                    <div className="px-6 py-5">
                         <h3 className="font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong">
                             {chartConfig.title}
                         </h3>
@@ -390,7 +390,7 @@ const DashboardView = ({ stats, products, analyticsData, setActiveTab }) => {
 
                 {/* Hourly Pattern */}
                 <Card className="p-0">
-                    <div className="p-6 pb-2">
+                    <div className="px-6 py-5">
                         <h3 className="font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong">
                             Bán hàng theo giờ (Trung vị)
                         </h3>
@@ -405,7 +405,7 @@ const DashboardView = ({ stats, products, analyticsData, setActiveTab }) => {
                                     </p>
                                 </div>
                                 <p className="whitespace-nowrap text-tremor-default text-tremor-content dark:text-dark-tremor-content">
-                                    Tổng doanh thu (Median / Ngày)
+                                    Tổng doanh thu
                                 </p>
                             </li>
                             <li>
@@ -416,7 +416,7 @@ const DashboardView = ({ stats, products, analyticsData, setActiveTab }) => {
                                     </p>
                                 </div>
                                 <p className="whitespace-nowrap text-tremor-default text-tremor-content dark:text-dark-tremor-content">
-                                    Tổng đơn hàng (Median / Ngày)
+                                    Tổng đơn hàng
                                 </p>
                             </li>
                         </ul>
@@ -443,7 +443,7 @@ const DashboardView = ({ stats, products, analyticsData, setActiveTab }) => {
 
                 {/* Median by Day of Week */}
                 <Card className="p-0">
-                    <div className="p-6 pb-2">
+                    <div className="px-6 py-5">
                         <h3 className="font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong">
                             Doanh thu theo ngày (Trung vị)
                         </h3>
@@ -458,7 +458,7 @@ const DashboardView = ({ stats, products, analyticsData, setActiveTab }) => {
                                     </p>
                                 </div>
                                 <p className="whitespace-nowrap text-tremor-default text-tremor-content dark:text-dark-tremor-content">
-                                    TB trung vị / ngày
+                                    Doanh thu TB / ngày
                                 </p>
                             </li>
                             <li>
@@ -469,7 +469,7 @@ const DashboardView = ({ stats, products, analyticsData, setActiveTab }) => {
                                     </p>
                                 </div>
                                 <p className="whitespace-nowrap text-tremor-default text-tremor-content dark:text-dark-tremor-content">
-                                    Tổng ngày mẫu
+                                    Tổng số ngày
                                 </p>
                             </li>
                         </ul>
