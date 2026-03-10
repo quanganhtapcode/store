@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
-    Receipt, Calendar, Search, ChevronRight, X, Package
+    Receipt, Calendar, Search, ChevronRight, ChevronLeft, X, Package
 } from 'lucide-react';
 import {
     flexRender,
