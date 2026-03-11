@@ -16,6 +16,77 @@ import {
     useReactTable,
 } from '@tanstack/react-table';
 
+// Modal component for viewing import details
+const ImportDetailsModal = ({ isOpen, onClose, importData, suppliers, fmt, products }) => {
+    if (!isOpen || !importData) return null;
+    const supplier = suppliers.find(s => s.id === importData.supplier_id);
+    const items = typeof importData.items === 'string' ? JSON.parse(importData.items) : (importData.items || []);
+
+    return (
+        <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 sm:p-6 opacity-100 transition-opacity">
+            <div className="bg-tremor-background dark:bg-dark-tremor-background rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <div className="px-5 py-4 border-b border-tremor-border dark:border-dark-tremor-border flex items-center justify-between bg-tremor-background-muted/30 dark:bg-dark-tremor-background-muted/30">
+                    <div>
+                        <h3 className="text-lg font-bold text-tremor-content-strong dark:text-dark-tremor-content-strong">Chi Tiết Phiếu Nhập</h3>
+                        <p className="text-xs text-tremor-content mt-1 font-medium">Mã: {importData.id}</p>
+                    </div>
+                    <button onClick={onClose} className="p-2 -mr-2 text-tremor-content hover:bg-tremor-background-muted dark:hover:bg-dark-tremor-background-muted rounded-full transition-colors"><X size={20} /></button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-5 scrollbar-hide">
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                        <div className="bg-tremor-background-muted/50 dark:bg-dark-tremor-background-muted/50 p-3 rounded-lg">
+                            <p className="text-[11px] font-bold text-tremor-content uppercase tracking-wider mb-1">Thời gian</p>
+                            <p className="text-sm font-semibold text-tremor-content-strong dark:text-dark-tremor-content-strong">
+                                {new Date(importData.timestamp).toLocaleString('vi-VN')}
+                            </p>
+                        </div>
+                        <div className="bg-tremor-background-muted/50 dark:bg-dark-tremor-background-muted/50 p-3 rounded-lg">
+                            <p className="text-[11px] font-bold text-tremor-content uppercase tracking-wider mb-1">Nhà cung cấp</p>
+                            <p className="text-sm font-semibold text-tremor-content-strong dark:text-dark-tremor-content-strong">
+                                {supplier ? supplier.name : '—'}
+                            </p>
+                        </div>
+                    </div>
+
+                    <h4 className="font-bold text-sm text-tremor-content-strong dark:text-dark-tremor-content-strong mb-3 border-b border-tremor-border dark:border-dark-tremor-border pb-2">Sản phẩm đã nhập</h4>
+                    <div className="space-y-3">
+                        {items.map((item, idx) => {
+                            const product = products.find(p => p.id === item.id) || item;
+                            return (
+                                <div key={idx} className="flex items-center gap-3 p-3 bg-white dark:bg-dark-tremor-background border border-tremor-border dark:border-dark-tremor-border shadow-sm rounded-lg">
+                                    <div className="w-12 h-12 bg-tremor-background-muted dark:bg-dark-tremor-background-subtle rounded-md flex items-center justify-center shrink-0">
+                                        {product.image ? <img src={getImageUrl(product.image)} className="w-full h-full object-cover rounded-md" /> : <Package size={20} className="text-tremor-content-subtle" />}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-bold text-sm text-tremor-content-strong dark:text-dark-tremor-content-strong truncate">{item.name}</p>
+                                        <p className="text-xs text-tremor-content mt-0.5">SL: <span className="font-bold text-tremor-content-strong dark:text-dark-tremor-content-strong">{item.quantity}</span> × {fmt(item.importPrice)}</p>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                        <p className="font-bold text-sm text-tremor-content-strong dark:text-dark-tremor-content-strong">{fmt(item.quantity * item.importPrice)}</p>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {importData.note && (
+                        <div className="mt-5 pt-4 border-t border-tremor-border dark:border-dark-tremor-border">
+                            <p className="text-[11px] font-bold text-tremor-content uppercase tracking-wider mb-1">Ghi chú</p>
+                            <p className="text-sm text-tremor-content-strong dark:text-dark-tremor-content-strong">{importData.note}</p>
+                        </div>
+                    )}
+                </div>
+
+                <div className="px-5 py-4 border-t border-tremor-border dark:border-dark-tremor-border bg-tremor-background-muted/30 dark:bg-dark-tremor-background-muted/30 flex justify-between items-center">
+                    <span className="text-sm font-bold text-tremor-content dark:text-dark-tremor-content">Tổng tiền nhập:</span>
+                    <span className="text-lg font-bold text-tremor-brand dark:text-dark-tremor-brand">{fmt(importData.total_cost)}</span>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 function classNames(...classes) {
@@ -67,7 +138,7 @@ const MobileButton = ({ onClick, disabled, children, position }) => (
     <button type="button" className={classNames('group p-2 flex items-center justify-center text-tremor-default ring-1 ring-inset ring-tremor-ring hover:bg-tremor-background-muted disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-tremor-background dark:ring-dark-tremor-ring hover:dark:bg-dark-tremor-background disabled:hover:dark:bg-dark-tremor-background', position === 'left' ? 'rounded-l-tremor-small' : position === 'right' ? '-ml-px rounded-r-tremor-small' : '')} onClick={onClick} disabled={disabled}>{children}</button>
 );
 
-const HistoryTable = ({ loading, history, suppliers, fmt }) => {
+const HistoryTable = ({ loading, history, suppliers, fmt, onRowClick }) => {
     const columns = useMemo(() => [
         {
             header: 'Mã phiếu',
@@ -139,7 +210,7 @@ const HistoryTable = ({ loading, history, suppliers, fmt }) => {
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id} className="border-b border-tremor-border dark:border-dark-tremor-border">
                                 {headerGroup.headers.map((header) => (
-                                    <TableHeaderCell key={header.id} className={classNames(header.column.columnDef.meta?.align || 'text-left')}>
+                                    <TableHeaderCell key={header.id} className={classNames(header.column.columnDef.meta?.align || 'text-left', 'py-3')}>
                                         {flexRender(header.column.columnDef.header, header.getContext())}
                                     </TableHeaderCell>
                                 ))}
@@ -148,7 +219,9 @@ const HistoryTable = ({ loading, history, suppliers, fmt }) => {
                     </TableHead>
                     <TableBody>
                         {table.getRowModel().rows.map((row) => (
-                            <TableRow key={row.id} className="hover:bg-tremor-background-muted hover:dark:bg-dark-tremor-background-muted transition-colors">
+                            <TableRow key={row.id} 
+                                onClick={() => onRowClick(row.original)}
+                                className="hover:bg-tremor-background-muted hover:dark:bg-dark-tremor-background-muted transition-colors cursor-pointer active:bg-blue-50 dark:active:bg-blue-900/20">
                                 {row.getVisibleCells().map((cell) => (
                                     <TableCell key={cell.id} className={classNames(cell.column.columnDef.meta?.align || 'text-left', 'align-middle')}>
                                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -222,6 +295,7 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
     const [profitData, setProfitData] = useState(null);
     const [recommendations, setRecommendations] = useState([]);
     const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+    const [selectedImportData, setSelectedImportData] = useState(null);
 
     // Filter products
     const filteredProducts = useMemo(() => {
@@ -337,9 +411,9 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
     const currentTitle = viewTitles[viewMode] || viewTitles['import'];
 
     return (
-        <div className="space-y-5 animate-in">
-            {/* Header */}
-            <div className="flex items-center gap-3">
+        <div className="space-y-4 animate-in">
+            {/* Header - hide on mobile to save space */}
+            <div className="hidden sm:flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
                     <currentTitle.icon size={20} />
                 </div>
@@ -351,15 +425,15 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
 
             {/* ═══ IMPORT FORM ═══ */}
             {viewMode === 'import' && (
-                <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
-                    {/* Left: Cart */}
+                <div className="flex flex-col lg:grid lg:grid-cols-5 gap-5">
+                    {/* Left/Bottom: Cart */}
                     <div className="lg:col-span-2 space-y-4">
                         {/* Supplier Selection */}
-                        <Card className="p-4">
-                            <label className="text-tremor-label font-semibold text-tremor-content dark:text-dark-tremor-content mb-2 block uppercase tracking-wider">Nhà cung cấp</label>
+                        <div className="bg-white dark:bg-dark-tremor-background rounded-tremor-default border border-tremor-border dark:border-dark-tremor-border p-4 shadow-sm">
+                            <label className="text-xs font-semibold text-tremor-content dark:text-dark-tremor-content mb-2 block uppercase tracking-wider">Nhà cung cấp</label>
                             <div className="relative">
                                 <button onClick={() => setShowSupplierDropdown(!showSupplierDropdown)}
-                                    className="w-full bg-tremor-background-muted dark:bg-dark-tremor-background-muted p-3 rounded-tremor-default text-left font-medium text-sm border border-tremor-border dark:border-dark-tremor-border hover:border-tremor-brand-subtle transition-colors flex items-center justify-between">
+                                    className="w-full bg-tremor-background-muted dark:bg-dark-tremor-background-muted p-2.5 rounded-lg text-left font-medium text-sm border border-tremor-border dark:border-dark-tremor-border hover:border-tremor-brand-subtle transition-colors flex items-center justify-between">
                                     <span className={selectedSupplier ? 'text-tremor-content-strong dark:text-dark-tremor-content-strong' : 'text-tremor-content dark:text-dark-tremor-content'}>
                                         {selectedSupplier ? suppliers.find(s => s.id === selectedSupplier)?.name || 'Chọn NCC' : 'Chọn nhà cung cấp (tùy chọn)'}
                                     </span>
@@ -368,7 +442,7 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                                 {showSupplierDropdown && (
                                     <div className="absolute top-full left-0 right-0 mt-1 bg-tremor-background dark:bg-dark-tremor-background border border-tremor-border dark:border-dark-tremor-border rounded-tremor-default shadow-xl z-20 max-h-48 overflow-y-auto">
                                         <button onClick={() => { setSelectedSupplier(''); setShowSupplierDropdown(false); }}
-                                            className="w-full px-4 py-2.5 text-left text-sm text-tremor-content hover:bg-tremor-background-muted font-medium dark:text-dark-tremor-content dark:hover:bg-dark-tremor-background-muted">
+                                            className="w-full px-4 py-2 text-left text-sm text-tremor-content hover:bg-tremor-background-muted font-medium dark:text-dark-tremor-content dark:hover:bg-dark-tremor-background-muted">
                                             — Không chọn —
                                         </button>
                                         {suppliers.map(s => (
@@ -384,7 +458,7 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                                     </div>
                                 )}
                             </div>
-                        </Card>
+                        </div>
 
                         {/* Cart */}
                         <div className="bg-gradient-to-br from-[#0f172a] to-[#1e293b] rounded-tremor-default p-5 shadow-xl text-white">
@@ -434,17 +508,26 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                                                 </div>
                                             </div>
                                             {/* Cost price input */}
-                                            <div className="mt-2 flex items-center gap-2">
-                                                <span className="text-[10px] text-white/50 whitespace-nowrap">Giá nhập:</span>
+                                            <div className="mt-3 flex items-center gap-2">
+                                                <span className="text-[12px] font-medium text-white/60 whitespace-nowrap">Giá nhập:</span>
                                                 {editingPrice?.idx === idx ? (
-                                                    <input type="text" inputMode="numeric" value={editingPrice.value}
-                                                        onChange={e => setEditingPrice({ idx, value: e.target.value.replace(/[^0-9]/g, '') })}
-                                                        onBlur={() => { const p = parseInt(editingPrice.value, 10) || 0; setImportCart(prev => prev.map((pi, i) => i === idx ? { ...pi, importPrice: p } : pi)); setEditingPrice(null); }}
-                                                        onKeyDown={e => { if (e.key === 'Enter') { const p = parseInt(editingPrice.value, 10) || 0; setImportCart(prev => prev.map((pi, i) => i === idx ? { ...pi, importPrice: p } : pi)); setEditingPrice(null); } }}
-                                                        autoFocus className="w-24 text-center text-xs font-bold bg-white text-gray-900 rounded px-2 py-1 outline-none" />
+                                                    <div className="flex items-stretch rounded-lg overflow-hidden bg-white shadow-lg shadow-blue-500/20 focus-within:ring-2 focus-within:ring-blue-500">
+                                                        <input type="text" inputMode="numeric" value={editingPrice.value || ''}
+                                                            onChange={e => setEditingPrice({ ...editingPrice, value: e.target.value.replace(/[^0-9]/g, '') })}
+                                                            onBlur={() => { const p = parseInt(editingPrice.value, 10) || 0; const fP = editingPrice.mode === 'case' ? Math.round(p / item.units_per_case) : p; setImportCart(prev => prev.map((pi, i) => i === idx ? { ...pi, importPrice: fP } : pi)); setEditingPrice(null); }}
+                                                            onKeyDown={e => { if (e.key === 'Enter') { e.target.blur(); } else if (e.key === 'Escape') setEditingPrice(null); }}
+                                                            autoFocus className="w-24 sm:w-32 text-center text-sm font-bold bg-transparent text-gray-900 px-2 py-1.5 outline-none" />
+                                                        {item.units_per_case > 1 && (
+                                                            <button type="button" onMouseDown={(e) => { e.preventDefault(); setEditingPrice({ ...editingPrice, mode: editingPrice.mode === 'case' ? 'unit' : 'case' }); }}
+                                                                className={classNames("px-3 text-xs font-bold border-l border-gray-300 outline-none select-none transition-colors", editingPrice.mode === 'case' ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')} >
+                                                                {editingPrice.mode === 'case' ? 'Thùng' : 'Lẻ'}
+                                                            </button>
+                                                        )}
+                                                        <button type="button" onMouseDown={(e) => { e.preventDefault(); document.activeElement?.blur(); }} className="px-3 flex items-center justify-center text-white bg-blue-600 hover:bg-blue-700 select-none transition-colors"><CheckCircle size={16}/></button>
+                                                    </div>
                                                 ) : (
-                                                    <span onClick={() => setEditingPrice({ idx, value: String(item.importPrice) })}
-                                                        className="text-xs font-semibold text-blue-300 cursor-pointer hover:text-blue-200 bg-white/10 px-2 py-0.5 rounded">
+                                                    <span onClick={() => setEditingPrice({ idx, value: String(item.importPrice), mode: 'unit' })}
+                                                        className="text-sm font-bold text-blue-300 cursor-pointer hover:text-blue-200 bg-white/10 hover:bg-white/20 px-3 py-1 rounded-lg transition-colors" title="Nhấn để sửa giá nhập">
                                                         {fmt(item.importPrice)}
                                                     </span>
                                                 )}
@@ -510,23 +593,23 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                             )}
                         </div>
 
-                        <div className="space-y-4 max-h-[70vh] overflow-y-auto scrollbar-hide">
+                        <div className="space-y-6 lg:max-h-[70vh] lg:overflow-y-auto scrollbar-hide">
                             {Object.entries(productsByBrand).map(([brand, items]) => (
                                 <div key={brand}>
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <Package size={14} className="text-tremor-brand" />
-                                        <h3 className="font-bold text-sm text-tremor-content-strong dark:text-dark-tremor-content-strong">{brand}</h3>
-                                        <span className="text-xs text-tremor-content">({items.length})</span>
+                                    <div className="flex items-center gap-2 mb-3 px-1">
+                                        <Package size={16} className="text-tremor-brand" />
+                                        <h3 className="font-bold text-sm text-tremor-content-strong dark:text-dark-tremor-content-strong uppercase tracking-wide">{brand}</h3>
+                                        <span className="text-xs font-semibold bg-tremor-background-muted text-tremor-content px-2 py-0.5 rounded-full">{items.length}</span>
                                     </div>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2">
+                                    <div className="flex overflow-x-auto lg:grid lg:grid-cols-2 xl:grid-cols-4 gap-3 snap-x snap-mandatory pb-4 scrollbar-hide">
                                         {items.map(p => {
                                             const inCart = importCart.find(i => i.id === p.id);
                                             const margin = p.cost_price && p.price ? ((p.price - p.cost_price) / p.price * 100).toFixed(0) : null;
                                             return (
                                                 <div key={p.id}
-                                                    className={classNames('bg-tremor-background dark:bg-dark-tremor-background rounded-xl p-3 border-2 transition-all cursor-pointer hover:shadow-md',
+                                                    className={classNames('snap-start shrink-0 w-[140px] sm:w-[150px] lg:w-auto lg:shrink-1 bg-tremor-background dark:bg-dark-tremor-background rounded-xl p-3 border-2 transition-all cursor-pointer hover:shadow-md flex flex-col',
                                                         inCart ? 'border-tremor-brand shadow-lg shadow-blue-500/10' : 'border-tremor-border dark:border-dark-tremor-border')}>
-                                                    <div className="h-20 bg-tremor-background-muted dark:bg-dark-tremor-background-muted rounded-lg flex items-center justify-center overflow-hidden mb-2 relative" onClick={() => addToImport(p)}>
+                                                    <div className="h-24 bg-tremor-background-muted dark:bg-dark-tremor-background-muted rounded-lg flex items-center justify-center overflow-hidden mb-3 relative" onClick={() => addToImport(p)}>
                                                         {p.image ? <img src={getImageUrl(p.image)} loading="lazy" className="w-full h-full object-cover" /> : <ImageIcon size={24} className="text-tremor-content-subtle" />}
                                                         {inCart && (
                                                             <div className="absolute top-1 right-1 bg-tremor-brand text-white text-[10px] w-6 h-6 rounded-full font-bold flex items-center justify-center shadow-lg">
@@ -539,12 +622,12 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                                                         <span>Tồn: {p.stock}</span>
                                                         {margin && <span className="text-emerald-600 font-semibold">· {margin}%</span>}
                                                     </div>
-                                                    <div className="flex gap-1">
+                                                    <div className="mt-auto flex gap-1.5 pt-2">
                                                         <button onClick={() => addToImport(p)}
-                                                            className="flex-1 bg-tremor-brand text-white text-[10px] py-1.5 rounded-lg font-bold active:scale-95 hover:bg-blue-600 transition-all">+1</button>
+                                                            className="flex-1 bg-blue-100 text-blue-700 hover:bg-blue-600 hover:text-white text-[11px] py-1.5 rounded-lg font-bold active:scale-95 transition-all">+1</button>
                                                         {p.units_per_case > 1 && (
                                                             <button onClick={() => addToImport(p, p.units_per_case)}
-                                                                className="flex-1 bg-emerald-500 text-white text-[10px] py-1.5 rounded-lg font-bold active:scale-95 hover:bg-emerald-600 transition-all">+{p.units_per_case}</button>
+                                                                className="flex-1 bg-emerald-100 text-emerald-700 hover:bg-emerald-600 hover:text-white text-[11px] py-1.5 rounded-lg font-bold active:scale-95 transition-all">+{p.units_per_case}</button>
                                                         )}
                                                     </div>
                                                 </div>
@@ -567,7 +650,8 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
             {/* ═══ HISTORY ═══ */}
             {viewMode === 'history' && (
                 <div className="space-y-3 mt-4">
-                    <HistoryTable loading={loadingHistory} history={importHistory} suppliers={suppliers} fmt={fmt} />
+                    <HistoryTable loading={loadingHistory} history={importHistory} suppliers={suppliers} fmt={fmt} onRowClick={setSelectedImportData} />
+                    <ImportDetailsModal isOpen={!!selectedImportData} onClose={() => setSelectedImportData(null)} importData={selectedImportData} suppliers={suppliers} fmt={fmt} products={products} />
                 </div>
             )}
 

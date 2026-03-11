@@ -137,24 +137,63 @@ app.get('/api/imports', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// --- INVENTORY BATCHES ---
+app.get('/api/inventory/batches', async (req, res) => {
+    try {
+        const batches = await dbAll(`
+            SELECT ib.*, p.name as product_name, p.brand, p.price as sell_price
+            FROM inventory_batches ib
+            JOIN products p ON ib.product_id = p.id
+            WHERE ib.remaining > 0
+            ORDER BY ib.created_at ASC
+        `);
+        res.json(batches);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/inventory/batches/:productId', async (req, res) => {
+    try {
+        const batches = await dbAll(`
+            SELECT ib.*, imp.note as import_note
+            FROM inventory_batches ib
+            LEFT JOIN import_notes imp ON ib.import_id = imp.id
+            WHERE ib.product_id = ? AND ib.remaining > 0
+            ORDER BY ib.created_at ASC
+        `, [req.params.productId]);
+        res.json(batches);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/imports', verifyToken, async (req, res) => {
     const { items, total_cost, note, timestamp, supplier_id } = req.body;
     const errors = validateImport({ items });
     if (errors.length > 0) return res.status(400).json({ error: errors.join(', ') });
 
+    // Validate importPrice is provided for every item
+    for (const item of items) {
+        if (!item.importPrice || item.importPrice <= 0) {
+            return res.status(400).json({ error: `Sản phẩm "${item.name}" chưa có giá nhập. Vui lòng nhập giá nhập cho tất cả sản phẩm.` });
+        }
+    }
+
     try {
         await dbRun('BEGIN TRANSACTION');
         const id = 'IMP-' + Date.now();
+        const ts = timestamp || Date.now();
 
         await dbRun(`INSERT INTO import_notes (id, timestamp, total_cost, note, items, supplier_id) VALUES (?, ?, ?, ?, ?, ?)`,
-            [id, timestamp || Date.now(), total_cost || 0, note || '', JSON.stringify(items), supplier_id || null]);
+            [id, ts, total_cost || 0, note || '', JSON.stringify(items), supplier_id || null]);
 
         for (const item of items) {
+            // Update stock
             await dbRun("UPDATE products SET stock = stock + ? WHERE id = ?", [item.quantity, item.id]);
-            // Update cost_price if provided
-            if (item.importPrice && item.importPrice > 0) {
-                await dbRun("UPDATE products SET cost_price = ? WHERE id = ?", [item.importPrice, item.id]);
-            }
+            // Update cost_price (latest import price as reference)
+            await dbRun("UPDATE products SET cost_price = ? WHERE id = ?", [item.importPrice, item.id]);
+            // Create inventory batch for FIFO tracking
+            await dbRun(
+                "INSERT INTO inventory_batches (product_id, import_id, quantity, remaining, cost_price, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                [item.id, id, item.quantity, item.quantity, item.importPrice, ts]
+            );
         }
 
         await dbRun('COMMIT');
@@ -174,9 +213,13 @@ app.get('/api/stats/profit-analysis', async (req, res) => {
         // Get all products with cost & selling price
         const products = await dbAll("SELECT id, name, brand, price, cost_price, stock, total_sold FROM products");
 
-        // Get 30-day sales per product
+        // Get 30-day sales per product with FIFO cost from order_items
         const sales30d = await dbAll(`
-            SELECT oi.product_id, SUM(oi.quantity) as qty_sold, SUM(oi.price * oi.quantity) as revenue
+            SELECT oi.product_id, 
+                   SUM(oi.quantity) as qty_sold, 
+                   SUM(oi.price * oi.quantity) as revenue,
+                   SUM(CASE WHEN oi.cost_price > 0 THEN oi.cost_price * oi.quantity ELSE 0 END) as total_cost_fifo,
+                   SUM(CASE WHEN oi.cost_price > 0 THEN oi.quantity ELSE 0 END) as qty_with_cost
             FROM order_items oi
             JOIN orders o ON oi.order_id = o.id
             WHERE o.timestamp >= ?
@@ -187,11 +230,17 @@ app.get('/api/stats/profit-analysis', async (req, res) => {
         sales30d.forEach(s => { salesMap[s.product_id] = s; });
 
         const analysis = products.map(p => {
-            const s = salesMap[p.id] || { qty_sold: 0, revenue: 0 };
-            const costPrice = p.cost_price || 0;
+            const s = salesMap[p.id] || { qty_sold: 0, revenue: 0, total_cost_fifo: 0, qty_with_cost: 0 };
             const sellPrice = p.price || 0;
-            const margin = sellPrice > 0 && costPrice > 0 ? ((sellPrice - costPrice) / sellPrice * 100) : 0;
-            const profit30d = s.qty_sold * (sellPrice - costPrice);
+            const fallbackCost = p.cost_price || 0;
+            
+            // Use FIFO cost from order_items where available, fallback for old orders
+            const qtyWithoutCost = s.qty_sold - (s.qty_with_cost || 0);
+            const totalCost = (s.total_cost_fifo || 0) + (qtyWithoutCost * fallbackCost);
+            const avgCost = s.qty_sold > 0 ? Math.round(totalCost / s.qty_sold) : fallbackCost;
+            
+            const margin = sellPrice > 0 && avgCost > 0 ? ((sellPrice - avgCost) / sellPrice * 100) : 0;
+            const profit30d = s.revenue - totalCost;
             const dailyAvgSales = s.qty_sold / 30;
             const daysOfStock = dailyAvgSales > 0 ? Math.round(p.stock / dailyAvgSales) : 999;
 
@@ -200,7 +249,7 @@ app.get('/api/stats/profit-analysis', async (req, res) => {
                 name: p.name,
                 brand: p.brand,
                 sellPrice,
-                costPrice,
+                costPrice: avgCost,
                 margin: Math.round(margin * 10) / 10,
                 stock: p.stock,
                 sold30d: s.qty_sold,
@@ -218,7 +267,7 @@ app.get('/api/stats/profit-analysis', async (req, res) => {
             products: analysis,
             summary: {
                 totalRevenue30d: analysis.reduce((s, p) => s + p.revenue30d, 0),
-                totalCost30d: analysis.reduce((s, p) => s + (p.costPrice * p.sold30d), 0),
+                totalCost30d: analysis.reduce((s, p) => s + (p.revenue30d - p.profit30d), 0),
                 totalProfit30d: analysis.reduce((s, p) => s + p.profit30d, 0),
                 avgMargin: analysis.length > 0
                     ? Math.round(analysis.reduce((s, p) => s + p.margin, 0) / analysis.filter(p => p.margin > 0).length * 10) / 10

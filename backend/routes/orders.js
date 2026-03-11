@@ -54,7 +54,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-// CREATE ORDER (Transaction + Normalized Data)
+// CREATE ORDER (Transaction + Normalized Data + FIFO)
 router.post('/', async (req, res) => {
     const { items, total, original_total, discount, customer_name, payment_method, note, timestamp } = req.body;
 
@@ -76,7 +76,7 @@ router.post('/', async (req, res) => {
         );
         const orderId = orderResult.lastID;
 
-        // 2. Update Stock & Insert Order Items
+        // 2. Update Stock & Insert Order Items with FIFO cost
         for (const item of items) {
             const qty = item.saleType === 'case' ? (item.quantity * (item.units_per_case || 1)) : item.quantity;
 
@@ -86,10 +86,35 @@ router.post('/', async (req, res) => {
                 [qty, qty, item.id]
             );
 
-            // Normalized Insert
+            // FIFO: Deduct from oldest batches and calculate weighted cost
+            let remainingToDeduct = qty;
+            let totalCost = 0;
+
+            const batches = await dbAll(
+                "SELECT id, remaining, cost_price FROM inventory_batches WHERE product_id = ? AND remaining > 0 ORDER BY created_at ASC",
+                [item.id]
+            );
+
+            for (const batch of batches) {
+                if (remainingToDeduct <= 0) break;
+                const deduct = Math.min(batch.remaining, remainingToDeduct);
+                totalCost += deduct * batch.cost_price;
+                await dbRun("UPDATE inventory_batches SET remaining = remaining - ? WHERE id = ?", [deduct, batch.id]);
+                remainingToDeduct -= deduct;
+            }
+
+            // If batches didn't cover all (old stock without batch data), use product's cost_price
+            if (remainingToDeduct > 0) {
+                const product = await dbGet("SELECT cost_price FROM products WHERE id = ?", [item.id]);
+                totalCost += remainingToDeduct * (product?.cost_price || 0);
+            }
+
+            const avgCostPrice = qty > 0 ? Math.round(totalCost / qty) : 0;
+
+            // Normalized Insert with cost_price
             await dbRun(
-                `INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)`,
-                [orderId, item.id, item.quantity, item.finalPrice || item.price || 0]
+                `INSERT INTO order_items (order_id, product_id, quantity, price, cost_price) VALUES (?, ?, ?, ?, ?)`,
+                [orderId, item.id, item.quantity, item.finalPrice || item.price || 0, avgCostPrice]
             );
         }
 
@@ -192,7 +217,7 @@ router.put('/:id', verifyToken, async (req, res) => {
     }
 });
 
-// DELETE ORDER (Restore Stock)
+// DELETE ORDER (Restore Stock + Restore Batches)
 router.delete('/:id', verifyToken, async (req, res) => {
     const { id } = req.params;
     try {
@@ -200,6 +225,9 @@ router.delete('/:id', verifyToken, async (req, res) => {
         if (!order) return res.status(404).json({ error: 'Đơn hàng không tồn tại' });
 
         await dbRun('BEGIN TRANSACTION');
+
+        // Get order_items with cost info for batch restoration
+        const orderItems = await dbAll("SELECT product_id, quantity, cost_price FROM order_items WHERE order_id = ?", [id]);
 
         // Restore Stock
         const items = JSON.parse(order.items);
@@ -209,6 +237,32 @@ router.delete('/:id', verifyToken, async (req, res) => {
                 `UPDATE products SET stock = stock + ?, total_sold = total_sold - ? WHERE id = ?`,
                 [qty, qty, item.id]
             );
+        }
+
+        // Restore inventory batches (add back to newest batch with matching cost, or oldest available)
+        for (const oi of orderItems) {
+            const qty = items.find(i => i.id === oi.product_id)?.saleType === 'case'
+                ? (oi.quantity * (items.find(i => i.id === oi.product_id)?.units_per_case || 1))
+                : oi.quantity;
+
+            // Try to find a batch with matching cost_price to restore to
+            const matchBatch = await dbGet(
+                "SELECT id FROM inventory_batches WHERE product_id = ? AND cost_price = ? ORDER BY created_at DESC LIMIT 1",
+                [oi.product_id, oi.cost_price]
+            );
+
+            if (matchBatch) {
+                await dbRun("UPDATE inventory_batches SET remaining = remaining + ? WHERE id = ?", [qty, matchBatch.id]);
+            } else {
+                // Restore to the newest batch for this product
+                const anyBatch = await dbGet(
+                    "SELECT id FROM inventory_batches WHERE product_id = ? ORDER BY created_at DESC LIMIT 1",
+                    [oi.product_id]
+                );
+                if (anyBatch) {
+                    await dbRun("UPDATE inventory_batches SET remaining = remaining + ? WHERE id = ?", [qty, anyBatch.id]);
+                }
+            }
         }
 
         // Delete records

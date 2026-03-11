@@ -198,8 +198,29 @@ const initDatabase = () => {
             }
         });
 
+        // ── Inventory Batches (FIFO) ──
+        db.run(`CREATE TABLE IF NOT EXISTS inventory_batches (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id TEXT NOT NULL,
+            import_id TEXT,
+            quantity INTEGER NOT NULL,
+            remaining INTEGER NOT NULL,
+            cost_price INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY(product_id) REFERENCES products(id),
+            FOREIGN KEY(import_id) REFERENCES import_notes(id)
+        )`);
+
+        // Add cost_price to order_items if not exists
+        db.run(`ALTER TABLE order_items ADD COLUMN cost_price INTEGER DEFAULT 0`, (err) => {
+            if (err && !err.message.includes('duplicate column')) {
+                // Column may already exist
+            }
+        });
+
         // Trigger migration check
         setTimeout(migrateOrderItems, 2000);
+        setTimeout(migrateInventoryBatches, 4000);
 
         // === CREATE INDEXES for faster queries ===
         db.run(`CREATE INDEX IF NOT EXISTS idx_orders_timestamp ON orders(timestamp)`);
@@ -208,6 +229,120 @@ const initDatabase = () => {
         db.run(`CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_order_items_product_id ON order_items(product_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_import_notes_timestamp ON import_notes(timestamp)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_inventory_batches_product ON inventory_batches(product_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_inventory_batches_remaining ON inventory_batches(remaining)`);
+    });
+};
+
+// --- Migration: Seed inventory_batches from existing data ---
+const migrateInventoryBatches = () => {
+    db.get("SELECT COUNT(*) as count FROM inventory_batches", (err, row) => {
+        if (err) { console.error('❌ inventory_batches check error:', err.message); return; }
+        if (row && row.count > 0) {
+            console.log(`✅ inventory_batches already has ${row.count} records, skip migration.`);
+            return;
+        }
+
+        console.log("🔄 Starting Migration: Seed inventory_batches from import_notes + stock...");
+
+        db.all("SELECT * FROM import_notes ORDER BY timestamp ASC", [], (err, imports) => {
+            if (err) { console.error('❌ import_notes read error:', err.message); return; }
+
+            // Track how much was imported per product
+            const importedQty = {};
+
+            db.serialize(() => {
+                db.run("BEGIN TRANSACTION");
+
+                const stmt = db.prepare(
+                    "INSERT INTO inventory_batches (product_id, import_id, quantity, remaining, cost_price, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+                );
+
+                // 1. Create batches from existing import_notes
+                for (const imp of imports) {
+                    let items;
+                    try { items = JSON.parse(imp.items); } catch (e) { continue; }
+                    for (const item of items) {
+                        const costPrice = item.importPrice || item.price || 0;
+                        // remaining = quantity (we'll adjust after)
+                        stmt.run(item.id, imp.id, item.quantity, item.quantity, costPrice, imp.timestamp);
+                        importedQty[item.id] = (importedQty[item.id] || 0) + item.quantity;
+                    }
+                }
+
+                stmt.finalize();
+
+                // 2. For products with stock > imported quantity, create an "initial stock" batch
+                db.all("SELECT id, stock, cost_price FROM products", [], (err2, products) => {
+                    if (err2) { db.run("ROLLBACK"); return; }
+
+                    const stmt2 = db.prepare(
+                        "INSERT INTO inventory_batches (product_id, import_id, quantity, remaining, cost_price, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+                    );
+
+                    for (const p of products) {
+                        const totalImported = importedQty[p.id] || 0;
+                        const untracked = p.stock; // Current stock is what remains
+                        // If product has stock but no import data covering it, create initial batch
+                        if (untracked > 0 && totalImported === 0) {
+                            stmt2.run(p.id, null, untracked, untracked, p.cost_price || 0, Date.now());
+                        } else if (totalImported > 0) {
+                            // Adjust remaining on batches to match current stock using FIFO
+                            // Total sold = totalImported - currentStock + (pre-import stock)
+                            // Since we don't know pre-import stock precisely, we'll set
+                            // remaining on the batches so that SUM(remaining) = current stock
+                        }
+                    }
+
+                    stmt2.finalize();
+
+                    // 3. Now adjust remaining on batches so SUM(remaining) per product = product.stock
+                    db.all(`SELECT product_id, SUM(quantity) as total_qty FROM inventory_batches GROUP BY product_id`, [], (err3, batchSums) => {
+                        if (err3) { db.run("ROLLBACK"); return; }
+
+                        const adjustments = [];
+                        for (const bs of batchSums) {
+                            const product = products.find(p => p.id === bs.product_id);
+                            if (!product) continue;
+                            const currentStock = product.stock;
+                            const totalBatched = bs.total_qty;
+                            const totalSold = totalBatched - currentStock;
+
+                            if (totalSold > 0) {
+                                adjustments.push({ productId: bs.product_id, toDeduct: totalSold });
+                            }
+                        }
+
+                        // FIFO deduct from oldest batches
+                        let pending = adjustments.length;
+                        if (pending === 0) {
+                            db.run("COMMIT", () => console.log("✅ inventory_batches migration completed."));
+                            return;
+                        }
+
+                        for (const adj of adjustments) {
+                            db.all(
+                                "SELECT id, remaining FROM inventory_batches WHERE product_id = ? AND remaining > 0 ORDER BY created_at ASC",
+                                [adj.productId],
+                                (err4, batches) => {
+                                    let toDeduct = adj.toDeduct;
+                                    for (const batch of batches) {
+                                        if (toDeduct <= 0) break;
+                                        const deduct = Math.min(batch.remaining, toDeduct);
+                                        db.run("UPDATE inventory_batches SET remaining = remaining - ? WHERE id = ?", [deduct, batch.id]);
+                                        toDeduct -= deduct;
+                                    }
+                                    pending--;
+                                    if (pending === 0) {
+                                        db.run("COMMIT", () => console.log("✅ inventory_batches migration completed (with FIFO adjustments)."));
+                                    }
+                                }
+                            );
+                        }
+                    });
+                });
+            });
+        });
     });
 };
 
