@@ -15,7 +15,6 @@ import {
     getPaginationRowModel,
     useReactTable,
 } from '@tanstack/react-table';
-import ProductDetailsModal from './ProductDetailsModal';
 
 // Modal component for viewing import details
 const ImportDetailsModal = ({ isOpen, onClose, importData, suppliers, fmt, products }) => {
@@ -314,7 +313,6 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
     });
     const [aiActionCards, setAiActionCards] = useState([]);
     const [aiActionLoading, setAiActionLoading] = useState(false);
-    const [selectedProfitProduct, setSelectedProfitProduct] = useState(null);
 
     const ANALYSIS_PAGE_SIZE = 20;
     const profitProductsRaw = useMemo(() => profitData?.products || [], [profitData]);
@@ -1170,8 +1168,7 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                                     )}
                                 </div>
                                 {/* Top pagination */}
-                                {analysisPageCount > 1 && (
-                                    <div className="px-4 py-2 border-t border-tremor-border dark:border-dark-tremor-border flex items-center justify-between bg-tremor-background-muted/30 dark:bg-dark-tremor-background-muted/30">
+                                <div className="px-4 py-2 border-t border-tremor-border dark:border-dark-tremor-border flex items-center justify-between bg-tremor-background-muted/30 dark:bg-dark-tremor-background-muted/30">
                                         <p className="text-xs text-tremor-content dark:text-dark-tremor-content">
                                             Trang <span className="font-semibold text-tremor-content-strong dark:text-dark-tremor-content-strong">{analysisPage}</span> / {analysisPageCount} · {profitProducts.length} sản phẩm
                                         </p>
@@ -1191,7 +1188,6 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                                             </TextButton>
                                         </div>
                                     </div>
-                                )}
 
                                 <div className="border-t border-tremor-border dark:border-dark-tremor-border overflow-x-auto">
                                     <Table>
@@ -1400,12 +1396,6 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                 </div>
             )}
 
-            <ProductDetailsModal
-                isOpen={!!selectedProfitProduct}
-                product={selectedProfitProduct?.product}
-                analysis={selectedProfitProduct?.analysis}
-                onClose={() => setSelectedProfitProduct(null)}
-            />
         </div>
     );
 };
