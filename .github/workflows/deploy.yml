@@ -38,7 +38,7 @@ jobs:
       - name: Sync backend files to VPS
         uses: burnett01/rsync-deployments@7.0.1
         with:
-          switches: -avz --delete --exclude='node_modules' --exclude='uploads' --exclude='.env'
+          switches: -avz --delete --exclude='node_modules' --exclude='uploads' --exclude='.env' --exclude='database'
           path: backend/
           remote_path: /var/www/store/api/
           remote_host: ${{ secrets.VPS_HOST }}

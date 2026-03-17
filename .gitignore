@@ -18,10 +18,13 @@ frontend/dist/
 .env.production
 
 # ====================================
-# Database (Backup files only)
+# Database (VPS is source of truth)
 # ====================================
-database/*_backup*.db
+database/*.db
+database/*.db-shm
+database/*.db-wal
 database/*.db.bak
+database/local_backups/
 
 # ====================================
 # OS Generated Files
