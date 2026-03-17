@@ -151,24 +151,6 @@ const App = () => {
         }
     };
 
-    // Protected Admin Route Component - Full Admin with Login
-    const ProtectedAdmin = () => {
-        if (!isAuthenticated()) {
-            return <LoginPage onLogin={handleLogin} />;
-        }
-        return (
-            <AdminLayout
-                products={products}
-                history={history}
-                refreshData={fetchData}
-                onBackToPos={() => navigate('/')}
-                authToken={authToken}
-                authUser={authUser}
-                onLogout={handleLogout}
-            />
-        );
-    };
-
     return (
         <>
             <Routes>
@@ -188,7 +170,19 @@ const App = () => {
                         setCart={setCart}
                     />
                 } />
-                <Route path="/admin/*" element={<ProtectedAdmin />} />
+                <Route path="/admin/*" element={
+                    isAuthenticated()
+                        ? <AdminLayout
+                            products={products}
+                            history={history}
+                            refreshData={fetchData}
+                            onBackToPos={() => navigate('/')}
+                            authToken={authToken}
+                            authUser={authUser}
+                            onLogout={handleLogout}
+                          />
+                        : <LoginPage onLogin={handleLogin} />
+                } />
                 <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
             </Routes>
 
