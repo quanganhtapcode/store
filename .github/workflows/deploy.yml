@@ -51,7 +51,7 @@ jobs:
           echo "VPS_USER=$VPS_USER" >> $GITHUB_ENV
 
       - name: Sync backend files to VPS
-        run: rsync -avz --delete --exclude='node_modules' --exclude='uploads' --exclude='.env' --exclude='database' -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" backend/ "$VPS_USER@$VPS_HOST:/var/www/store/api/"
+        run: rsync -avz --delete --exclude='node_modules' --exclude='uploads' --exclude='.env' --exclude='database' --exclude='public/images' -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" backend/ "$VPS_USER@$VPS_HOST:/var/www/store/api/"
 
       - name: Restart PM2
         run: ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no "$VPS_USER@$VPS_HOST" "cd /var/www/store/api && npm install --production --silent && (pm2 restart pos-api 2>/dev/null || pm2 start server.cjs --name pos-api) && pm2 save && echo deployed"
