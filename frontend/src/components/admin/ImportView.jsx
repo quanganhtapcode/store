@@ -286,6 +286,12 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
     const [importSearch, setImportSearch] = useState('');
     const [selectedSupplier, setSelectedSupplier] = useState('');
     const [supplierPriceMap, setSupplierPriceMap] = useState({}); // productId -> import_price
+    const [supplierProductsList, setSupplierProductsList] = useState([]); // full product rows for selected supplier
+    const [showAddToSupplier, setShowAddToSupplier] = useState(false);
+    const [addToSupplierSearch, setAddToSupplierSearch] = useState('');
+    const [addToSupplierSelected, setAddToSupplierSelected] = useState(null);
+    const [addToSupplierPrice, setAddToSupplierPrice] = useState('');
+    const [addToSupplierSaving, setAddToSupplierSaving] = useState(false);
     const [importNote, setImportNote] = useState('');
     const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
     const [editingQty, setEditingQty] = useState(null);
@@ -692,9 +698,9 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
         localStorage.setItem('ops_watchlist_product_ids', JSON.stringify(watchlistIds));
     }, [watchlistIds]);
 
-    // Load supplier product prices when supplier is selected
-    useEffect(() => {
-        if (!selectedSupplier) { setSupplierPriceMap({}); return; }
+    // Load supplier products when supplier is selected
+    const loadSupplierProducts = useCallback(() => {
+        if (!selectedSupplier) { setSupplierPriceMap({}); setSupplierProductsList([]); return; }
         fetch(`${API_URL}/suppliers/${selectedSupplier}/products`, {
             headers: { Authorization: `Bearer ${authToken}` }
         })
@@ -703,9 +709,12 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                 const map = {};
                 rows.forEach(r => { map[r.product_id] = r.import_price; });
                 setSupplierPriceMap(map);
+                setSupplierProductsList(rows);
             })
             .catch(() => {});
     }, [selectedSupplier, authToken]);
+
+    useEffect(() => { loadSupplierProducts(); }, [loadSupplierProducts]);
 
     // Auto-add recommendations to cart
     const addRecommendationsToCart = (recs) => {
@@ -748,39 +757,62 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
 
             {/* ═══ IMPORT FORM ═══ */}
             {viewMode === 'import' && (
-                <div className="flex flex-col lg:grid lg:grid-cols-5 gap-5">
-                    {/* Left/Bottom: Cart */}
-                    <div className="lg:col-span-2 space-y-4">
-                        {/* Supplier Selection */}
-                        <div className="bg-white dark:bg-dark-tremor-background rounded-tremor-default border border-tremor-border dark:border-dark-tremor-border p-4 shadow-sm">
-                            <label className="text-xs font-semibold text-tremor-content dark:text-dark-tremor-content mb-2 block uppercase tracking-wider">Nhà cung cấp</label>
-                            <div className="relative">
-                                <button onClick={() => setShowSupplierDropdown(!showSupplierDropdown)}
-                                    className="w-full bg-tremor-background-muted dark:bg-dark-tremor-background-muted p-2.5 rounded-lg text-left font-medium text-sm border border-tremor-border dark:border-dark-tremor-border hover:border-tremor-brand-subtle transition-colors flex items-center justify-between">
-                                    <span className={selectedSupplier ? 'text-tremor-content-strong dark:text-dark-tremor-content-strong' : 'text-tremor-content dark:text-dark-tremor-content'}>
-                                        {selectedSupplier ? suppliers.find(s => s.id === selectedSupplier)?.name || 'Chọn NCC' : 'Chọn nhà cung cấp (tùy chọn)'}
-                                    </span>
-                                    <ChevronDown size={16} className="text-tremor-content" />
-                                </button>
-                                {showSupplierDropdown && (
-                                    <div className="absolute top-full left-0 right-0 mt-1 bg-tremor-background dark:bg-dark-tremor-background border border-tremor-border dark:border-dark-tremor-border rounded-tremor-default shadow-xl z-20 max-h-48 overflow-y-auto">
-                                        <button onClick={() => { setSelectedSupplier(''); setShowSupplierDropdown(false); }}
-                                            className="w-full px-4 py-2 text-left text-sm text-tremor-content hover:bg-tremor-background-muted font-medium dark:text-dark-tremor-content dark:hover:bg-dark-tremor-background-muted">
-                                            — Không chọn —
-                                        </button>
-                                        {suppliers.map(s => (
-                                            <button key={s.id} onClick={() => { setSelectedSupplier(s.id); setShowSupplierDropdown(false); }}
-                                                className={classNames('w-full px-4 py-2.5 text-left text-sm hover:bg-blue-50 font-medium transition-colors dark:hover:bg-dark-tremor-background-muted',
-                                                    selectedSupplier === s.id ? 'bg-blue-50 text-tremor-brand dark:bg-dark-tremor-background-muted' : 'text-tremor-content-strong dark:text-dark-tremor-content-strong')}>
-                                                <span className="flex items-center gap-2">
-                                                    <span className="w-6 h-6 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center text-[10px] font-bold">{s.name.charAt(0)}</span>
-                                                    {s.name}
-                                                </span>
-                                            </button>
-                                        ))}
+                <>
+                {/* ── Step 1: Supplier picker overlay ── */}
+                {!selectedSupplier && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <div className="bg-white dark:bg-dark-tremor-background rounded-2xl shadow-2xl w-full max-w-md">
+                            <div className="p-6 border-b border-tremor-border dark:border-dark-tremor-border">
+                                <h3 className="font-bold text-lg text-tremor-content-strong dark:text-dark-tremor-content-strong">Chọn nhà cung cấp</h3>
+                                <p className="text-sm text-tremor-content mt-0.5">Chọn NCC để xem sản phẩm và giá nhập của họ</p>
+                            </div>
+                            <div className="p-4 max-h-[60vh] overflow-y-auto space-y-2">
+                                {suppliers.length === 0 ? (
+                                    <div className="text-center py-8 text-tremor-content">
+                                        <Package size={40} className="mx-auto mb-3 opacity-30" />
+                                        <p className="font-medium">Chưa có nhà cung cấp</p>
+                                        <p className="text-sm mt-1">Vào tab Nhà cung cấp để thêm</p>
                                     </div>
+                                ) : (
+                                    suppliers.map(s => (
+                                        <button key={s.id} onClick={() => setSelectedSupplier(s.id)}
+                                            className="w-full flex items-center gap-3 p-4 rounded-xl border border-tremor-border dark:border-dark-tremor-border hover:border-tremor-brand hover:bg-blue-50 dark:hover:bg-dark-tremor-background-muted transition-all text-left">
+                                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0">
+                                                {s.name.charAt(0).toUpperCase()}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-bold text-tremor-content-strong dark:text-dark-tremor-content-strong">{s.name}</p>
+                                                {s.phone && <p className="text-xs text-tremor-content">{s.phone}</p>}
+                                            </div>
+                                            <ChevronRight size={16} className="text-tremor-content shrink-0" />
+                                        </button>
+                                    ))
                                 )}
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ── Step 2: Import form with supplier's products ── */}
+                {selectedSupplier && (
+                <div className="flex flex-col lg:grid lg:grid-cols-5 gap-5">
+                    {/* Left: Cart */}
+                    <div className="lg:col-span-2 space-y-4">
+                        {/* Supplier header + change */}
+                        <div className="bg-white dark:bg-dark-tremor-background rounded-tremor-default border border-tremor-border dark:border-dark-tremor-border p-4 shadow-sm flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0">
+                                    {suppliers.find(s => s.id === selectedSupplier)?.name.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                    <p className="text-xs text-tremor-content uppercase tracking-wider font-semibold">Nhà cung cấp</p>
+                                    <p className="font-bold text-tremor-content-strong dark:text-dark-tremor-content-strong text-sm">{suppliers.find(s => s.id === selectedSupplier)?.name}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => { setSelectedSupplier(''); setImportCart([]); }}
+                                className="text-xs text-tremor-content hover:text-red-500 font-semibold px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors">
+                                Đổi NCC
+                            </button>
                         </div>
 
                         {/* Cart */}
@@ -842,7 +874,7 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                                                             autoFocus className="w-24 sm:w-32 text-center text-sm font-bold bg-transparent text-gray-900 px-2 py-1.5 outline-none" />
                                                         {item.units_per_case > 1 && (
                                                             <button type="button" onMouseDown={(e) => { e.preventDefault(); setEditingPrice({ ...editingPrice, mode: editingPrice.mode === 'case' ? 'unit' : 'case' }); }}
-                                                                className={classNames("px-3 text-xs font-bold border-l border-gray-300 outline-none select-none transition-colors", editingPrice.mode === 'case' ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')} >
+                                                                className={classNames("px-3 text-xs font-bold border-l border-gray-300 outline-none select-none transition-colors", editingPrice.mode === 'case' ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')}>
                                                                 {editingPrice.mode === 'case' ? 'Thùng' : 'Lẻ'}
                                                             </button>
                                                         )}
@@ -872,8 +904,6 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                                     <input type="text" placeholder="Ghi chú phiếu nhập..."
                                         value={importNote} onChange={e => setImportNote(e.target.value)}
                                         className="w-full bg-white/10 px-3 py-2.5 rounded-xl text-sm placeholder-white/30 outline-none font-medium" />
-
-                                    {/* Profit preview */}
                                     <div className="grid grid-cols-3 gap-2 text-center">
                                         <div className="bg-white/10 rounded-lg p-2">
                                             <p className="text-[9px] text-white/50 uppercase">Giá nhập</p>
@@ -888,7 +918,6 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                                             <p className="text-sm font-bold text-blue-300">{avgMargin}%</p>
                                         </div>
                                     </div>
-
                                     <button onClick={submitImport} disabled={submitting}
                                         className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3.5 rounded-xl font-bold text-sm shadow-lg shadow-blue-500/30 active:scale-[0.98] transition-all disabled:opacity-60 flex items-center justify-center gap-2">
                                         {submitting ? (
@@ -902,77 +931,174 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                         </div>
                     </div>
 
-                    {/* Right: Product Selection */}
+                    {/* Right: Supplier's products only */}
                     <div className="lg:col-span-3 space-y-4">
-                        <div className="relative">
-                            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-tremor-content" />
-                            <input type="text" placeholder="Tìm sản phẩm để nhập kho..." value={importSearch}
-                                onChange={e => setImportSearch(e.target.value)}
-                                className="w-full bg-tremor-background dark:bg-dark-tremor-background pl-12 pr-10 py-3 rounded-tremor-default text-sm font-medium outline-none border border-tremor-border focus:border-tremor-brand focus:ring-2 focus:ring-tremor-brand-muted transition-all dark:border-dark-tremor-border dark:text-dark-tremor-content-strong" />
-                            {importSearch && (
-                                <button onClick={() => setImportSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 bg-tremor-background-muted rounded-full hover:bg-gray-300">
-                                    <X size={12} />
-                                </button>
-                            )}
+                        <div className="flex items-center justify-between">
+                            <div className="relative flex-1 mr-3">
+                                <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-tremor-content" />
+                                <input type="text" placeholder="Tìm trong sản phẩm của NCC..." value={importSearch}
+                                    onChange={e => setImportSearch(e.target.value)}
+                                    className="w-full bg-tremor-background dark:bg-dark-tremor-background pl-12 pr-10 py-3 rounded-tremor-default text-sm font-medium outline-none border border-tremor-border focus:border-tremor-brand transition-all dark:border-dark-tremor-border dark:text-dark-tremor-content-strong" />
+                                {importSearch && (
+                                    <button onClick={() => setImportSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 bg-tremor-background-muted rounded-full hover:bg-gray-300">
+                                        <X size={12} />
+                                    </button>
+                                )}
+                            </div>
+                            <button onClick={() => { setShowAddToSupplier(true); setAddToSupplierSearch(''); setAddToSupplierSelected(null); setAddToSupplierPrice(''); }}
+                                className="flex items-center gap-2 bg-tremor-brand text-white px-4 py-3 rounded-tremor-default font-bold text-sm shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all active:scale-[0.97] shrink-0">
+                                <Plus size={16} /> Thêm SP
+                            </button>
                         </div>
 
-                        <div className="space-y-6 lg:max-h-[70vh] lg:overflow-y-auto scrollbar-hide">
-                            {Object.entries(productsByBrand).map(([brand, items]) => (
-                                <div key={brand}>
-                                    <div className="flex items-center gap-2 mb-3 px-1">
-                                        <Package size={16} className="text-tremor-brand" />
-                                        <h3 className="font-bold text-sm text-tremor-content-strong dark:text-dark-tremor-content-strong uppercase tracking-wide">{brand}</h3>
-                                        <span className="text-xs font-semibold bg-tremor-background-muted text-tremor-content px-2 py-0.5 rounded-full">{items.length}</span>
-                                    </div>
-                                    <div className="flex overflow-x-auto lg:grid lg:grid-cols-2 xl:grid-cols-4 gap-3 snap-x snap-mandatory pb-4 scrollbar-hide">
-                                        {items.map(p => {
-                                            const inCart = importCart.find(i => i.id === p.id);
-                                            const supplierPrice = supplierPriceMap[p.id];
-                                            const displayCost = supplierPrice ?? p.cost_price;
-                                            const margin = displayCost && p.price ? ((p.price - displayCost) / p.price * 100).toFixed(0) : null;
-                                            return (
-                                                <div key={p.id}
-                                                    className={classNames('snap-start shrink-0 w-[140px] sm:w-[150px] lg:w-auto lg:shrink-1 bg-tremor-background dark:bg-dark-tremor-background rounded-xl p-3 border-2 transition-all cursor-pointer hover:shadow-md flex flex-col',
-                                                        inCart ? 'border-tremor-brand shadow-lg shadow-blue-500/10' : 'border-tremor-border dark:border-dark-tremor-border')}>
-                                                    <div className="h-24 bg-tremor-background-muted dark:bg-dark-tremor-background-muted rounded-lg flex items-center justify-center overflow-hidden mb-3 relative" onClick={() => addToImport(p)}>
-                                                        {p.image ? <img src={getImageUrl(p.image)} loading="lazy" className="w-full h-full object-cover" /> : <ImageIcon size={24} className="text-tremor-content-subtle" />}
-                                                        {inCart && (
-                                                            <div className="absolute top-1 right-1 bg-tremor-brand text-white text-[10px] w-6 h-6 rounded-full font-bold flex items-center justify-center shadow-lg">
-                                                                {inCart.quantity}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <p className="font-bold text-[11px] text-tremor-content-strong dark:text-dark-tremor-content-strong line-clamp-1 mb-0.5">{p.name}</p>
-                                                    <div className="flex items-center gap-1 text-[10px] text-tremor-content mb-1.5">
-                                                        <span>Tồn: {p.stock}</span>
-                                                        {margin && <span className="text-emerald-600 font-semibold">· {margin}%</span>}
-                                                    </div>
-                                                    {supplierPrice != null && (
-                                                        <p className="text-[10px] text-blue-600 font-bold -mt-1 mb-1.5">NCC: {fmt(supplierPrice)}</p>
+                        {supplierProductsList.length === 0 ? (
+                            <div className="text-center py-16 bg-tremor-background-muted dark:bg-dark-tremor-background-muted rounded-2xl">
+                                <Package size={48} className="mx-auto mb-3 opacity-30" />
+                                <p className="font-semibold text-tremor-content">Chưa có sản phẩm nào</p>
+                                <p className="text-sm text-tremor-content mt-1">Nhấn "Thêm SP" để thêm sản phẩm vào NCC này</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 lg:max-h-[70vh] lg:overflow-y-auto scrollbar-hide">
+                                {supplierProductsList
+                                    .filter(p => !importSearch || p.name?.toLowerCase().includes(importSearch.toLowerCase()) || p.brand?.toLowerCase().includes(importSearch.toLowerCase()))
+                                    .map(p => {
+                                        const fullProduct = products.find(fp => fp.id === p.product_id) || p;
+                                        const inCart = importCart.find(i => i.id === p.product_id);
+                                        const margin = p.sell_price > 0 && p.import_price > 0 ? ((p.sell_price - p.import_price) / p.sell_price * 100).toFixed(0) : null;
+                                        return (
+                                            <div key={p.product_id}
+                                                className={classNames('bg-tremor-background dark:bg-dark-tremor-background rounded-xl p-3 border-2 transition-all hover:shadow-md flex flex-col',
+                                                    inCart ? 'border-tremor-brand shadow-lg shadow-blue-500/10' : 'border-tremor-border dark:border-dark-tremor-border')}>
+                                                <div className="h-24 bg-tremor-background-muted dark:bg-dark-tremor-background-muted rounded-lg flex items-center justify-center overflow-hidden mb-3 relative cursor-pointer" onClick={() => addToImport({ ...fullProduct, id: p.product_id, price: p.sell_price, cost_price: p.import_price })}>
+                                                    {p.image ? <img src={getImageUrl(p.image)} loading="lazy" className="w-full h-full object-cover" /> : <ImageIcon size={24} className="text-tremor-content-subtle" />}
+                                                    {inCart && (
+                                                        <div className="absolute top-1 right-1 bg-tremor-brand text-white text-[10px] w-6 h-6 rounded-full font-bold flex items-center justify-center shadow-lg">
+                                                            {inCart.quantity}
+                                                        </div>
                                                     )}
-                                                    <div className="mt-auto flex gap-1.5 pt-2">
-                                                        <button onClick={() => addToImport(p)}
-                                                            className="flex-1 bg-blue-100 text-blue-700 hover:bg-blue-600 hover:text-white text-[11px] py-1.5 rounded-lg font-bold active:scale-95 transition-all">+1</button>
-                                                        {p.units_per_case > 1 && (
-                                                            <button onClick={() => addToImport(p, p.units_per_case)}
-                                                                className="flex-1 bg-emerald-100 text-emerald-700 hover:bg-emerald-600 hover:text-white text-[11px] py-1.5 rounded-lg font-bold active:scale-95 transition-all">+{p.units_per_case}</button>
-                                                        )}
-                                                    </div>
                                                 </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            ))}
-                            {Object.keys(productsByBrand).length === 0 && (
-                                <div className="text-center py-12 text-tremor-content">
-                                    <Package size={48} className="mx-auto mb-3 opacity-30" />
-                                    <p className="font-medium">Không tìm thấy sản phẩm</p>
-                                </div>
-                            )}
-                        </div>
+                                                <p className="font-bold text-[11px] text-tremor-content-strong dark:text-dark-tremor-content-strong line-clamp-1 mb-0.5">{p.name}</p>
+                                                <div className="flex items-center gap-1 text-[10px] text-tremor-content mb-1">
+                                                    <span>Tồn: {p.stock ?? fullProduct.stock}</span>
+                                                    {margin && <span className={parseFloat(margin) >= 20 ? 'text-emerald-600 font-bold' : 'text-yellow-600 font-bold'}>· {margin}%</span>}
+                                                </div>
+                                                <p className="text-[10px] text-blue-600 dark:text-blue-400 font-bold mb-2">Nhập: {fmt(p.import_price)}</p>
+                                                <div className="mt-auto flex gap-1.5">
+                                                    <button onClick={() => addToImport({ ...fullProduct, id: p.product_id, price: p.sell_price, cost_price: p.import_price })}
+                                                        className="flex-1 bg-blue-100 text-blue-700 hover:bg-blue-600 hover:text-white text-[11px] py-1.5 rounded-lg font-bold active:scale-95 transition-all">+1</button>
+                                                    {(fullProduct.units_per_case > 1) && (
+                                                        <button onClick={() => addToImport({ ...fullProduct, id: p.product_id, price: p.sell_price, cost_price: p.import_price }, fullProduct.units_per_case)}
+                                                            className="flex-1 bg-emerald-100 text-emerald-700 hover:bg-emerald-600 hover:text-white text-[11px] py-1.5 rounded-lg font-bold active:scale-95 transition-all">+{fullProduct.units_per_case}</button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                            </div>
+                        )}
                     </div>
                 </div>
+                )}
+
+                {/* ── Add product to supplier modal ── */}
+                {showAddToSupplier && (
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+                        <div className="bg-white dark:bg-dark-tremor-background rounded-2xl shadow-2xl w-full max-w-md">
+                            <div className="p-5 border-b border-tremor-border dark:border-dark-tremor-border flex items-center justify-between">
+                                <div>
+                                    <h3 className="font-bold text-base text-tremor-content-strong dark:text-dark-tremor-content-strong">Thêm sản phẩm vào NCC</h3>
+                                    <p className="text-xs text-tremor-content mt-0.5">{suppliers.find(s => s.id === selectedSupplier)?.name}</p>
+                                </div>
+                                <button onClick={() => setShowAddToSupplier(false)} className="p-2 rounded-xl hover:bg-tremor-background-muted"><X size={16} /></button>
+                            </div>
+                            <div className="p-5 space-y-4">
+                                {/* Product search */}
+                                <div>
+                                    <label className="text-xs font-bold text-tremor-content uppercase tracking-wider mb-2 block">Sản phẩm *</label>
+                                    <div className="relative">
+                                        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-tremor-content" />
+                                        <input autoFocus value={addToSupplierSearch} onChange={e => { setAddToSupplierSearch(e.target.value); setAddToSupplierSelected(null); }}
+                                            placeholder="Tìm sản phẩm..."
+                                            className="w-full pl-9 pr-4 py-2.5 bg-tremor-background-muted dark:bg-dark-tremor-background-muted rounded-xl text-sm font-medium outline-none border border-tremor-border focus:border-tremor-brand dark:border-dark-tremor-border dark:text-dark-tremor-content-strong transition-all" />
+                                    </div>
+                                    {addToSupplierSelected ? (
+                                        <div className="mt-2 flex items-center gap-2 p-3 bg-blue-50 dark:bg-dark-tremor-background-muted rounded-xl border border-tremor-brand">
+                                            <div className="w-8 h-8 bg-blue-100 rounded-lg overflow-hidden shrink-0">
+                                                {addToSupplierSelected.image ? <img src={getImageUrl(addToSupplierSelected.image)} className="w-full h-full object-cover" /> : <Package size={16} className="m-1 text-blue-400" />}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-bold text-tremor-content-strong dark:text-dark-tremor-content-strong truncate">{addToSupplierSelected.name}</p>
+                                                <p className="text-xs text-tremor-content">{addToSupplierSelected.brand} · Giá bán: {fmt(addToSupplierSelected.price)}</p>
+                                            </div>
+                                            <button onClick={() => { setAddToSupplierSelected(null); setAddToSupplierSearch(''); }} className="p-1 hover:text-red-500"><X size={14} /></button>
+                                        </div>
+                                    ) : addToSupplierSearch.trim() ? (
+                                        <div className="mt-1 bg-white dark:bg-dark-tremor-background border border-tremor-border dark:border-dark-tremor-border rounded-xl shadow-xl max-h-48 overflow-y-auto">
+                                            {products
+                                                .filter(p => !supplierPriceMap[p.id] && (p.name?.toLowerCase().includes(addToSupplierSearch.toLowerCase()) || p.brand?.toLowerCase().includes(addToSupplierSearch.toLowerCase())))
+                                                .slice(0, 6)
+                                                .map(p => (
+                                                    <button key={p.id} onClick={() => { setAddToSupplierSelected(p); setAddToSupplierSearch(p.name); }}
+                                                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-dark-tremor-background-muted text-left transition-colors">
+                                                        <span className="text-sm font-semibold text-tremor-content-strong dark:text-dark-tremor-content-strong truncate">{p.name}</span>
+                                                        <span className="text-xs text-tremor-content ml-auto shrink-0">{p.brand}</span>
+                                                    </button>
+                                                ))}
+                                            {products.filter(p => !supplierPriceMap[p.id] && (p.name?.toLowerCase().includes(addToSupplierSearch.toLowerCase()) || p.brand?.toLowerCase().includes(addToSupplierSearch.toLowerCase()))).length === 0 && (
+                                                <p className="text-center py-4 text-sm text-tremor-content">Không tìm thấy hoặc đã có trong NCC</p>
+                                            )}
+                                        </div>
+                                    ) : null}
+                                </div>
+
+                                {/* Import price - REQUIRED */}
+                                <div>
+                                    <label className="text-xs font-bold text-tremor-content uppercase tracking-wider mb-2 block">
+                                        Giá nhập từ NCC này <span className="text-red-500">*</span>
+                                    </label>
+                                    <input type="text" inputMode="numeric" value={addToSupplierPrice}
+                                        onChange={e => setAddToSupplierPrice(e.target.value.replace(/[^0-9]/g, ''))}
+                                        placeholder="VD: 45000"
+                                        className={classNames('w-full px-4 py-3 rounded-xl text-sm font-bold outline-none border transition-all dark:bg-dark-tremor-background-muted dark:text-dark-tremor-content-strong',
+                                            !addToSupplierPrice && addToSupplierSelected ? 'border-red-400 bg-red-50' : 'border-tremor-border focus:border-tremor-brand bg-tremor-background-muted')} />
+                                    {!addToSupplierPrice && addToSupplierSelected && (
+                                        <p className="text-red-500 text-xs mt-1 font-medium">Bắt buộc nhập giá nhập</p>
+                                    )}
+                                    {addToSupplierSelected && addToSupplierPrice && (
+                                        <p className="text-xs text-emerald-600 font-semibold mt-1">
+                                            Margin: {((addToSupplierSelected.price - parseInt(addToSupplierPrice)) / addToSupplierSelected.price * 100).toFixed(1)}%
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="p-5 pt-0 flex gap-3">
+                                <button onClick={() => setShowAddToSupplier(false)}
+                                    className="flex-1 py-3 bg-tremor-background-muted text-tremor-content-strong rounded-xl font-bold text-sm hover:bg-gray-200 dark:bg-dark-tremor-background-muted transition-colors">
+                                    Hủy
+                                </button>
+                                <button
+                                    disabled={!addToSupplierSelected || !addToSupplierPrice || addToSupplierSaving}
+                                    onClick={async () => {
+                                        if (!addToSupplierSelected || !addToSupplierPrice) return;
+                                        setAddToSupplierSaving(true);
+                                        await fetch(`${API_URL}/suppliers/${selectedSupplier}/products`, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+                                            body: JSON.stringify({ product_id: addToSupplierSelected.id, import_price: parseInt(addToSupplierPrice) })
+                                        });
+                                        await loadSupplierProducts();
+                                        addToImport({ ...addToSupplierSelected, cost_price: parseInt(addToSupplierPrice) });
+                                        setAddToSupplierSaving(false);
+                                        setShowAddToSupplier(false);
+                                    }}
+                                    className="flex-[2] py-3 bg-tremor-brand text-white rounded-xl font-bold text-sm shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">
+                                    {addToSupplierSaving ? 'Đang lưu...' : 'Thêm vào NCC & Giỏ hàng'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                </>
             )}
 
             {/* ═══ HISTORY ═══ */}
