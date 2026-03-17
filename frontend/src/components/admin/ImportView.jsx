@@ -7,7 +7,7 @@ import {
     Truck, Package, Search, X, Plus, Minus, Trash2,
     CheckCircle, Image as ImageIcon, ChevronDown, Clock,
     TrendingUp, AlertTriangle, ShoppingCart, DollarSign, Percent, ArrowRight,
-    ChevronLeft, ChevronRight, FileText, Bot, Sparkles
+    ChevronLeft, ChevronRight, FileText, Bot, Sparkles, ScanLine
 } from 'lucide-react';
 import {
     flexRender,
@@ -15,6 +15,74 @@ import {
     getPaginationRowModel,
     useReactTable,
 } from '@tanstack/react-table';
+
+const API_URL_MODAL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const getImageUrlModal = (p) => { if (!p) return null; if (p.startsWith('http') || p.startsWith('data:')) return p; let b = API_URL_MODAL.replace(/\/api\/?$/, ''); return b + (p.startsWith('/') ? p : '/' + p); };
+const fmtNum = v => { if (v === '' || v == null) return ''; return Number(v).toLocaleString('vi-VN'); };
+
+/* ── Inline Product Edit Modal (reused from ProductsView) ── */
+const ProductEditModal = ({ product, onClose, onSave, authToken, onLogout }) => {
+    const [form, setForm] = useState({ ...product });
+    const [saving, setSaving] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+    const [display, setDisplay] = useState({
+        price: fmtNum(product.price), case_price: fmtNum(product.case_price),
+        cost_price: fmtNum(product.cost_price), units_per_case: String(product.units_per_case || 1), stock: fmtNum(product.stock)
+    });
+    const num = (field, val) => { const n = val.replace(/[^0-9]/g, ''); setDisplay(d => ({ ...d, [field]: n })); setForm(f => ({ ...f, [field]: parseInt(n, 10) || (field === 'units_per_case' ? 1 : 0) })); };
+    const blur = (field) => setDisplay(d => ({ ...d, [field]: field === 'units_per_case' ? String(form[field] || 1) : fmtNum(form[field] || 0) }));
+    const focus = (field) => setDisplay(d => ({ ...d, [field]: form[field] ? String(form[field]) : '' }));
+    const compress = (file) => new Promise(resolve => { const r = new FileReader(); r.onload = e => { const img = new Image(); img.onload = () => { const c = document.createElement('canvas'); let w = img.width, h = img.height; if (w > 800) { h = Math.round(h * 800 / w); w = 800; } c.width = w; c.height = h; c.getContext('2d').drawImage(img, 0, 0, w, h); resolve(c.toDataURL('image/jpeg', 0.7)); }; img.src = e.target.result; }; r.readAsDataURL(file); });
+    const save = async () => { setSaving(true); try { const res = await fetch(`${API_URL_MODAL}/products/${form.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` }, body: JSON.stringify(form) }); if (res.status === 401) { alert('Phiên hết hạn'); onLogout(); return; } onSave(); } catch {} finally { setSaving(false); } };
+    const del = async () => { if (!confirm('Xóa sản phẩm này?')) return; setDeleting(true); try { const res = await fetch(`${API_URL_MODAL}/products/${form.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${authToken}` } }); if (res.ok) onSave(); } catch {} finally { setDeleting(false); } };
+    const inp = 'w-full bg-gray-50 p-3 rounded-xl font-bold outline-none border border-gray-200 focus:border-blue-400 transition-colors text-sm';
+    return (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4 animate-in">
+            <div className="bg-white w-full max-w-lg max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+                <div className="p-5 border-b border-gray-100 flex justify-between items-center shrink-0">
+                    <h3 className="font-bold text-lg text-gray-900">Sửa sản phẩm</h3>
+                    <button onClick={onClose} className="p-2 bg-gray-100 rounded-xl hover:bg-gray-200"><X size={18} /></button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                    <div className="flex flex-col items-center gap-2">
+                        <label className="w-24 h-24 bg-gray-50 rounded-2xl overflow-hidden border-2 border-dashed border-gray-200 flex items-center justify-center cursor-pointer hover:border-blue-400 transition-colors relative">
+                            {form.image ? <img src={getImageUrlModal(form.image)} className="w-full h-full object-cover" /> : <ImageIcon className="text-gray-300" />}
+                            <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" onChange={async e => { if (e.target.files[0]) { const c = await compress(e.target.files[0]); setForm(f => ({ ...f, image: c })); } }} />
+                        </label>
+                        <p className="text-xs text-blue-500 font-bold">Chạm để đổi ảnh</p>
+                    </div>
+                    <input value={form.name || ''} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Tên sản phẩm" className={inp + ' font-bold'} />
+                    <div className="grid grid-cols-2 gap-3">
+                        <div><label className="text-xs font-bold uppercase text-gray-400 mb-1 block tracking-wider">Giá lẻ</label><input type="text" inputMode="numeric" value={display.price} onChange={e => num('price', e.target.value)} onFocus={() => focus('price')} onBlur={() => blur('price')} className={inp + ' text-blue-500'} /></div>
+                        <div><label className="text-xs font-bold uppercase text-gray-400 mb-1 block tracking-wider">Giá thùng</label><input type="text" inputMode="numeric" value={display.case_price} onChange={e => num('case_price', e.target.value)} onFocus={() => focus('case_price')} onBlur={() => blur('case_price')} className={inp + ' text-orange-500'} /></div>
+                    </div>
+                    <div><label className="text-xs font-bold uppercase text-gray-400 mb-1 block tracking-wider">Giá nhập</label>
+                        <div className="relative"><input type="text" inputMode="numeric" value={display.cost_price} onChange={e => num('cost_price', e.target.value)} onFocus={() => focus('cost_price')} onBlur={() => blur('cost_price')} className={inp + ' text-emerald-500'} />
+                            {form.cost_price > 0 && form.price > 0 && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-lg">Margin: {((form.price - form.cost_price) / form.price * 100).toFixed(1)}%</span>}
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div><label className="text-xs font-bold uppercase text-gray-400 mb-1 block tracking-wider">SL/Thùng</label><input type="text" inputMode="numeric" value={display.units_per_case} onChange={e => num('units_per_case', e.target.value)} onFocus={() => focus('units_per_case')} onBlur={() => blur('units_per_case')} className={inp} /></div>
+                        <div><label className="text-xs font-bold uppercase text-gray-400 mb-1 block tracking-wider">Tồn kho</label><input type="text" inputMode="numeric" value={display.stock} onChange={e => num('stock', e.target.value)} onFocus={() => focus('stock')} onBlur={() => blur('stock')} className={inp} /></div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div><label className="text-xs font-bold uppercase text-gray-400 mb-1 block tracking-wider">Thương hiệu</label><input value={form.brand || ''} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} className={inp} /></div>
+                        <div><label className="text-xs font-bold uppercase text-gray-400 mb-1 block tracking-wider">Danh mục</label><input value={form.category || ''} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className={inp} /></div>
+                    </div>
+                    <div><label className="text-xs font-bold uppercase text-gray-400 mb-1 block tracking-wider">Mã vạch</label><input value={form.code || ''} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} className={inp + ' font-mono'} /></div>
+                </div>
+                <div className="p-4 border-t border-gray-100 flex gap-3 shrink-0">
+                    <button onClick={del} disabled={deleting} className="bg-red-50 text-red-500 p-3.5 rounded-xl hover:bg-red-100 disabled:opacity-50">
+                        {deleting ? <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin" /> : <Trash2 size={20} />}
+                    </button>
+                    <button onClick={save} disabled={saving} className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3.5 rounded-xl font-bold shadow-lg shadow-blue-500/25 transition-all active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2">
+                        {saving ? <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />Đang lưu...</> : 'Lưu thay đổi'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // Modal component for viewing import details
 const ImportDetailsModal = ({ isOpen, onClose, importData, suppliers, fmt, products }) => {
@@ -291,7 +359,9 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
     const [addToSupplierSearch, setAddToSupplierSearch] = useState('');
     const [addToSupplierSelected, setAddToSupplierSelected] = useState(null);
     const [addToSupplierPrice, setAddToSupplierPrice] = useState('');
+    const [addToSupplierPriceMode, setAddToSupplierPriceMode] = useState('unit'); // 'unit' | 'case'
     const [addToSupplierSaving, setAddToSupplierSaving] = useState(false);
+    const [selectedProfitProduct, setSelectedProfitProduct] = useState(null);
     const [importNote, setImportNote] = useState('');
     const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
     const [editingQty, setEditingQty] = useState(null);
@@ -1053,22 +1123,45 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
 
                                 {/* Import price - REQUIRED */}
                                 <div>
-                                    <label className="text-xs font-bold text-tremor-content uppercase tracking-wider mb-2 block">
-                                        Giá nhập từ NCC này <span className="text-red-500">*</span>
-                                    </label>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="text-xs font-bold text-tremor-content uppercase tracking-wider">
+                                            Giá nhập từ NCC này <span className="text-red-500">*</span>
+                                        </label>
+                                        {addToSupplierSelected?.units_per_case > 1 && (
+                                            <div className="flex rounded-lg overflow-hidden border border-tremor-border text-xs font-bold">
+                                                <button onClick={() => setAddToSupplierPriceMode('unit')}
+                                                    className={classNames('px-3 py-1 transition-colors', addToSupplierPriceMode === 'unit' ? 'bg-tremor-brand text-white' : 'bg-tremor-background-muted text-tremor-content')}>
+                                                    Giá lẻ
+                                                </button>
+                                                <button onClick={() => setAddToSupplierPriceMode('case')}
+                                                    className={classNames('px-3 py-1 transition-colors', addToSupplierPriceMode === 'case' ? 'bg-tremor-brand text-white' : 'bg-tremor-background-muted text-tremor-content')}>
+                                                    Giá thùng
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
                                     <input type="text" inputMode="numeric" value={addToSupplierPrice}
                                         onChange={e => setAddToSupplierPrice(e.target.value.replace(/[^0-9]/g, ''))}
-                                        placeholder="VD: 45000"
+                                        placeholder={addToSupplierPriceMode === 'case' ? `Giá 1 thùng (${addToSupplierSelected?.units_per_case || '?'} cái)` : 'VD: 45000'}
                                         className={classNames('w-full px-4 py-3 rounded-xl text-sm font-bold outline-none border transition-all dark:bg-dark-tremor-background-muted dark:text-dark-tremor-content-strong',
                                             !addToSupplierPrice && addToSupplierSelected ? 'border-red-400 bg-red-50' : 'border-tremor-border focus:border-tremor-brand bg-tremor-background-muted')} />
                                     {!addToSupplierPrice && addToSupplierSelected && (
                                         <p className="text-red-500 text-xs mt-1 font-medium">Bắt buộc nhập giá nhập</p>
                                     )}
-                                    {addToSupplierSelected && addToSupplierPrice && (
-                                        <p className="text-xs text-emerald-600 font-semibold mt-1">
-                                            Margin: {((addToSupplierSelected.price - parseInt(addToSupplierPrice)) / addToSupplierSelected.price * 100).toFixed(1)}%
-                                        </p>
-                                    )}
+                                    {addToSupplierSelected && addToSupplierPrice && (() => {
+                                        const unitPrice = addToSupplierPriceMode === 'case'
+                                            ? Math.round(parseInt(addToSupplierPrice) / (addToSupplierSelected.units_per_case || 1))
+                                            : parseInt(addToSupplierPrice);
+                                        const margin = ((addToSupplierSelected.price - unitPrice) / addToSupplierSelected.price * 100).toFixed(1);
+                                        return (
+                                            <div className="mt-1 space-y-0.5">
+                                                {addToSupplierPriceMode === 'case' && (
+                                                    <p className="text-xs text-blue-600 font-semibold">= {fmt(unitPrice)}/cái</p>
+                                                )}
+                                                <p className="text-xs text-emerald-600 font-semibold">Margin: {margin}%</p>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             </div>
                             <div className="p-5 pt-0 flex gap-3">
@@ -1080,14 +1173,18 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                                     disabled={!addToSupplierSelected || !addToSupplierPrice || addToSupplierSaving}
                                     onClick={async () => {
                                         if (!addToSupplierSelected || !addToSupplierPrice) return;
+                                        const rawPrice = parseInt(addToSupplierPrice);
+                                        const unitPrice = addToSupplierPriceMode === 'case'
+                                            ? Math.round(rawPrice / (addToSupplierSelected.units_per_case || 1))
+                                            : rawPrice;
                                         setAddToSupplierSaving(true);
                                         await fetch(`${API_URL}/suppliers/${selectedSupplier}/products`, {
                                             method: 'POST',
                                             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
-                                            body: JSON.stringify({ product_id: addToSupplierSelected.id, import_price: parseInt(addToSupplierPrice) })
+                                            body: JSON.stringify({ product_id: addToSupplierSelected.id, import_price: unitPrice })
                                         });
                                         await loadSupplierProducts();
-                                        addToImport({ ...addToSupplierSelected, cost_price: parseInt(addToSupplierPrice) });
+                                        addToImport({ ...addToSupplierSelected, cost_price: unitPrice });
                                         setAddToSupplierSaving(false);
                                         setShowAddToSupplier(false);
                                     }}
@@ -1545,6 +1642,16 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                 </div>
             )}
 
+            {/* Product edit modal from gross margin */}
+            {selectedProfitProduct && (
+                <ProductEditModal
+                    product={selectedProfitProduct.product}
+                    authToken={authToken}
+                    onLogout={onLogout}
+                    onClose={() => setSelectedProfitProduct(null)}
+                    onSave={() => { setSelectedProfitProduct(null); refreshData(); fetchProfitAnalysis(); }}
+                />
+            )}
         </div>
     );
 };
