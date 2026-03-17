@@ -242,6 +242,22 @@ const POSView = ({
                     </section>
                 ) : (
                     <>
+                        {bestSellers.length > 0 && (
+                            <section className="mb-8">
+                                <div className="px-5 mb-4 flex items-center justify-between">
+                                    <h3 className="text-[15px] font-black text-[#1D1D1F] tracking-tight">Thịnh hành</h3>
+                                    <div className="h-1 w-8 bg-[#0071E3] rounded-full opacity-80"></div>
+                                </div>
+                                <div className="flex gap-3.5 overflow-x-auto px-5 pb-2 scrollbar-hide">
+                                    {bestSellers.map(p => (
+                                        <div key={`best-${p.id}-${p.saleType}`} className="w-36 md:w-40 flex-shrink-0">
+                                            <ProductCard p={p} size="sm" />
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
+                        )}
+
                         {Object.entries(productsByBrand).map(([brand, items]) => (
                             <section key={brand} className="mb-9">
                                 <div className="px-5 mb-3.5 flex items-center justify-between">
