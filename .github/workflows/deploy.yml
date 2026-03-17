@@ -46,6 +46,12 @@ jobs:
           ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
           ssh-keygen -l -f ~/.ssh/deploy_key
 
+      - name: Test SSH connection
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -v "$VPS_USER@$VPS_HOST" "echo SSH_OK"
+
       - name: Sync backend files to VPS
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
