@@ -136,7 +136,7 @@ const DashboardView = ({ stats, products, analyticsData, setActiveTab }) => {
         {
             id: 'avg',
             label: 'Trung bình / đơn',
-            value: kpis.todayOrders > 0 ? fmtCompact(Math.round(kpis.monthRevenue / Math.max(kpis.todayOrders, 1))) + 'đ' : '0đ',
+            value: kpis.todayOrders > 0 ? fmtCompact(Math.round(kpis.todayRevenue / kpis.todayOrders)) + 'đ' : '0đ',
             sub: 'giá trị TB đơn hàng',
             change: null,
         },
