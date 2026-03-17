@@ -44,6 +44,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
         db.run("PRAGMA temp_store = MEMORY;");          // Temp tables trong RAM
         db.run("PRAGMA mmap_size = 268435456;");        // 256MB memory-mapped I/O
         db.run("PRAGMA busy_timeout = 5000;");          // Đợi 5s nếu DB bị lock
+        db.run("PRAGMA foreign_keys = ON;");            // Enforce FK constraints
         console.log('⚡ SQLite optimizations applied.');
     }
 });
@@ -209,6 +210,14 @@ const initDatabase = () => {
             created_at INTEGER NOT NULL,
             FOREIGN KEY(product_id) REFERENCES products(id),
             FOREIGN KEY(import_id) REFERENCES import_notes(id)
+        )`);
+
+        // Sessions (persistent token store)
+        db.run(`CREATE TABLE IF NOT EXISTS sessions (
+            token TEXT PRIMARY KEY,
+            username TEXT NOT NULL,
+            expiry INTEGER NOT NULL,
+            created_at INTEGER NOT NULL
         )`);
 
         // Add cost_price to order_items if not exists

@@ -66,11 +66,17 @@ const App = () => {
 
     useEffect(() => {
         fetchData();
-        // Check auth status on mount
         if (!isAuthenticated()) {
             setAuthToken(null);
             setAuthUser(null);
         }
+        const interval = setInterval(fetchData, 30000);
+        const onFocus = () => document.visibilityState === 'visible' && fetchData();
+        document.addEventListener('visibilitychange', onFocus);
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', onFocus);
+        };
     }, []);
 
     const handleLogin = (token, user) => {

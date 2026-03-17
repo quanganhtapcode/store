@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { dbRun, dbGet } = require('../config/database');
 
 // Validate required environment variables
 const requiredEnvVars = ['ADMIN_PASSWORD', 'SECRET_KEY'];
@@ -9,7 +10,6 @@ if (missingVars.length > 0) {
     process.exit(1);
 }
 
-// Auth Configuration
 const AUTH_CONFIG = {
     username: process.env.ADMIN_USERNAME || 'admin',
     password: process.env.ADMIN_PASSWORD,
@@ -17,39 +17,50 @@ const AUTH_CONFIG = {
     tokenExpiry: 24 * 60 * 60 * 1000 // 24 hours
 };
 
-// In-memory token storage (Use Redis in production for scalability)
-const activeTokens = new Map();
-
-// Generate Token
-const generateToken = (username) => {
+// Generate token and persist to DB
+const generateToken = async (username) => {
     const token = crypto.randomBytes(32).toString('hex');
     const expiry = Date.now() + AUTH_CONFIG.tokenExpiry;
-    activeTokens.set(token, { username, expiry });
+    await dbRun(
+        'INSERT INTO sessions (token, username, expiry, created_at) VALUES (?, ?, ?, ?)',
+        [token, username, expiry, Date.now()]
+    );
     return token;
 };
 
-// Verify Token Middleware
-const verifyToken = (req, res, next) => {
-    const authHeader = req.headers.authorization;
+// Delete a specific token (logout)
+const deleteToken = async (token) => {
+    await dbRun('DELETE FROM sessions WHERE token = ?', [token]);
+};
 
+// Purge expired sessions (call periodically)
+const cleanupExpiredSessions = () => {
+    dbRun('DELETE FROM sessions WHERE expiry < ?', [Date.now()])
+        .catch(e => console.error('Session cleanup error:', e));
+};
+
+// Run cleanup every hour
+setInterval(cleanupExpiredSessions, 60 * 60 * 1000);
+
+// Verify Token Middleware
+const verifyToken = async (req, res, next) => {
+    const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'Unauthorized: No token provided' });
     }
-
     const token = authHeader.split(' ')[1];
-    const tokenData = activeTokens.get(token);
-
-    if (!tokenData) {
-        return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+    try {
+        const session = await dbGet('SELECT * FROM sessions WHERE token = ?', [token]);
+        if (!session) return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+        if (Date.now() > session.expiry) {
+            await dbRun('DELETE FROM sessions WHERE token = ?', [token]);
+            return res.status(401).json({ error: 'Unauthorized: Token expired' });
+        }
+        req.user = session.username;
+        next();
+    } catch (e) {
+        return res.status(500).json({ error: 'Auth error' });
     }
-
-    if (Date.now() > tokenData.expiry) {
-        activeTokens.delete(token);
-        return res.status(401).json({ error: 'Unauthorized: Token expired' });
-    }
-
-    req.user = tokenData.username;
-    next();
 };
 
-module.exports = { AUTH_CONFIG, generateToken, verifyToken };
+module.exports = { AUTH_CONFIG, generateToken, deleteToken, verifyToken };

@@ -9,7 +9,7 @@ const multer = require('multer');
 
 // --- Modules ---
 const { initDatabase, dbRun, dbAll, logActivity } = require('./config/database');
-const { verifyToken, generateToken, AUTH_CONFIG } = require('./middleware/auth');
+const { verifyToken, generateToken, deleteToken, AUTH_CONFIG } = require('./middleware/auth');
 const { validateImport } = require('./utils/helpers');
 const { verifyOTP, getQRCode } = require('./utils/otp');
 
@@ -78,7 +78,7 @@ app.use('/api/reports', reportsRoute.router);
 
 // --- AUTH ROUTE ---
 // --- AUTH ROUTE ---
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
     const { username, password, otp } = req.body;
 
     // Check Username
@@ -104,7 +104,7 @@ app.post('/api/auth/login', (req, res) => {
     }
 
     if (isAuthenticated) {
-        const token = generateToken(username);
+        const token = await generateToken(username);
         res.json({ success: true, token, user: username, expiresIn: AUTH_CONFIG.tokenExpiry });
     } else {
         res.status(401).json({ error: 'Sai mật khẩu' });
@@ -119,12 +119,18 @@ app.get('/api/auth/2fa/setup', verifyToken, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Logout
+app.post('/api/auth/logout', verifyToken, async (req, res) => {
+    const token = req.headers.authorization.split(' ')[1];
+    await deleteToken(token);
+    res.json({ success: true });
+});
+
 // --- LOGS ROUTE ---
 app.get('/api/logs', async (req, res) => {
     try {
-        const limitStr = req.query.limit ? req.query.limit : '100000';
-        const limit = parseInt(limitStr);
-        const logs = await dbAll(`SELECT * FROM activity_logs ORDER BY timestamp DESC LIMIT ${limit}`);
+        const limit = Math.min(parseInt(req.query.limit) || 100000, 100000);
+        const logs = await dbAll('SELECT * FROM activity_logs ORDER BY timestamp DESC LIMIT ?', [limit]);
         res.json(logs);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -327,16 +333,6 @@ app.get('/api/stats/purchase-recommendations', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-
-// GET ALL IMPORTS
-app.get('/api/imports', async (req, res) => {
-    try {
-        const imports = await dbAll("SELECT * FROM import_notes ORDER BY timestamp DESC LIMIT 200");
-        res.json(imports);
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
 
 // UPDATE IMPORT (add invoice PDF link, note, etc.)
 app.put('/api/imports/:id', verifyToken, async (req, res) => {
