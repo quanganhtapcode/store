@@ -18,7 +18,6 @@ import {
 
 const API_URL_MODAL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 const getImageUrlModal = (p) => { if (!p) return null; if (p.startsWith('http') || p.startsWith('data:')) return p; let b = API_URL_MODAL.replace(/\/api\/?$/, ''); return b + (p.startsWith('/') ? p : '/' + p); };
-const fmtNum = v => { if (v === '' || v == null) return ''; return Number(v).toLocaleString('vi-VN'); };
 
 /* ── Inline Product Edit Modal (reused from ProductsView) ── */
 const ProductEditModal = ({ product, onClose, onSave, authToken, onLogout }) => {
@@ -26,11 +25,14 @@ const ProductEditModal = ({ product, onClose, onSave, authToken, onLogout }) => 
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [display, setDisplay] = useState({
-        price: fmtNum(product.price), case_price: fmtNum(product.case_price),
-        cost_price: fmtNum(product.cost_price), units_per_case: String(product.units_per_case || 1), stock: fmtNum(product.stock)
+        price: Number(product.price || 0).toLocaleString('vi-VN'),
+        case_price: Number(product.case_price || 0).toLocaleString('vi-VN'),
+        cost_price: Number(product.cost_price || 0).toLocaleString('vi-VN'),
+        units_per_case: String(product.units_per_case || 1),
+        stock: Number(product.stock || 0).toLocaleString('vi-VN')
     });
     const num = (field, val) => { const n = val.replace(/[^0-9]/g, ''); setDisplay(d => ({ ...d, [field]: n })); setForm(f => ({ ...f, [field]: parseInt(n, 10) || (field === 'units_per_case' ? 1 : 0) })); };
-    const blur = (field) => setDisplay(d => ({ ...d, [field]: field === 'units_per_case' ? String(form[field] || 1) : fmtNum(form[field] || 0) }));
+    const blur = (field) => setDisplay(d => ({ ...d, [field]: field === 'units_per_case' ? String(form[field] || 1) : Number(form[field] || 0).toLocaleString('vi-VN') }));
     const focus = (field) => setDisplay(d => ({ ...d, [field]: form[field] ? String(form[field]) : '' }));
     const compress = (file) => new Promise(resolve => { const r = new FileReader(); r.onload = e => { const img = new Image(); img.onload = () => { const c = document.createElement('canvas'); let w = img.width, h = img.height; if (w > 800) { h = Math.round(h * 800 / w); w = 800; } c.width = w; c.height = h; c.getContext('2d').drawImage(img, 0, 0, w, h); resolve(c.toDataURL('image/jpeg', 0.7)); }; img.src = e.target.result; }; r.readAsDataURL(file); });
     const save = async () => { setSaving(true); try { const res = await fetch(`${API_URL_MODAL}/products/${form.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` }, body: JSON.stringify(form) }); if (res.status === 401) { alert('Phiên hết hạn'); onLogout(); return; } onSave(); } catch {} finally { setSaving(false); } };
