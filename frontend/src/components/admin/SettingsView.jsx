@@ -1,10 +1,36 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     Settings, ShieldCheck, LogOut, User, Lock, Bell,
     Palette, Database, Globe, ChevronRight
 } from 'lucide-react';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
 const SettingsView = ({ authUser, authToken, onLogout, handleSetup2FA }) => {
+    const [exporting, setExporting] = useState(false);
+
+    const handleExport = async () => {
+        setExporting(true);
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            const res = await fetch(`${API_URL}/reports/export`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                body: JSON.stringify({ type: 'sales_detail', startDate: '2024-01-01', endDate: today }),
+            });
+            if (!res.ok) throw new Error('Export failed');
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `BaoCao_BanHang_${today}.xlsx`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            alert('Lỗi xuất dữ liệu: ' + e.message);
+        }
+        setExporting(false);
+    };
     const settingsSections = [
         {
             title: 'Tài khoản',
@@ -26,9 +52,9 @@ const SettingsView = ({ authUser, authToken, onLogout, handleSetup2FA }) => {
                 {
                     icon: Lock,
                     label: 'Đổi mật khẩu',
-                    desc: 'Cập nhật mật khẩu đăng nhập',
+                    desc: 'Cập nhật trong file .env trên VPS',
                     color: 'orange',
-                    action: () => alert('Tính năng đang phát triển')
+                    action: null
                 },
             ]
         },
@@ -37,10 +63,10 @@ const SettingsView = ({ authUser, authToken, onLogout, handleSetup2FA }) => {
             items: [
                 {
                     icon: Database,
-                    label: 'Sao lưu dữ liệu',
-                    desc: 'Xuất và sao lưu cơ sở dữ liệu',
+                    label: exporting ? 'Đang xuất...' : 'Sao lưu dữ liệu',
+                    desc: 'Xuất báo cáo bán hàng (.xlsx)',
                     color: 'purple',
-                    action: () => alert('Tính năng đang phát triển')
+                    action: handleExport
                 },
                 {
                     icon: Globe,

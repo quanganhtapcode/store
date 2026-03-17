@@ -7,7 +7,7 @@ import {
     Truck, Package, Search, X, Plus, Minus, Trash2,
     CheckCircle, Image as ImageIcon, ChevronDown, Clock,
     TrendingUp, AlertTriangle, ShoppingCart, DollarSign, Percent, ArrowRight,
-    ChevronLeft, ChevronRight, FileText
+    ChevronLeft, ChevronRight, FileText, Bot, Sparkles
 } from 'lucide-react';
 import {
     flexRender,
@@ -15,6 +15,7 @@ import {
     getPaginationRowModel,
     useReactTable,
 } from '@tanstack/react-table';
+import ProductDetailsModal from './ProductDetailsModal';
 
 // Modal component for viewing import details
 const ImportDetailsModal = ({ isOpen, onClose, importData, suppliers, fmt, products }) => {
@@ -88,6 +89,7 @@ const ImportDetailsModal = ({ isOpen, onClose, importData, suppliers, fmt, produ
 };
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const AI_ASSISTANT_URL = import.meta.env.VITE_AI_ASSISTANT_URL || `${API_URL}/ai/ops-assistant`;
 
 function classNames(...classes) {
     return classes.filter(Boolean).join(' ');
@@ -296,6 +298,296 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
     const [recommendations, setRecommendations] = useState([]);
     const [loadingAnalysis, setLoadingAnalysis] = useState(false);
     const [selectedImportData, setSelectedImportData] = useState(null);
+    const [analysisPage, setAnalysisPage] = useState(1);
+    const [analysisSearch, setAnalysisSearch] = useState('');
+    const [analysisOnlyLowStock, setAnalysisOnlyLowStock] = useState(false);
+    const [analysisOnlyLowMargin, setAnalysisOnlyLowMargin] = useState(false);
+    const [watchlistIds, setWatchlistIds] = useState(() => {
+        if (typeof window === 'undefined') return [];
+        try {
+            const raw = localStorage.getItem('ops_watchlist_product_ids');
+            const parsed = JSON.parse(raw || '[]');
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            return [];
+        }
+    });
+    const [aiActionCards, setAiActionCards] = useState([]);
+    const [aiActionLoading, setAiActionLoading] = useState(false);
+    const [selectedProfitProduct, setSelectedProfitProduct] = useState(null);
+
+    const ANALYSIS_PAGE_SIZE = 20;
+    const profitProductsRaw = useMemo(() => profitData?.products || [], [profitData]);
+    const profitProducts = useMemo(() => {
+        const searchNorm = normalizeText(analysisSearch.trim());
+        const searchWords = searchNorm.split(/\s+/).filter(Boolean);
+
+        return profitProductsRaw.filter((item) => {
+            const baseProduct = products.find((p) => p.id === item.id) || {};
+            const searchable = normalizeText([
+                item.id,
+                item.name,
+                item.brand,
+                baseProduct.code,
+                baseProduct.category,
+            ].filter(Boolean).join(' '));
+
+            const isSearchMatch = searchWords.length === 0 || searchWords.every((word) => searchable.includes(word));
+            const isLowStockMatch = !analysisOnlyLowStock || Number(item.daysOfStock || 0) <= 7;
+            const isLowMarginMatch = !analysisOnlyLowMargin || (Number(item.margin || 0) > 0 && Number(item.margin || 0) < 15);
+
+            return isSearchMatch && isLowStockMatch && isLowMarginMatch;
+        });
+    }, [analysisOnlyLowMargin, analysisOnlyLowStock, analysisSearch, products, profitProductsRaw]);
+    const analysisPageCount = Math.max(1, Math.ceil(profitProducts.length / ANALYSIS_PAGE_SIZE));
+    const analysisRows = useMemo(() => {
+        const start = (analysisPage - 1) * ANALYSIS_PAGE_SIZE;
+        return profitProducts.slice(start, start + ANALYSIS_PAGE_SIZE);
+    }, [analysisPage, profitProducts]);
+    const analysisStartIndex = profitProducts.length === 0 ? 0 : ((analysisPage - 1) * ANALYSIS_PAGE_SIZE) + 1;
+    const analysisEndIndex = Math.min(analysisPage * ANALYSIS_PAGE_SIZE, profitProducts.length);
+
+    const profitById = useMemo(() => {
+        const map = new Map();
+        for (const item of profitProductsRaw) {
+            map.set(item.id, item);
+        }
+        return map;
+    }, [profitProductsRaw]);
+
+    const stockRiskProducts = useMemo(
+        () => profitProducts.filter((p) => Number(p.daysOfStock || 0) <= 7),
+        [profitProducts]
+    );
+
+    const lowMarginProducts = useMemo(
+        () => profitProducts.filter((p) => Number(p.margin || 0) > 0 && Number(p.margin || 0) < 15),
+        [profitProducts]
+    );
+
+    const highProfitProducts = useMemo(
+        () => [...profitProducts].sort((a, b) => Number(b.profit30d || 0) - Number(a.profit30d || 0)).slice(0, 8),
+        [profitProducts]
+    );
+
+    const watchlistProducts = useMemo(() => {
+        return watchlistIds.map((id) => {
+            const p = products.find((item) => item.id === id) || {};
+            const analysis = profitById.get(id) || null;
+            if (!p.id && !analysis) return null;
+            return {
+                id,
+                name: p.name || analysis?.name || id,
+                brand: p.brand || analysis?.brand || '',
+                margin: analysis?.margin,
+                daysOfStock: analysis?.daysOfStock,
+                profit30d: analysis?.profit30d,
+            };
+        }).filter(Boolean);
+    }, [watchlistIds, products, profitById]);
+
+    const analysisPageTokens = useMemo(() => {
+        if (analysisPageCount <= 7) {
+            return Array.from({ length: analysisPageCount }, (_, i) => i + 1);
+        }
+
+        const pages = new Set([1, analysisPageCount, analysisPage - 1, analysisPage, analysisPage + 1]);
+        const sortedPages = [...pages].filter((p) => p >= 1 && p <= analysisPageCount).sort((a, b) => a - b);
+
+        const tokens = [];
+        for (let i = 0; i < sortedPages.length; i++) {
+            if (i > 0 && sortedPages[i] - sortedPages[i - 1] > 1) {
+                tokens.push('ellipsis');
+            }
+            tokens.push(sortedPages[i]);
+        }
+
+        return tokens;
+    }, [analysisPage, analysisPageCount]);
+
+    const openProfitProductDetail = (profitItem) => {
+        const baseProduct = products.find((p) => p.id === profitItem.id) || {};
+        const mergedProduct = {
+            ...baseProduct,
+            ...profitItem,
+            id: profitItem.id,
+            name: profitItem.name,
+            brand: profitItem.brand,
+            price: baseProduct.price ?? profitItem.sellPrice,
+            cost_price: baseProduct.cost_price ?? profitItem.costPrice,
+            stock: baseProduct.stock ?? profitItem.stock,
+        };
+
+        setSelectedProfitProduct({
+            product: mergedProduct,
+            analysis: profitItem,
+        });
+    };
+
+    const openProductDetailById = (productId) => {
+        const analysis = profitById.get(productId);
+        if (analysis) {
+            openProfitProductDetail(analysis);
+            return;
+        }
+
+        const baseProduct = products.find((p) => p.id === productId);
+        if (!baseProduct) return;
+        setSelectedProfitProduct({ product: baseProduct, analysis: null });
+    };
+
+    const getSuggestedQty = (profitItem) => {
+        const dailyAvg = Number(profitItem?.sold30d || 0) / 30;
+        const suggested = Math.ceil((dailyAvg * 14) - Number(profitItem?.stock || 0));
+        return Math.max(1, suggested);
+    };
+
+    const addSingleProfitItemToImport = (profitItem) => {
+        const baseProduct = products.find((p) => p.id === profitItem.id);
+        if (!baseProduct) return;
+
+        const qty = getSuggestedQty(profitItem);
+        setImportCart((prev) => {
+            const ex = prev.find((i) => i.id === baseProduct.id);
+            if (ex) {
+                return prev.map((i) => i.id === baseProduct.id ? { ...i, quantity: i.quantity + qty } : i);
+            }
+            return [
+                ...prev,
+                {
+                    ...baseProduct,
+                    quantity: qty,
+                    importPrice: profitItem.costPrice || baseProduct.cost_price || Math.round(baseProduct.price * 0.7),
+                },
+            ];
+        });
+    };
+
+    const addBatchProfitItemsToImport = (items) => {
+        if (!items || items.length === 0) return;
+
+        setImportCart((prev) => {
+            let next = [...prev];
+            for (const item of items) {
+                const baseProduct = products.find((p) => p.id === item.id);
+                if (!baseProduct) continue;
+
+                const qty = getSuggestedQty(item);
+                const exIndex = next.findIndex((i) => i.id === baseProduct.id);
+                if (exIndex >= 0) {
+                    next[exIndex] = { ...next[exIndex], quantity: next[exIndex].quantity + qty };
+                } else {
+                    next.push({
+                        ...baseProduct,
+                        quantity: qty,
+                        importPrice: item.costPrice || baseProduct.cost_price || Math.round(baseProduct.price * 0.7),
+                    });
+                }
+            }
+            return next;
+        });
+
+        setActiveTab('import');
+    };
+
+    const toggleWatchlist = (productId) => {
+        setWatchlistIds((prev) => (
+            prev.includes(productId)
+                ? prev.filter((id) => id !== productId)
+                : [...prev, productId]
+        ));
+    };
+
+    const runAiOpsAssistant = async () => {
+        if (aiActionLoading) return;
+        setAiActionLoading(true);
+
+        try {
+            // If external AI endpoint is configured, use it. Otherwise fallback to built-in heuristic copilot.
+            if (AI_ASSISTANT_URL) {
+                const response = await fetch(AI_ASSISTANT_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        objective: 'Tối ưu tồn kho và lợi nhuận theo ngày',
+                        summary: profitData?.summary || {},
+                        products: profitProducts.slice(0, 120).map((p) => ({
+                            id: p.id,
+                            name: p.name,
+                            brand: p.brand,
+                            margin: p.margin,
+                            daysOfStock: p.daysOfStock,
+                            profit30d: p.profit30d,
+                            sold30d: p.sold30d,
+                        })),
+                    }),
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const actions = Array.isArray(data?.actions)
+                        ? data.actions.slice(0, 6).map((a, idx) => ({
+                            id: `ai-${idx}`,
+                            title: a.title || 'AI Action',
+                            detail: a.detail || a.description || '',
+                            actionType: a.actionType || 'none',
+                        }))
+                        : [];
+
+                    if (actions.length > 0) {
+                        setAiActionCards(actions);
+                        setAiActionLoading(false);
+                        return;
+                    }
+                }
+            }
+
+            const localActions = [];
+
+            if (stockRiskProducts.length > 0) {
+                localActions.push({
+                    id: 'risk-restock',
+                    title: `Nhập ngay ${Math.min(stockRiskProducts.length, 10)} sản phẩm rủi ro tồn kho`,
+                    detail: 'Tập trung nhóm có tồn kho <= 7 ngày để tránh đứt hàng.',
+                    actionType: 'import-risk',
+                });
+            }
+
+            if (lowMarginProducts.length > 0) {
+                localActions.push({
+                    id: 'margin-review',
+                    title: `Rà soát ${Math.min(lowMarginProducts.length, 10)} sản phẩm margin thấp`,
+                    detail: 'Ưu tiên điều chỉnh giá nhập/giá bán cho nhóm dưới 15%.',
+                    actionType: 'open-low-margin',
+                });
+            }
+
+            if (highProfitProducts.length > 0) {
+                localActions.push({
+                    id: 'watch-high-profit',
+                    title: `Ghim ${Math.min(highProfitProducts.length, 8)} sản phẩm lợi nhuận cao`,
+                    detail: 'Theo dõi liên tục nhóm sản phẩm tạo dòng tiền tốt nhất.',
+                    actionType: 'watch-high-profit',
+                });
+            }
+
+            if (localActions.length === 0) {
+                localActions.push({
+                    id: 'stable-state',
+                    title: 'Không có cảnh báo nghiêm trọng',
+                    detail: 'Tồn kho và margin đang ở ngưỡng an toàn. Tiếp tục theo dõi định kỳ.',
+                    actionType: 'none',
+                });
+            }
+
+            setAiActionCards(localActions);
+        } catch (error) {
+            console.error(error);
+            alert('Không thể khởi tạo AI Assistant. Vui lòng thử lại.');
+        } finally {
+            setAiActionLoading(false);
+        }
+    };
 
     // Filter products
     const filteredProducts = useMemo(() => {
@@ -383,6 +675,21 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
         if (viewMode === 'history') fetchHistory();
         if (viewMode === 'analysis' || viewMode === 'recommend') fetchProfitAnalysis();
     }, [viewMode, fetchHistory, fetchProfitAnalysis]);
+
+    useEffect(() => {
+        setAnalysisPage(1);
+    }, [viewMode, analysisSearch, analysisOnlyLowStock, analysisOnlyLowMargin, profitProducts.length]);
+
+    useEffect(() => {
+        if (analysisPage > analysisPageCount) {
+            setAnalysisPage(analysisPageCount);
+        }
+    }, [analysisPage, analysisPageCount]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        localStorage.setItem('ops_watchlist_product_ids', JSON.stringify(watchlistIds));
+    }, [watchlistIds]);
 
     // Auto-add recommendations to cart
     const addRecommendationsToCart = (recs) => {
@@ -686,8 +993,206 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                             <Card className="p-0 overflow-hidden">
                                 <div className="p-6">
                                     <h3 className="font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong">Phân tích lợi nhuận theo sản phẩm</h3>
-                                    <p className="mt-1 text-tremor-default text-tremor-content dark:text-dark-tremor-content">Dữ liệu 30 ngày gần nhất. Sắp xếp theo lợi nhuận giảm dần.</p>
+                                    <p className="mt-1 text-tremor-default text-tremor-content dark:text-dark-tremor-content">Dữ liệu 30 ngày gần nhất. Sắp xếp theo lợi nhuận giảm dần. Nhấn vào từng dòng để xem chi tiết sản phẩm.</p>
+
+                                    <div className="mt-4 space-y-3">
+                                        <div className="relative">
+                                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-tremor-content" />
+                                            <input
+                                                type="text"
+                                                value={analysisSearch}
+                                                onChange={(e) => setAnalysisSearch(e.target.value)}
+                                                placeholder="Tìm theo tên, thương hiệu, mã sản phẩm, barcode..."
+                                                className="w-full bg-tremor-background dark:bg-dark-tremor-background pl-10 pr-9 py-2.5 rounded-tremor-default text-sm font-medium outline-none border border-tremor-border focus:border-tremor-brand focus:ring-2 focus:ring-tremor-brand-muted transition-all dark:border-dark-tremor-border dark:text-dark-tremor-content-strong"
+                                            />
+                                            {analysisSearch && (
+                                                <button
+                                                    onClick={() => setAnalysisSearch('')}
+                                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full bg-tremor-background-muted hover:bg-gray-300"
+                                                    title="Xóa tìm kiếm"
+                                                >
+                                                    <X size={12} />
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <button
+                                                onClick={() => setAnalysisOnlyLowStock((v) => !v)}
+                                                className={classNames(
+                                                    'px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors',
+                                                    analysisOnlyLowStock
+                                                        ? 'bg-red-100 text-red-700 border-red-200'
+                                                        : 'bg-white text-tremor-content border-tremor-border hover:bg-tremor-background-muted'
+                                                )}
+                                            >
+                                                Tồn kho {'<='} 7 ngày
+                                            </button>
+
+                                            <button
+                                                onClick={() => setAnalysisOnlyLowMargin((v) => !v)}
+                                                className={classNames(
+                                                    'px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors',
+                                                    analysisOnlyLowMargin
+                                                        ? 'bg-amber-100 text-amber-700 border-amber-200'
+                                                        : 'bg-white text-tremor-content border-tremor-border hover:bg-tremor-background-muted'
+                                                )}
+                                            >
+                                                Margin thấp {'<'} 15%
+                                            </button>
+
+                                            {(analysisOnlyLowStock || analysisOnlyLowMargin || analysisSearch) && (
+                                                <button
+                                                    onClick={() => {
+                                                        setAnalysisSearch('');
+                                                        setAnalysisOnlyLowStock(false);
+                                                        setAnalysisOnlyLowMargin(false);
+                                                    }}
+                                                    className="px-3 py-1.5 rounded-full text-xs font-semibold border bg-white text-tremor-content border-tremor-border hover:bg-tremor-background-muted"
+                                                >
+                                                    Xóa bộ lọc
+                                                </button>
+                                            )}
+
+                                            <span className="ml-auto text-xs text-tremor-content dark:text-dark-tremor-content">
+                                                {profitProducts.length} kết quả
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Action Center */}
+                                    <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-3">
+                                        <div className="rounded-xl border border-red-200 bg-red-50 p-3">
+                                            <p className="text-[11px] uppercase tracking-wider font-bold text-red-700">Stock Risk</p>
+                                            <p className="mt-1 text-sm font-semibold text-red-800">{stockRiskProducts.length} sản phẩm cần xử lý</p>
+                                            <button
+                                                onClick={() => addBatchProfitItemsToImport(stockRiskProducts.slice(0, 20))}
+                                                disabled={stockRiskProducts.length === 0}
+                                                className="mt-2 px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-600 text-white disabled:opacity-40"
+                                            >
+                                                Nhập ngay nhóm rủi ro
+                                            </button>
+                                        </div>
+
+                                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                                            <p className="text-[11px] uppercase tracking-wider font-bold text-amber-700">Margin Risk</p>
+                                            <p className="mt-1 text-sm font-semibold text-amber-800">{lowMarginProducts.length} sản phẩm margin thấp</p>
+                                            <button
+                                                onClick={() => {
+                                                    if (lowMarginProducts.length > 0) openProfitProductDetail(lowMarginProducts[0]);
+                                                }}
+                                                disabled={lowMarginProducts.length === 0}
+                                                className="mt-2 px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-600 text-white disabled:opacity-40"
+                                            >
+                                                Mở sản phẩm cần xử lý
+                                            </button>
+                                        </div>
+
+                                        <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
+                                            <p className="text-[11px] uppercase tracking-wider font-bold text-blue-700">AI Ops Assistant</p>
+                                            <p className="mt-1 text-sm font-semibold text-blue-800">Đề xuất hành động từ dữ liệu sống</p>
+                                            <button
+                                                onClick={runAiOpsAssistant}
+                                                disabled={aiActionLoading}
+                                                className="mt-2 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 text-white disabled:opacity-40 inline-flex items-center gap-1"
+                                            >
+                                                {aiActionLoading ? <Bot size={12} className="animate-pulse" /> : <Sparkles size={12} />}
+                                                {aiActionLoading ? 'Đang phân tích...' : 'AI đề xuất hành động'}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {aiActionCards.length > 0 && (
+                                        <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-2">
+                                            {aiActionCards.map((card) => (
+                                                <div key={card.id} className="rounded-xl border border-tremor-border dark:border-dark-tremor-border bg-white dark:bg-dark-tremor-background p-3">
+                                                    <p className="text-sm font-semibold text-tremor-content-strong dark:text-dark-tremor-content-strong">{card.title}</p>
+                                                    <p className="text-xs text-tremor-content mt-1">{card.detail}</p>
+                                                    <div className="mt-2 flex gap-2">
+                                                        {card.actionType === 'import-risk' && (
+                                                            <button
+                                                                onClick={() => addBatchProfitItemsToImport(stockRiskProducts.slice(0, 20))}
+                                                                className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-red-600 text-white"
+                                                            >
+                                                                Thực thi
+                                                            </button>
+                                                        )}
+                                                        {card.actionType === 'open-low-margin' && (
+                                                            <button
+                                                                onClick={() => lowMarginProducts[0] && openProfitProductDetail(lowMarginProducts[0])}
+                                                                className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-amber-600 text-white"
+                                                            >
+                                                                Xem ngay
+                                                            </button>
+                                                        )}
+                                                        {card.actionType === 'watch-high-profit' && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    const ids = highProfitProducts.map((p) => p.id);
+                                                                    setWatchlistIds((prev) => [...new Set([...prev, ...ids])]);
+                                                                }}
+                                                                className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-600 text-white"
+                                                            >
+                                                                Ghim theo dõi
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {watchlistProducts.length > 0 && (
+                                        <div className="mt-3 rounded-xl border border-tremor-border dark:border-dark-tremor-border bg-tremor-background dark:bg-dark-tremor-background p-3">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <p className="text-xs font-bold uppercase tracking-wider text-tremor-content">Watchlist vận hành</p>
+                                                <button
+                                                    onClick={() => setWatchlistIds([])}
+                                                    className="text-xs font-semibold text-tremor-content hover:text-red-600"
+                                                >
+                                                    Xóa tất cả
+                                                </button>
+                                            </div>
+                                            <div className="mt-2 flex flex-wrap gap-2">
+                                                {watchlistProducts.slice(0, 12).map((item) => (
+                                                    <button
+                                                        key={item.id}
+                                                        onClick={() => openProductDetailById(item.id)}
+                                                        className="px-2.5 py-1 rounded-full border border-tremor-border text-xs font-semibold text-tremor-content-strong hover:bg-tremor-background-muted"
+                                                        title="Mở chi tiết sản phẩm"
+                                                    >
+                                                        {item.name}
+                                                        {item.daysOfStock !== undefined && ` · ${item.daysOfStock >= 999 ? '∞' : `${item.daysOfStock}d`}`}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
+                                {/* Top pagination */}
+                                {analysisPageCount > 1 && (
+                                    <div className="px-4 py-2 border-t border-tremor-border dark:border-dark-tremor-border flex items-center justify-between bg-tremor-background-muted/30 dark:bg-dark-tremor-background-muted/30">
+                                        <p className="text-xs text-tremor-content dark:text-dark-tremor-content">
+                                            Trang <span className="font-semibold text-tremor-content-strong dark:text-dark-tremor-content-strong">{analysisPage}</span> / {analysisPageCount} · {profitProducts.length} sản phẩm
+                                        </p>
+                                        <div className="flex items-center gap-1">
+                                            <TextButton onClick={() => setAnalysisPage((p) => Math.max(1, p - 1))} disabled={analysisPage <= 1} className="group">
+                                                <ChevronLeft className="size-4 text-tremor-content-emphasis" aria-hidden={true} />
+                                            </TextButton>
+                                            {analysisPageTokens.map((token, idx) => (
+                                                token === 'ellipsis' ? (
+                                                    <span key={`t-${idx}`} className="px-1.5 text-xs text-tremor-content">…</span>
+                                                ) : (
+                                                    <NumberButton key={token} onClick={() => setAnalysisPage(token)} active={analysisPage === token}>{token}</NumberButton>
+                                                )
+                                            ))}
+                                            <TextButton onClick={() => setAnalysisPage((p) => Math.min(analysisPageCount, p + 1))} disabled={analysisPage >= analysisPageCount} className="group">
+                                                <ChevronRight className="size-4 text-tremor-content-emphasis" aria-hidden={true} />
+                                            </TextButton>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="border-t border-tremor-border dark:border-dark-tremor-border overflow-x-auto">
                                     <Table>
                                         <TableHead>
@@ -702,8 +1207,12 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
-                                            {(profitData.products || []).slice(0, 20).map(p => (
-                                                <TableRow key={p.id} className="hover:bg-tremor-background-muted dark:hover:bg-dark-tremor-background-muted">
+                                            {analysisRows.map(p => (
+                                                <TableRow
+                                                    key={p.id}
+                                                    onClick={() => openProfitProductDetail(p)}
+                                                    className="hover:bg-tremor-background-muted dark:hover:bg-dark-tremor-background-muted cursor-pointer"
+                                                >
                                                     <TableCell>
                                                         <div>
                                                             <p className="font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong text-sm">{p.name}</p>
@@ -736,6 +1245,41 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                                             ))}
                                         </TableBody>
                                     </Table>
+                                </div>
+                                <div className="p-4 border-t border-tremor-border dark:border-dark-tremor-border bg-tremor-background-muted/30 dark:bg-dark-tremor-background-muted/30 flex items-center justify-between gap-3">
+                                    <p className="text-xs text-tremor-content dark:text-dark-tremor-content">
+                                        Hiển thị {analysisStartIndex}-{analysisEndIndex} / {profitProducts.length} sản phẩm
+                                    </p>
+
+                                    <div className="hidden sm:inline-flex items-center gap-1">
+                                        <TextButton onClick={() => setAnalysisPage((p) => Math.max(1, p - 1))} disabled={analysisPage <= 1} className="group">
+                                            <ChevronLeft className="size-5 text-tremor-content-emphasis group-hover:text-tremor-content-strong dark:text-dark-tremor-content-emphasis group-hover:dark:text-dark-tremor-content-strong" aria-hidden={true} />
+                                        </TextButton>
+
+                                        {analysisPageTokens.map((token, idx) => (
+                                            token === 'ellipsis' ? (
+                                                <span key={`ellipsis-${idx}`} className="px-2 text-tremor-content">...</span>
+                                            ) : (
+                                                <NumberButton key={token} onClick={() => setAnalysisPage(token)} active={analysisPage === token}>
+                                                    {token}
+                                                </NumberButton>
+                                            )
+                                        ))}
+
+                                        <TextButton onClick={() => setAnalysisPage((p) => Math.min(analysisPageCount, p + 1))} disabled={analysisPage >= analysisPageCount} className="group">
+                                            <ChevronRight className="size-5 text-tremor-content-emphasis group-hover:text-tremor-content-strong dark:text-dark-tremor-content-emphasis group-hover:dark:text-dark-tremor-content-strong" aria-hidden={true} />
+                                        </TextButton>
+                                    </div>
+
+                                    <div className="inline-flex sm:hidden items-center gap-1">
+                                        <MobileButton position="left" onClick={() => setAnalysisPage((p) => Math.max(1, p - 1))} disabled={analysisPage <= 1}>
+                                            <ChevronLeft className="size-5 text-tremor-content-emphasis group-hover:text-tremor-content-strong dark:text-dark-tremor-content-emphasis group-hover:dark:text-dark-tremor-content-strong" aria-hidden={true} />
+                                        </MobileButton>
+                                        <p className="text-xs px-2 text-tremor-content dark:text-dark-tremor-content">{analysisPage}/{analysisPageCount}</p>
+                                        <MobileButton position="right" onClick={() => setAnalysisPage((p) => Math.min(analysisPageCount, p + 1))} disabled={analysisPage >= analysisPageCount}>
+                                            <ChevronRight className="size-5 text-tremor-content-emphasis group-hover:text-tremor-content-strong dark:text-dark-tremor-content-emphasis group-hover:dark:text-dark-tremor-content-strong" aria-hidden={true} />
+                                        </MobileButton>
+                                    </div>
                                 </div>
                             </Card>
                         </>
@@ -855,6 +1399,13 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                     )}
                 </div>
             )}
+
+            <ProductDetailsModal
+                isOpen={!!selectedProfitProduct}
+                product={selectedProfitProduct?.product}
+                analysis={selectedProfitProduct?.analysis}
+                onClose={() => setSelectedProfitProduct(null)}
+            />
         </div>
     );
 };
