@@ -285,6 +285,7 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
     const [importCart, setImportCart] = useState([]);
     const [importSearch, setImportSearch] = useState('');
     const [selectedSupplier, setSelectedSupplier] = useState('');
+    const [supplierPriceMap, setSupplierPriceMap] = useState({}); // productId -> import_price
     const [importNote, setImportNote] = useState('');
     const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
     const [editingQty, setEditingQty] = useState(null);
@@ -610,10 +611,12 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
     }, [filteredProducts]);
 
     const addToImport = (p, qty = 1) => {
+        const supplierPrice = supplierPriceMap[p.id];
         setImportCart(prev => {
             const ex = prev.find(i => i.id === p.id);
             if (ex) return prev.map(i => i.id === p.id ? { ...i, quantity: i.quantity + qty } : i);
-            return [...prev, { ...p, quantity: qty, importPrice: p.cost_price || Math.round(p.price * 0.7) }];
+            const importPrice = supplierPrice ?? p.cost_price ?? Math.round(p.price * 0.7);
+            return [...prev, { ...p, quantity: qty, importPrice }];
         });
     };
 
@@ -688,6 +691,21 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
         if (typeof window === 'undefined') return;
         localStorage.setItem('ops_watchlist_product_ids', JSON.stringify(watchlistIds));
     }, [watchlistIds]);
+
+    // Load supplier product prices when supplier is selected
+    useEffect(() => {
+        if (!selectedSupplier) { setSupplierPriceMap({}); return; }
+        fetch(`${API_URL}/suppliers/${selectedSupplier}/products`, {
+            headers: { Authorization: `Bearer ${authToken}` }
+        })
+            .then(r => r.json())
+            .then(rows => {
+                const map = {};
+                rows.forEach(r => { map[r.product_id] = r.import_price; });
+                setSupplierPriceMap(map);
+            })
+            .catch(() => {});
+    }, [selectedSupplier, authToken]);
 
     // Auto-add recommendations to cart
     const addRecommendationsToCart = (recs) => {
@@ -909,7 +927,9 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                                     <div className="flex overflow-x-auto lg:grid lg:grid-cols-2 xl:grid-cols-4 gap-3 snap-x snap-mandatory pb-4 scrollbar-hide">
                                         {items.map(p => {
                                             const inCart = importCart.find(i => i.id === p.id);
-                                            const margin = p.cost_price && p.price ? ((p.price - p.cost_price) / p.price * 100).toFixed(0) : null;
+                                            const supplierPrice = supplierPriceMap[p.id];
+                                            const displayCost = supplierPrice ?? p.cost_price;
+                                            const margin = displayCost && p.price ? ((p.price - displayCost) / p.price * 100).toFixed(0) : null;
                                             return (
                                                 <div key={p.id}
                                                     className={classNames('snap-start shrink-0 w-[140px] sm:w-[150px] lg:w-auto lg:shrink-1 bg-tremor-background dark:bg-dark-tremor-background rounded-xl p-3 border-2 transition-all cursor-pointer hover:shadow-md flex flex-col',
@@ -927,6 +947,9 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                                                         <span>Tồn: {p.stock}</span>
                                                         {margin && <span className="text-emerald-600 font-semibold">· {margin}%</span>}
                                                     </div>
+                                                    {supplierPrice != null && (
+                                                        <p className="text-[10px] text-blue-600 font-bold -mt-1 mb-1.5">NCC: {fmt(supplierPrice)}</p>
+                                                    )}
                                                     <div className="mt-auto flex gap-1.5 pt-2">
                                                         <button onClick={() => addToImport(p)}
                                                             className="flex-1 bg-blue-100 text-blue-700 hover:bg-blue-600 hover:text-white text-[11px] py-1.5 rounded-lg font-bold active:scale-95 transition-all">+1</button>

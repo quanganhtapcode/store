@@ -220,6 +220,20 @@ const initDatabase = () => {
             created_at INTEGER NOT NULL
         )`);
 
+        // Supplier-Product catalogue (many-to-many with per-supplier price)
+        db.run(`CREATE TABLE IF NOT EXISTS supplier_products (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            supplier_id TEXT NOT NULL,
+            product_id TEXT NOT NULL,
+            import_price INTEGER NOT NULL DEFAULT 0,
+            note TEXT DEFAULT '',
+            updated_at INTEGER NOT NULL,
+            UNIQUE(supplier_id, product_id),
+            FOREIGN KEY(supplier_id) REFERENCES suppliers(id) ON DELETE CASCADE,
+            FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE
+        )`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_supplier_products_supplier ON supplier_products(supplier_id)`);
+
         // Add cost_price to order_items if not exists
         db.run(`ALTER TABLE order_items ADD COLUMN cost_price INTEGER DEFAULT 0`, (err) => {
             if (err && !err.message.includes('duplicate column')) {

@@ -220,10 +220,11 @@ app.get('/api/stats/profit-analysis', async (req, res) => {
         const products = await dbAll("SELECT id, name, brand, price, cost_price, stock, total_sold FROM products");
 
         // Get 30-day sales per product with FIFO cost from order_items
+        // Revenue uses effective price after distributing order-level discount proportionally
         const sales30d = await dbAll(`
-            SELECT oi.product_id, 
-                   SUM(oi.quantity) as qty_sold, 
-                   SUM(oi.price * oi.quantity) as revenue,
+            SELECT oi.product_id,
+                   SUM(oi.quantity) as qty_sold,
+                   SUM(oi.price * oi.quantity * CASE WHEN o.original_total > 0 THEN CAST(o.total AS REAL) / o.original_total ELSE 1.0 END) as revenue,
                    SUM(CASE WHEN oi.cost_price > 0 THEN oi.cost_price * oi.quantity ELSE 0 END) as total_cost_fifo,
                    SUM(CASE WHEN oi.cost_price > 0 THEN oi.quantity ELSE 0 END) as qty_with_cost
             FROM order_items oi

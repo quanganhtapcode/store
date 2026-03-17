@@ -115,4 +115,71 @@ router.get('/:id/stats', async (req, res) => {
     }
 });
 
+// ── SUPPLIER PRODUCTS ──────────────────────────────────────────────────────
+
+// GET products linked to a supplier (with their agreed import price)
+router.get('/:id/products', async (req, res) => {
+    try {
+        const rows = await dbAll(`
+            SELECT sp.id, sp.supplier_id, sp.product_id, sp.import_price, sp.note, sp.updated_at,
+                   p.name, p.brand, p.category, p.price as sell_price, p.stock, p.image, p.code, p.cost_price
+            FROM supplier_products sp
+            JOIN products p ON sp.product_id = p.id
+            WHERE sp.supplier_id = ?
+            ORDER BY p.brand, p.name
+        `, [req.params.id]);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// LINK / UPDATE a product to a supplier (upsert)
+router.post('/:id/products', verifyToken, async (req, res) => {
+    const { product_id, import_price, note } = req.body;
+    if (!product_id) return res.status(400).json({ error: 'product_id is required' });
+    try {
+        await dbRun(
+            `INSERT INTO supplier_products (supplier_id, product_id, import_price, note, updated_at)
+             VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(supplier_id, product_id) DO UPDATE SET
+               import_price = excluded.import_price,
+               note = excluded.note,
+               updated_at = excluded.updated_at`,
+            [req.params.id, product_id, import_price || 0, note || '', Date.now()]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// UPDATE import price for a linked product
+router.put('/:id/products/:productId', verifyToken, async (req, res) => {
+    const { import_price, note } = req.body;
+    try {
+        await dbRun(
+            `UPDATE supplier_products SET import_price = ?, note = ?, updated_at = ?
+             WHERE supplier_id = ? AND product_id = ?`,
+            [import_price || 0, note || '', Date.now(), req.params.id, req.params.productId]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// UNLINK a product from a supplier
+router.delete('/:id/products/:productId', verifyToken, async (req, res) => {
+    try {
+        await dbRun(
+            `DELETE FROM supplier_products WHERE supplier_id = ? AND product_id = ?`,
+            [req.params.id, req.params.productId]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;
