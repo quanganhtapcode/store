@@ -92,18 +92,29 @@ const ProductModal = ({ product, onClose, onSave, authToken, onLogout }) => {
         setDisplayValues(prev => ({ ...prev, [field]: value ? String(value) : '' }));
     };
 
-    const compressImage = (file, maxWidth = 800, quality = 0.7) => {
-        return new Promise((resolve) => {
+    const compressImage = (file) => {
+        return new Promise((resolve, reject) => {
             const reader = new FileReader();
+            reader.onerror = () => reject(new Error('Không đọc được file ảnh'));
             reader.onload = (e) => {
                 const img = new Image();
+                img.onerror = () => reject(new Error('Định dạng ảnh không được hỗ trợ'));
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
                     let width = img.width, height = img.height;
-                    if (width > maxWidth) { height = Math.round((height * maxWidth) / width); width = maxWidth; }
+                    const maxDim = 900;
+                    if (width > height && width > maxDim) { height = Math.round(height * maxDim / width); width = maxDim; }
+                    else if (height > maxDim) { width = Math.round(width * maxDim / height); height = maxDim; }
                     canvas.width = width; canvas.height = height;
                     canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-                    resolve(canvas.toDataURL('image/jpeg', quality));
+                    // Giảm chất lượng nếu ảnh vẫn quá lớn (> ~7MB base64)
+                    let quality = 0.8;
+                    let result = canvas.toDataURL('image/jpeg', quality);
+                    while (result.length > 7 * 1024 * 1024 && quality > 0.3) {
+                        quality -= 0.1;
+                        result = canvas.toDataURL('image/jpeg', quality);
+                    }
+                    resolve(result);
                 };
                 img.src = e.target.result;
             };
@@ -114,8 +125,12 @@ const ProductModal = ({ product, onClose, onSave, authToken, onLogout }) => {
     const handleImageChange = async (e) => {
         const file = e.target.files[0];
         if (file) {
-            const compressed = await compressImage(file);
-            setFormData({ ...formData, image: compressed });
+            try {
+                const compressed = await compressImage(file);
+                setFormData({ ...formData, image: compressed });
+            } catch (err) {
+                alert('Không thể đọc ảnh: ' + err.message + '\nVui lòng dùng định dạng JPG, PNG hoặc WebP.');
+            }
         }
     };
 
