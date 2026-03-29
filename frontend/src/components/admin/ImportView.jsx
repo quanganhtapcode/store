@@ -693,7 +693,7 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
         setImportCart(prev => {
             const ex = prev.find(i => i.id === p.id);
             if (ex) return prev.map(i => i.id === p.id ? { ...i, quantity: i.quantity + qty } : i);
-            const importPrice = supplierPrice ?? p.cost_price ?? Math.round(p.price * 0.7);
+            const importPrice = supplierPrice != null ? supplierPrice : (p.cost_price > 0 ? p.cost_price : Math.round(p.price * 0.7));
             return [...prev, { ...p, quantity: qty, importPrice }];
         });
     };
@@ -831,12 +831,17 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
             {viewMode === 'import' && (
                 <>
                 {/* ── Step 1: Supplier picker overlay ── */}
-                {!selectedSupplier && (
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                        <div className="bg-white dark:bg-dark-tremor-background rounded-2xl shadow-2xl w-full max-w-md">
-                            <div className="p-6 border-b border-tremor-border dark:border-dark-tremor-border">
-                                <h3 className="font-bold text-lg text-tremor-content-strong dark:text-dark-tremor-content-strong">Chọn nhà cung cấp</h3>
-                                <p className="text-sm text-tremor-content mt-0.5">Chọn NCC để xem sản phẩm và giá nhập của họ</p>
+                {showSupplierDropdown && !selectedSupplier && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowSupplierDropdown(false)}>
+                        <div className="bg-white dark:bg-dark-tremor-background rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+                            <div className="p-6 border-b border-tremor-border dark:border-dark-tremor-border flex items-center justify-between">
+                                <div>
+                                    <h3 className="font-bold text-lg text-tremor-content-strong dark:text-dark-tremor-content-strong">Chọn nhà cung cấp</h3>
+                                    <p className="text-sm text-tremor-content mt-0.5">Chọn NCC để xem sản phẩm và giá nhập của họ</p>
+                                </div>
+                                <button onClick={() => setShowSupplierDropdown(false)} className="p-2 rounded-xl hover:bg-tremor-background-muted dark:hover:bg-dark-tremor-background-muted transition-colors">
+                                    <X size={18} />
+                                </button>
                             </div>
                             <div className="p-4 max-h-[60vh] overflow-y-auto space-y-2">
                                 {suppliers.length === 0 ? (
@@ -847,7 +852,7 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                                     </div>
                                 ) : (
                                     suppliers.map(s => (
-                                        <button key={s.id} onClick={() => setSelectedSupplier(s.id)}
+                                        <button key={s.id} onClick={() => { setSelectedSupplier(s.id); setShowSupplierDropdown(false); }}
                                             className="w-full flex items-center gap-3 p-4 rounded-xl border border-tremor-border dark:border-dark-tremor-border hover:border-tremor-brand hover:bg-blue-50 dark:hover:bg-dark-tremor-background-muted transition-all text-left">
                                             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0">
                                                 {s.name.charAt(0).toUpperCase()}
@@ -865,26 +870,45 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                     </div>
                 )}
 
-                {/* ── Step 2: Import form with supplier's products ── */}
-                {selectedSupplier && (
+                {/* ── Step 2: Import form ── */}
                 <div className="flex flex-col lg:grid lg:grid-cols-5 gap-5">
                     {/* Left: Cart */}
                     <div className="lg:col-span-2 space-y-4">
                         {/* Supplier header + change */}
                         <div className="bg-white dark:bg-dark-tremor-background rounded-tremor-default border border-tremor-border dark:border-dark-tremor-border p-4 shadow-sm flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0">
-                                    {suppliers.find(s => s.id === selectedSupplier)?.name.charAt(0).toUpperCase()}
-                                </div>
-                                <div>
-                                    <p className="text-xs text-tremor-content uppercase tracking-wider font-semibold">Nhà cung cấp</p>
-                                    <p className="font-bold text-tremor-content-strong dark:text-dark-tremor-content-strong text-sm">{suppliers.find(s => s.id === selectedSupplier)?.name}</p>
-                                </div>
-                            </div>
-                            <button onClick={() => { setSelectedSupplier(''); setImportCart([]); }}
-                                className="text-xs text-tremor-content hover:text-red-500 font-semibold px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors">
-                                Đổi NCC
-                            </button>
+                            {selectedSupplier ? (
+                                <>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0">
+                                            {suppliers.find(s => s.id === selectedSupplier)?.name.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-tremor-content uppercase tracking-wider font-semibold">Nhà cung cấp</p>
+                                            <p className="font-bold text-tremor-content-strong dark:text-dark-tremor-content-strong text-sm">{suppliers.find(s => s.id === selectedSupplier)?.name}</p>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => { setSelectedSupplier(''); setImportCart([]); setShowSupplierDropdown(true); }}
+                                        className="text-xs text-tremor-content hover:text-red-500 font-semibold px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors">
+                                        Đổi NCC
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-9 h-9 bg-tremor-background-muted dark:bg-dark-tremor-background-muted rounded-xl flex items-center justify-center shrink-0">
+                                            <Truck size={16} className="text-tremor-content" />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-tremor-content uppercase tracking-wider font-semibold">Nhà cung cấp</p>
+                                            <p className="text-sm text-tremor-content dark:text-dark-tremor-content">Chưa chọn</p>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setShowSupplierDropdown(true)}
+                                        className="text-xs text-tremor-brand font-semibold px-3 py-1.5 rounded-lg hover:bg-blue-50 border border-blue-200 transition-colors">
+                                        Chọn NCC
+                                    </button>
+                                </>
+                            )}
                         </div>
 
                         {/* Cart */}
@@ -1005,6 +1029,17 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
 
                     {/* Right: Supplier's products only */}
                     <div className="lg:col-span-3 space-y-4">
+                        {!selectedSupplier ? (
+                            <div className="text-center py-20 bg-tremor-background-muted dark:bg-dark-tremor-background-muted rounded-2xl">
+                                <Truck size={48} className="mx-auto mb-3 opacity-20" />
+                                <p className="font-semibold text-tremor-content">Chưa chọn nhà cung cấp</p>
+                                <p className="text-sm text-tremor-content mt-1 mb-4">Chọn NCC để xem sản phẩm và giá nhập</p>
+                                <button onClick={() => setShowSupplierDropdown(true)}
+                                    className="inline-flex items-center gap-2 bg-tremor-brand text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all active:scale-[0.97]">
+                                    <Plus size={16} /> Chọn NCC
+                                </button>
+                            </div>
+                        ) : (<>
                         <div className="flex items-center justify-between">
                             <div className="relative flex-1 mr-3">
                                 <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-tremor-content" />
@@ -1068,9 +1103,9 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                                     })}
                             </div>
                         )}
+                    </>)}
                     </div>
                 </div>
-                )}
 
                 {/* ── Add product to supplier modal ── */}
                 {showAddToSupplier && (
@@ -1110,7 +1145,7 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                                                 .filter(p => !supplierPriceMap[p.id] && (p.name?.toLowerCase().includes(addToSupplierSearch.toLowerCase()) || p.brand?.toLowerCase().includes(addToSupplierSearch.toLowerCase())))
                                                 .slice(0, 6)
                                                 .map(p => (
-                                                    <button key={p.id} onClick={() => { setAddToSupplierSelected(p); setAddToSupplierSearch(p.name); }}
+                                                    <button key={p.id} onClick={() => { setAddToSupplierSelected(p); setAddToSupplierSearch(p.name); if (p.cost_price > 0) setAddToSupplierPrice(String(p.cost_price)); }}
                                                         className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-dark-tremor-background-muted text-left transition-colors">
                                                         <span className="text-sm font-semibold text-tremor-content-strong dark:text-dark-tremor-content-strong truncate">{p.name}</span>
                                                         <span className="text-xs text-tremor-content ml-auto shrink-0">{p.brand}</span>
