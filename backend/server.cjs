@@ -15,7 +15,7 @@ const { verifyOTP, getQRCode } = require('./utils/otp');
 
 // --- Init App ---
 const app = express();
-const port = 3001;
+const port = process.env.PORT === undefined ? 3001 : Number(process.env.PORT);
 
 // --- Middlewares ---
 const allowedOrigins = [
@@ -70,6 +70,7 @@ app.use('/api/products', require('./routes/products'));
 app.use('/api/orders', require('./routes/orders'));
 app.use('/api/stats', require('./routes/stats'));
 app.use('/api/suppliers', require('./routes/suppliers'));
+app.use('/api/analytics', require('./routes/analytics'));
 
 // Reports route (with DB init)
 const reportsRoute = require('./routes/reports');
@@ -380,6 +381,10 @@ app.post('/api/products/import-csv', verifyToken, upload.single('file'), (req, r
 });
 
 // --- START SERVER ---
-app.listen(port, '0.0.0.0', () => {
-    console.log(`🚀 Cát Hải Server running at port ${port}`);
+const server = app.listen(port, '0.0.0.0', () => {
+    const address = server.address();
+    const actualPort = typeof address === 'object' && address ? address.port : port;
+    console.log(`🚀 Cát Hải Server running at port ${actualPort}`);
 });
+
+module.exports = { app, server };
