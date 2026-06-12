@@ -688,6 +688,41 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
         return grouped;
     }, [filteredProducts]);
 
+    const selectedSupplierData = useMemo(
+        () => suppliers.find(s => s.id === selectedSupplier),
+        [selectedSupplier, suppliers]
+    );
+
+    const productPickerItems = useMemo(() => {
+        const searchNorm = normalizeText(importSearch);
+
+        if (!selectedSupplier) return filteredProducts;
+
+        return supplierProductsList
+            .map((supplierProduct) => {
+                const fullProduct = products.find(p => p.id === supplierProduct.product_id) || {};
+                return {
+                    ...fullProduct,
+                    ...supplierProduct,
+                    id: supplierProduct.product_id,
+                    name: supplierProduct.name || fullProduct.name,
+                    brand: supplierProduct.brand || fullProduct.brand,
+                    image: supplierProduct.image || fullProduct.image,
+                    price: supplierProduct.sell_price ?? fullProduct.price,
+                    cost_price: supplierProduct.import_price ?? fullProduct.cost_price,
+                    stock: supplierProduct.stock ?? fullProduct.stock,
+                    units_per_case: fullProduct.units_per_case || supplierProduct.units_per_case || 1,
+                    supplierImportPrice: supplierProduct.import_price,
+                };
+            })
+            .filter(p => {
+                if (!searchNorm.trim()) return true;
+                return normalizeText(p.name).includes(searchNorm) ||
+                    normalizeText(p.brand).includes(searchNorm) ||
+                    (p.code && p.code.includes(importSearch));
+            });
+    }, [filteredProducts, importSearch, products, selectedSupplier, supplierProductsList]);
+
     const addToImport = (p, qty = 1) => {
         const supplierPrice = supplierPriceMap[p.id];
         setImportCart(prev => {
@@ -831,7 +866,7 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
             {viewMode === 'import' && (
                 <>
                 {/* ── Step 1: Supplier picker overlay ── */}
-                {showSupplierDropdown && !selectedSupplier && (
+                {showSupplierDropdown && (
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowSupplierDropdown(false)}>
                         <div className="bg-white dark:bg-dark-tremor-background rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
                             <div className="p-6 border-b border-tremor-border dark:border-dark-tremor-border flex items-center justify-between">
@@ -1027,23 +1062,37 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                         </div>
                     </div>
 
-                    {/* Right: Supplier's products only */}
+                    {/* Right: Product picker */}
                     <div className="lg:col-span-3 space-y-4">
-                        {!selectedSupplier ? (
-                            <div className="text-center py-20 bg-tremor-background-muted dark:bg-dark-tremor-background-muted rounded-2xl">
-                                <Truck size={48} className="mx-auto mb-3 opacity-20" />
-                                <p className="font-semibold text-tremor-content">Chưa chọn nhà cung cấp</p>
-                                <p className="text-sm text-tremor-content mt-1 mb-4">Chọn NCC để xem sản phẩm và giá nhập</p>
-                                <button onClick={() => setShowSupplierDropdown(true)}
-                                    className="inline-flex items-center gap-2 bg-tremor-brand text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all active:scale-[0.97]">
-                                    <Plus size={16} /> Chọn NCC
-                                </button>
+                        <div className="bg-white dark:bg-dark-tremor-background border border-tremor-border dark:border-dark-tremor-border rounded-2xl p-4 shadow-sm">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div>
+                                    <h3 className="text-base font-bold text-tremor-content-strong dark:text-dark-tremor-content-strong">Chọn sản phẩm</h3>
+                                    <p className="text-xs text-tremor-content mt-0.5">
+                                        {selectedSupplierData
+                                            ? `Đang dùng bảng giá của ${selectedSupplierData.name}`
+                                            : 'Nhập nhanh từ toàn bộ danh mục. Có thể chọn NCC nếu cần bảng giá riêng.'}
+                                    </p>
+                                </div>
+                                <div className="flex gap-2">
+                                    {selectedSupplier ? (
+                                        <button onClick={() => { setSelectedSupplier(''); setSupplierPriceMap({}); setSupplierProductsList([]); }}
+                                            className="px-3 py-2 rounded-xl bg-tremor-background-muted dark:bg-dark-tremor-background-muted text-xs font-bold text-tremor-content-strong dark:text-dark-tremor-content-strong hover:bg-red-50 hover:text-red-600 transition-colors">
+                                            Bỏ lọc NCC
+                                        </button>
+                                    ) : null}
+                                    <button onClick={() => setShowSupplierDropdown(true)}
+                                        className="px-3 py-2 rounded-xl border border-blue-200 text-xs font-bold text-tremor-brand hover:bg-blue-50 transition-colors">
+                                        {selectedSupplier ? 'Đổi NCC' : 'Chọn NCC'}
+                                    </button>
+                                </div>
                             </div>
-                        ) : (<>
-                        <div className="flex items-center justify-between">
+                        </div>
+
+                        <div className="flex items-center justify-between gap-3">
                             <div className="relative flex-1 mr-3">
                                 <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-tremor-content" />
-                                <input type="text" placeholder="Tìm trong sản phẩm của NCC..." value={importSearch}
+                                <input type="text" placeholder={selectedSupplier ? 'Tìm trong sản phẩm của NCC...' : 'Tìm sản phẩm theo tên, hãng hoặc mã vạch...'} value={importSearch}
                                     onChange={e => setImportSearch(e.target.value)}
                                     className="w-full bg-tremor-background dark:bg-dark-tremor-background pl-12 pr-10 py-3 rounded-tremor-default text-sm font-medium outline-none border border-tremor-border focus:border-tremor-brand transition-all dark:border-dark-tremor-border dark:text-dark-tremor-content-strong" />
                                 {importSearch && (
@@ -1052,31 +1101,32 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                                     </button>
                                 )}
                             </div>
-                            <button onClick={() => { setShowAddToSupplier(true); setAddToSupplierSearch(''); setAddToSupplierSelected(null); setAddToSupplierPrice(''); }}
+                            {selectedSupplier && <button onClick={() => { setShowAddToSupplier(true); setAddToSupplierSearch(''); setAddToSupplierSelected(null); setAddToSupplierPrice(''); }}
                                 className="flex items-center gap-2 bg-tremor-brand text-white px-4 py-3 rounded-tremor-default font-bold text-sm shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all active:scale-[0.97] shrink-0">
                                 <Plus size={16} /> Thêm SP
-                            </button>
+                            </button>}
                         </div>
 
-                        {supplierProductsList.length === 0 ? (
+                        {productPickerItems.length === 0 ? (
                             <div className="text-center py-16 bg-tremor-background-muted dark:bg-dark-tremor-background-muted rounded-2xl">
                                 <Package size={48} className="mx-auto mb-3 opacity-30" />
-                                <p className="font-semibold text-tremor-content">Chưa có sản phẩm nào</p>
-                                <p className="text-sm text-tremor-content mt-1">Nhấn "Thêm SP" để thêm sản phẩm vào NCC này</p>
+                                <p className="font-semibold text-tremor-content">Không có sản phẩm phù hợp</p>
+                                <p className="text-sm text-tremor-content mt-1">
+                                    {selectedSupplier ? 'NCC này chưa có sản phẩm hoặc không khớp tìm kiếm.' : 'Thử đổi từ khóa tìm kiếm.'}
+                                </p>
                             </div>
                         ) : (
                             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 lg:max-h-[70vh] lg:overflow-y-auto scrollbar-hide">
-                                {supplierProductsList
-                                    .filter(p => !importSearch || p.name?.toLowerCase().includes(importSearch.toLowerCase()) || p.brand?.toLowerCase().includes(importSearch.toLowerCase()))
+                                {productPickerItems
                                     .map(p => {
-                                        const fullProduct = products.find(fp => fp.id === p.product_id) || p;
-                                        const inCart = importCart.find(i => i.id === p.product_id);
-                                        const margin = p.sell_price > 0 && p.import_price > 0 ? ((p.sell_price - p.import_price) / p.sell_price * 100).toFixed(0) : null;
+                                        const inCart = importCart.find(i => i.id === p.id);
+                                        const importPrice = p.supplierImportPrice ?? p.cost_price ?? Math.round((p.price || 0) * 0.7);
+                                        const margin = p.price > 0 && importPrice > 0 ? ((p.price - importPrice) / p.price * 100).toFixed(0) : null;
                                         return (
-                                            <div key={p.product_id}
+                                            <div key={p.id}
                                                 className={classNames('bg-tremor-background dark:bg-dark-tremor-background rounded-xl p-3 border-2 transition-all hover:shadow-md flex flex-col',
                                                     inCart ? 'border-tremor-brand shadow-lg shadow-blue-500/10' : 'border-tremor-border dark:border-dark-tremor-border')}>
-                                                <div className="h-24 bg-tremor-background-muted dark:bg-dark-tremor-background-muted rounded-lg flex items-center justify-center overflow-hidden mb-3 relative cursor-pointer" onClick={() => addToImport({ ...fullProduct, id: p.product_id, price: p.sell_price, cost_price: p.import_price })}>
+                                                <div className="h-24 bg-tremor-background-muted dark:bg-dark-tremor-background-muted rounded-lg flex items-center justify-center overflow-hidden mb-3 relative cursor-pointer" onClick={() => addToImport({ ...p, cost_price: importPrice })}>
                                                     {p.image ? <img src={getImageUrl(p.image)} loading="lazy" className="w-full h-full object-cover" /> : <ImageIcon size={24} className="text-tremor-content-subtle" />}
                                                     {inCart && (
                                                         <div className="absolute top-1 right-1 bg-tremor-brand text-white text-[10px] w-6 h-6 rounded-full font-bold flex items-center justify-center shadow-lg">
@@ -1086,16 +1136,16 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                                                 </div>
                                                 <p className="font-bold text-[11px] text-tremor-content-strong dark:text-dark-tremor-content-strong line-clamp-1 mb-0.5">{p.name}</p>
                                                 <div className="flex items-center gap-1 text-[10px] text-tremor-content mb-1">
-                                                    <span>Tồn: {p.stock ?? fullProduct.stock}</span>
+                                                    <span>Tồn: {p.stock ?? 0}</span>
                                                     {margin && <span className={parseFloat(margin) >= 20 ? 'text-emerald-600 font-bold' : 'text-yellow-600 font-bold'}>· {margin}%</span>}
                                                 </div>
-                                                <p className="text-[10px] text-blue-600 dark:text-blue-400 font-bold mb-2">Nhập: {fmt(p.import_price)}</p>
+                                                <p className="text-[10px] text-blue-600 dark:text-blue-400 font-bold mb-2">Nhập: {fmt(importPrice)}</p>
                                                 <div className="mt-auto flex gap-1.5">
-                                                    <button onClick={() => addToImport({ ...fullProduct, id: p.product_id, price: p.sell_price, cost_price: p.import_price })}
+                                                    <button onClick={() => addToImport({ ...p, cost_price: importPrice })}
                                                         className="flex-1 bg-blue-100 text-blue-700 hover:bg-blue-600 hover:text-white text-[11px] py-1.5 rounded-lg font-bold active:scale-95 transition-all">+1</button>
-                                                    {(fullProduct.units_per_case > 1) && (
-                                                        <button onClick={() => addToImport({ ...fullProduct, id: p.product_id, price: p.sell_price, cost_price: p.import_price }, fullProduct.units_per_case)}
-                                                            className="flex-1 bg-emerald-100 text-emerald-700 hover:bg-emerald-600 hover:text-white text-[11px] py-1.5 rounded-lg font-bold active:scale-95 transition-all">+{fullProduct.units_per_case}</button>
+                                                    {(p.units_per_case > 1) && (
+                                                        <button onClick={() => addToImport({ ...p, cost_price: importPrice }, p.units_per_case)}
+                                                            className="flex-1 bg-emerald-100 text-emerald-700 hover:bg-emerald-600 hover:text-white text-[11px] py-1.5 rounded-lg font-bold active:scale-95 transition-all">+{p.units_per_case}</button>
                                                     )}
                                                 </div>
                                             </div>
@@ -1103,7 +1153,6 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                                     })}
                             </div>
                         )}
-                    </>)}
                     </div>
                 </div>
 
