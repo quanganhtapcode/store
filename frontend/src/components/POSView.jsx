@@ -45,9 +45,11 @@ const POSView = ({
     const [showCartDetail, setShowCartDetail] = useState(false);
     const [showPaymentChoice, setShowPaymentChoice] = useState(false);
 
+    const availableProducts = useMemo(() => products.filter(p => Number(p.stock || 0) > 0), [products]);
+
     const expandedProducts = useMemo(() => {
         const result = [];
-        products.forEach(p => {
+        availableProducts.forEach(p => {
             result.push({
                 ...p,
                 saleType: 'unit',
@@ -68,7 +70,7 @@ const POSView = ({
             }
         });
         return result;
-    }, [products]);
+    }, [availableProducts]);
 
     const productsByBrand = useMemo(() => {
         const groups = {};
@@ -214,7 +216,7 @@ const POSView = ({
                 </div>
 
                 <div className="flex gap-2.5 overflow-x-auto scrollbar-hide mt-3.5 py-1">
-                    {['Tất cả', ...new Set(products.map(p => p.category))].map(c => (
+                    {['Tất cả', ...new Set(availableProducts.map(p => p.category))].map(c => (
                         <button
                             key={c}
                             onClick={() => setSelectedCategory(c)}

@@ -92,11 +92,30 @@ router.put('/:id', verifyToken, async (req, res) => {
 
 // DELETE PRODUCT
 router.delete('/:id', verifyToken, async (req, res) => {
+    const { id } = req.params;
+
     try {
-        await dbRun("DELETE FROM products WHERE id = ?", [req.params.id]);
-        logActivity('DELETE_PRODUCT', `Deleted product ${req.params.id}`);
-        res.json({ success: true });
+        const product = await dbGet("SELECT id, name, image FROM products WHERE id = ?", [id]);
+        if (!product) return res.status(404).json({ error: 'Sản phẩm không tồn tại' });
+
+        await dbRun('BEGIN TRANSACTION');
+
+        await dbRun("DELETE FROM supplier_products WHERE product_id = ?", [id]);
+        await dbRun("DELETE FROM inventory_batches WHERE product_id = ?", [id]);
+        await dbRun("DELETE FROM order_items WHERE product_id = ?", [id]);
+        const result = await dbRun("DELETE FROM products WHERE id = ?", [id]);
+
+        await dbRun('COMMIT');
+
+        if (product.image && product.image.startsWith('/images/')) {
+            const imagePath = path.join(__dirname, '../public', product.image);
+            fs.unlink(imagePath, () => { });
+        }
+
+        logActivity('DELETE_PRODUCT', `Deleted product ${id} (${product.name})`);
+        res.json({ success: true, deleted: result.changes });
     } catch (err) {
+        await dbRun('ROLLBACK').catch(() => { });
         res.status(500).json({ error: err.message });
     }
 });
