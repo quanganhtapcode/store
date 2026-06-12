@@ -905,6 +905,25 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                     </div>
                 )}
 
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {[
+                        { step: '1', title: 'Chọn hàng', desc: 'Tìm toàn bộ sản phẩm hoặc lọc theo NCC', icon: Search },
+                        { step: '2', title: 'Kiểm tra phiếu', desc: 'Sửa số lượng và giá nhập ngay bên trái', icon: FileText },
+                        { step: '3', title: 'Xác nhận', desc: 'Lưu phiếu để cập nhật tồn kho', icon: CheckCircle },
+                    ].map(item => (
+                        <div key={item.step} className="bg-white dark:bg-dark-tremor-background border border-tremor-border dark:border-dark-tremor-border rounded-2xl p-4 flex items-start gap-3 shadow-sm">
+                            <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                                <item.icon size={17} />
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-[11px] font-black uppercase tracking-wider text-tremor-brand">Bước {item.step}</p>
+                                <h3 className="text-sm font-bold text-tremor-content-strong dark:text-dark-tremor-content-strong">{item.title}</h3>
+                                <p className="text-xs text-tremor-content mt-0.5">{item.desc}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
                 {/* ── Step 2: Import form ── */}
                 <div className="flex flex-col lg:grid lg:grid-cols-5 gap-5">
                     {/* Left: Cart */}
@@ -935,7 +954,7 @@ const ImportView = ({ subView, setActiveTab, products, suppliers, refreshData, a
                                         </div>
                                         <div>
                                             <p className="text-xs text-tremor-content uppercase tracking-wider font-semibold">Nhà cung cấp</p>
-                                            <p className="text-sm text-tremor-content dark:text-dark-tremor-content">Chưa chọn</p>
+                                            <p className="text-sm text-tremor-content dark:text-dark-tremor-content">Tùy chọn, có thể nhập nhanh không cần NCC</p>
                                         </div>
                                     </div>
                                     <button onClick={() => setShowSupplierDropdown(true)}
