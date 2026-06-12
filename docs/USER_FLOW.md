@@ -1,6 +1,6 @@
-# 🔄 User Flow - Gemini POS
+# 🔄 User Flow - Cát Hải POS
 
-Tài liệu mô tả chi tiết luồng hoạt động của người dùng trong hệ thống Gemini POS.
+Tài liệu mô tả chi tiết luồng hoạt động của người dùng trong hệ thống Cát Hải POS.
 
 ---
 

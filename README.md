@@ -1,4 +1,4 @@
-# 🛒 Gemini POS - Hệ thống Bán hàng Chuyên nghiệp
+# 🛒 Cát Hải POS - Hệ thống Bán hàng Chuyên nghiệp
 
 Hệ thống Point of Sale (POS) hiện đại với giao diện Apple-style, được thiết kế cho các cửa hàng bán lẻ.
 
@@ -12,7 +12,7 @@ Hệ thống Point of Sale (POS) hiện đại với giao diện Apple-style, đ
 ## 📁 Cấu trúc Dự án
 
 ```
-gemini-pos/
+cat-hai-pos/
 ├── 📂 frontend/                 # React + Vite Frontend
 │   ├── 📂 src/
 │   │   ├── 📂 components/       # React Components
@@ -70,7 +70,7 @@ gemini-pos/
 
 ```bash
 git clone <repo-url>
-cd gemini-pos
+cd cat-hai-pos
 
 # Cài đặt Backend
 cd backend

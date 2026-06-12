@@ -1,8 +1,8 @@
 {
-    "name": "gemini-pos-backend",
+    "name": "cat-hai-pos-backend",
     "private": true,
     "version": "1.0.0",
-    "description": "Backend Express.js API cho hệ thống POS Gemini",
+    "description": "Backend Express.js API cho hệ thống POS Cát Hải",
     "main": "server.cjs",
     "scripts": {
         "start": "node server.cjs",

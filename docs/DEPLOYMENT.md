@@ -1,13 +1,13 @@
-# 🚀 Deployment Guide - Gemini POS (Cát Hải Store)
+# 🚀 Deployment Guide - Cát Hải POS
 
 *Cập nhật lần cuối: 2026-01-08*
 
-Tài liệu hướng dẫn deploy và cấu trúc hệ thống Gemini POS trên VPS.
+Tài liệu hướng dẫn deploy và cấu trúc hệ thống Cát Hải POS trên VPS.
 
 ---
 
 ## 📋 Tổng quan Kiến trúc
-Hệ thống Backend đã được **chuẩn hóa** về thư mục `/var/www/store` (thay vì `/root/gemini-pos-api` cũ) để tăng cường bảo mật và dễ quản lý.
+Hệ thống Backend đã được **chuẩn hóa** về thư mục `/var/www/store` (thay vì `/root/cat-hai-pos-api` cũ) để tăng cường bảo mật và dễ quản lý.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐

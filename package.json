@@ -1,7 +1,7 @@
 {
-  "name": "gemini-pos",
+  "name": "cat-hai-pos",
   "version": "1.0.0",
-  "description": "Hệ thống Point of Sale (POS) hiện đại với giao diện Apple-style",
+  "description": "Hệ thống Point of Sale (POS) Cát Hải hiện đại với giao diện Apple-style",
   "private": true,
   "type": "module",
   "scripts": {

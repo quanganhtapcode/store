@@ -1,12 +1,12 @@
-# 🤖 AI Development Guide - Gemini POS
+# 🤖 AI Development Guide - Cát Hải POS
 
-Tài liệu này dành cho các AI assistant (Claude, GPT, Gemini, etc.) hiểu cách làm việc với codebase Gemini POS.
+Tài liệu này dành cho các AI assistant (Claude, GPT, etc.) hiểu cách làm việc với codebase Cát Hải POS.
 
 ---
 
 ## 📁 Cấu trúc Dự án
 
-gemini-pos/
+cat-hai-pos/
 ├── frontend/           # React + Vite (Deploy: Vercel)
 │   └── src/
 │       ├── components/

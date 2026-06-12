@@ -1,8 +1,8 @@
 {
-    "name": "gemini-pos-frontend",
+    "name": "cat-hai-pos-frontend",
     "private": true,
     "version": "1.0.0",
-    "description": "Frontend React + Vite cho hệ thống POS Gemini",
+    "description": "Frontend React + Vite cho hệ thống POS Cát Hải",
     "type": "module",
     "scripts": {
         "dev": "vite",

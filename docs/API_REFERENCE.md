@@ -1,6 +1,6 @@
-# 🔌 API Reference - Gemini POS
+# 🔌 API Reference - Cát Hải POS
 
-Tài liệu chi tiết về tất cả API endpoints của hệ thống Gemini POS.
+Tài liệu chi tiết về tất cả API endpoints của hệ thống Cát Hải POS.
 
 ---
 

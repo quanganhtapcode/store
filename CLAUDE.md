@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Gemini POS** is a Point-of-Sale system with a React+Vite frontend (deployed on Vercel) and an Express.js backend with SQLite (deployed on VPS).
+**Cát Hải POS** is a Point-of-Sale system with a React+Vite frontend (deployed on Vercel) and an Express.js backend with SQLite (deployed on VPS).
 
 - **Production frontend:** `store-six-fawn.vercel.app`
 - **Production backend:** `api.quanganh.org/v1/store`

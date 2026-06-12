@@ -1,6 +1,6 @@
-# 📊 Database Schema - Gemini POS
+# 📊 Database Schema - Cát Hải POS
 
-Tài liệu mô tả chi tiết cấu trúc cơ sở dữ liệu SQLite cho hệ thống Gemini POS.
+Tài liệu mô tả chi tiết cấu trúc cơ sở dữ liệu SQLite cho hệ thống Cát Hải POS.
 
 ---
 
@@ -274,7 +274,7 @@ CREATE TABLE import_notes (
 ## 📍 Vị trí Database
 
 ```
-gemini-pos/
+cat-hai-pos/
 └── database/
     └── pos.db          # File SQLite chính
 ```
